@@ -1,0 +1,87 @@
+# Official documentation at http://goreleaser.com
+project_name: github-go
+builds:
+- env:
+  - CGO_ENABLED=0
+  binary: github-go
+  goarch:
+    - amd64
+    - arm64
+  goos:
+    - windows
+    - linux
+    - darwin
+  hooks:
+    post:
+      - upx "{{ .Path }}"
+  ldflags:
+    - -X github.com/linuxsuren/cgit/app.version={{.Version}}
+    - -X github.com/linuxsuren/cgit/app.commit={{.ShortCommit}}
+    - -X github.com/linuxsuren/cgit/app.date={{.Date}}
+    - -w
+dist: release
+archives:
+- name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
+  replacements:
+    darwin: darwin
+    linux: linux
+    windows: windows
+    amd64: amd64
+    arm64: arm64
+  format_overrides:
+    - goos: windows
+      format: zip
+  files:
+    - README.md
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next-{{.ShortCommit}}"
+changelog:
+  skip: true
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
+brews:
+  -
+    name: github-go
+    tap:
+      owner: linuxsuren
+      name: homebrew-linuxsuren
+    folder: Formula
+    homepage: "https://github.com/linuxsuren/github-go"
+    description: cgit is a tiny tool for Chinese developers.
+    dependencies:
+      - name: vim
+        type: optional
+      - name: bash-completion
+        type: optional
+    test: |
+      version_output = shell_output("#{bin}/github-go version")
+      assert_match version.to_s, version_output
+    install: |
+      bin.install name
+
+      prefix.install_metafiles
+nfpms:
+  - file_name_template: "{{ .Binary }}-{{.Os}}-{{.Arch}}"
+    homepage: https://github.com/linuxsuren/github-go
+    description: cgit is a tiny tool for Chinese developers.
+    maintainer: rick <rick@jenkins-zh.cn>
+    license: MIT
+    vendor: Jenkins
+    formats:
+      - deb
+      - rpm
+    recommends:
+      - bash-completion
+      - vim
+    bindir: /usr/bin
+    replacements:
+      amd64: 64bit
+      arm64: arm64
+      darwin: macOS
+      linux: linux
+      windows: windows
