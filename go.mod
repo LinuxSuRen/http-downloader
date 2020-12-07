@@ -1,4 +1,4 @@
-module github.com/linuxsuren/github-go
+module github.com/linuxsuren/http-downloader
 
 go 1.15
 
