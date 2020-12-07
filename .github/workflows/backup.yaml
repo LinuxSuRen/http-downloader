@@ -15,4 +15,4 @@ jobs:
       uses: jenkins-zh/git-backup-actions@v0.0.4
       env:
         GIT_DEPLOY_KEY: ${{ secrets.GIT_DEPLOY_KEY }}
-        TARGET_GIT: "git@gitee.com:linuxsuren/github-go.git"
+        TARGET_GIT: "git@gitee.com:linuxsuren/http-downloader.git"

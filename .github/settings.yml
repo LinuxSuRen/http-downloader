@@ -1,5 +1,5 @@
 repository:
-  name: github-go
+  name: http-downloader
   description: This is a template project
   homepage: https://github.com/linuxsuren
   private: false

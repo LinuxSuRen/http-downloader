@@ -1,9 +1,9 @@
 # Official documentation at http://goreleaser.com
-project_name: github-go
+project_name: http-downloader
 builds:
 - env:
   - CGO_ENABLED=0
-  binary: github-go
+  binary: http-downloader
   goarch:
     - amd64
     - arm64
@@ -46,12 +46,12 @@ changelog:
     - '^test:'
 brews:
   -
-    name: github-go
+    name: http-downloader
     tap:
       owner: linuxsuren
       name: homebrew-linuxsuren
     folder: Formula
-    homepage: "https://github.com/linuxsuren/github-go"
+    homepage: "https://github.com/linuxsuren/http-downloader"
     description: cgit is a tiny tool for Chinese developers.
     dependencies:
       - name: vim
@@ -59,7 +59,7 @@ brews:
       - name: bash-completion
         type: optional
     test: |
-      version_output = shell_output("#{bin}/github-go version")
+      version_output = shell_output("#{bin}/http-downloader version")
       assert_match version.to_s, version_output
     install: |
       bin.install name
@@ -67,7 +67,7 @@ brews:
       prefix.install_metafiles
 nfpms:
   - file_name_template: "{{ .Binary }}-{{.Os}}-{{.Arch}}"
-    homepage: https://github.com/linuxsuren/github-go
+    homepage: https://github.com/linuxsuren/http-downloader
     description: cgit is a tiny tool for Chinese developers.
     maintainer: rick <rick@jenkins-zh.cn>
     license: MIT
