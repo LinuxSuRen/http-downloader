@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -119,12 +118,10 @@ func (h *HTTPDownloader) DownloadFile() error {
 	}
 
 	if resp.StatusCode != 200 {
-		if h.Debug {
-			if data, err := ioutil.ReadAll(resp.Body); err == nil {
-				ioutil.WriteFile("debug-download.html", data, 0664)
-			}
+		return &DownloadError{
+			Message: fmt.Sprintf("failed to download from '%s'", downloadURL),
+			StatusCode: resp.StatusCode,
 		}
-		return fmt.Errorf("invalidate status code: %d", resp.StatusCode)
 	}
 
 	writer := &ProgressIndicator{
