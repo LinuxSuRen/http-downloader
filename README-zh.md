@@ -4,21 +4,21 @@
 [![GitHub release](https://img.shields.io/github/release/linuxsuren/http-downloader.svg?label=release)](https://github.com/linuxsuren/github-go/releases/latest)
 ![GitHub All Releases](https://img.shields.io/github/downloads/linuxsuren/http-downloader/total)
 
-# Get started
+# 入门
 
-`hd` is a HTTP download tool.
+`hd` 是一个基于 HTTP 协议的下载工具。
 
-Install it via: `brew install linuxsuren/linuxsuren/hd`
+通过命令：`brew install linuxsuren/linuxsuren/hd` 来安装
 
-# Usage
+# 用法
 
 ```
 hd https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-linux-amd64.tar.gz -o jcli.tar.gz --thread 10
 ```
 
-# Features
+# 功能
 
-* go library for HTTP
-* multi-thread
-* continuously (TODO)
-* GitHub release asset friendly (TODO)
+* 基于 HTTP 协议下载文件的 Golang 工具库
+* 多线程
+* 断点续传 (TODO)
+* 对 GitHub release 文件下载友好 (TODO)
