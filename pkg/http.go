@@ -34,6 +34,11 @@ type HTTPDownloader struct {
 	Proxy     string
 	ProxyAuth string
 
+	Header map[string]string
+
+	// PreStart returns false will don't continue
+	PreStart func(*http.Response) bool
+
 	Debug        bool
 	RoundTripper http.RoundTripper
 }
@@ -80,6 +85,9 @@ func (h *HTTPDownloader) fetchProxyFromEnv(scheme string) {
 	}
 }
 
+//Range: bytes=10-
+//HTTP/1.1 206 Partial Content
+
 // DownloadFile download a file with the progress
 func (h *HTTPDownloader) DownloadFile() error {
 	filepath, downloadURL, showProgress := h.TargetFilePath, h.URL, h.ShowProgress
@@ -87,6 +95,10 @@ func (h *HTTPDownloader) DownloadFile() error {
 	req, err := http.NewRequest(http.MethodGet, downloadURL, nil)
 	if err != nil {
 		return err
+	}
+
+	for k, v := range h.Header {
+		req.Header.Set(k, v)
 	}
 
 	if h.UserName != "" && h.Password != "" {
@@ -117,11 +129,16 @@ func (h *HTTPDownloader) DownloadFile() error {
 		return err
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 		return &DownloadError{
-			Message: fmt.Sprintf("failed to download from '%s'", downloadURL),
+			Message:    fmt.Sprintf("failed to download from '%s'", downloadURL),
 			StatusCode: resp.StatusCode,
 		}
+	}
+
+	// pre-hook before get started to download file
+	if h.PreStart != nil && !h.PreStart(resp) {
+		return nil
 	}
 
 	writer := &ProgressIndicator{
