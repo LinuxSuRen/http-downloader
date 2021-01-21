@@ -13,7 +13,7 @@ Install it via: `brew install linuxsuren/linuxsuren/hd`
 # Usage
 
 ```
-hd https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-linux-amd64.tar.gz -o jcli.tar.gz --thread 10
+hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-linux-amd64.tar.gz -o jcli.tar.gz --thread 10
 ```
 
 # Features

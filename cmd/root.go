@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg"
 	extver "github.com/linuxsuren/cobra-extension/version"
+	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/spf13/cobra"
 	"io/ioutil"
 	"net/http"
@@ -15,22 +15,28 @@ import (
 
 // NewRoot returns the root command
 func NewRoot() (cmd *cobra.Command) {
-	opt := &downloadOption{}
 	cmd = &cobra.Command{
-		Use:     "hd",
-		Short:   "HTTP download tool",
+		Use:   "hd",
+		Short: "HTTP download tool",
+	}
+
+	opt := &downloadOption{}
+	getCmd := &cobra.Command{
+		Use:     "get",
+		Short:   "download the file",
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
 	}
 
 	// set flags
-	flags := cmd.Flags()
+	flags := getCmd.Flags()
 	flags.StringVarP(&opt.Output, "output", "o", "", "Write output to <file> instead of stdout.")
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.Int64VarP(&opt.ContinueAt, "continue-at", "", -1, "ContinueAt")
 	flags.IntVarP(&opt.Thread, "thread", "", 0, "")
 
 	cmd.AddCommand(
+		getCmd,
 		extver.NewVersionCmd("linuxsuren", "http-downloader", "hd", nil))
 	return
 }
