@@ -3,7 +3,7 @@ project_name: http-downloader
 builds:
 - env:
   - CGO_ENABLED=0
-  binary: http-downloader
+  binary: hd
   goarch:
     - amd64
     - arm64
@@ -15,9 +15,9 @@ builds:
     post:
       - upx "{{ .Path }}"
   ldflags:
-    - -X github.com/linuxsuren/cgit/app.version={{.Version}}
-    - -X github.com/linuxsuren/cgit/app.commit={{.ShortCommit}}
-    - -X github.com/linuxsuren/cgit/app.date={{.Date}}
+    - -X github.com/linuxsuren/cobra-extension/version.version={{.Version}}
+    - -X github.com/linuxsuren/cobra-extension/version.commit={{.ShortCommit}}
+    - -X github.com/linuxsuren/cobra-extension/version.date={{.Date}}
     - -w
 dist: release
 archives:
@@ -46,20 +46,18 @@ changelog:
     - '^test:'
 brews:
   -
-    name: http-downloader
+    name: hd
     tap:
       owner: linuxsuren
       name: homebrew-linuxsuren
     folder: Formula
     homepage: "https://github.com/linuxsuren/http-downloader"
-    description: cgit is a tiny tool for Chinese developers.
+    description: HTTP download tool
     dependencies:
-      - name: vim
-        type: optional
       - name: bash-completion
         type: optional
     test: |
-      version_output = shell_output("#{bin}/http-downloader version")
+      version_output = shell_output("#{bin}/hd version")
       assert_match version.to_s, version_output
     install: |
       bin.install name
@@ -68,7 +66,7 @@ brews:
 nfpms:
   - file_name_template: "{{ .Binary }}-{{.Os}}-{{.Arch}}"
     homepage: https://github.com/linuxsuren/http-downloader
-    description: cgit is a tiny tool for Chinese developers.
+    description: HTTP download tool
     maintainer: rick <rick@jenkins-zh.cn>
     license: MIT
     vendor: Jenkins

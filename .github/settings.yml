@@ -1,6 +1,6 @@
 repository:
   name: http-downloader
-  description: This is a template project
+  description: HTTP download tool
   homepage: https://github.com/linuxsuren
   private: false
   has_issues: true
