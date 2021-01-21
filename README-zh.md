@@ -21,4 +21,4 @@ hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-l
 * 基于 HTTP 协议下载文件的 Golang 工具库
 * 多线程
 * 断点续传 (TODO)
-* 对 GitHub release 文件下载友好 (TODO)
+* 对 GitHub release 文件下载友好

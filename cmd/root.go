@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,6 +25,7 @@ func NewRoot() (cmd *cobra.Command) {
 	getCmd := &cobra.Command{
 		Use:     "get",
 		Short:   "download the file",
+		Example: "hd get jenkins-zh/jenkins-cli/jcli -o jcli.tar.gz --thread 3",
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
 	}
@@ -34,6 +36,9 @@ func NewRoot() (cmd *cobra.Command) {
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.Int64VarP(&opt.ContinueAt, "continue-at", "", -1, "ContinueAt")
 	flags.IntVarP(&opt.Thread, "thread", "", 0, "")
+	flags.StringVarP(&opt.Provider, "provider", "", ProviderGitHub, "The file provider")
+	flags.StringVarP(&opt.OS, "os", "", "", "The OS of target binary file")
+	flags.StringVarP(&opt.Arch, "arch", "", "", "The arch of target binary file")
 
 	cmd.AddCommand(
 		getCmd,
@@ -48,7 +53,61 @@ type downloadOption struct {
 
 	ContinueAt int64
 
+	Provider string
+	Arch     string
+	OS       string
+
 	Thread int
+}
+
+const (
+	// ProviderGitHub represents https://github.com
+	ProviderGitHub = "github"
+)
+
+func (o *downloadOption) providerURLParse(path string) (url string, err error) {
+	url = path
+	if o.Provider != ProviderGitHub {
+		return
+	}
+
+	var (
+		org     string
+		repo    string
+		name    string
+		version string
+	)
+
+	addr := strings.Split(url, "/")
+	if len(addr) >= 2 {
+		org = addr[0]
+		repo = addr[1]
+		name = repo
+	} else {
+		err = fmt.Errorf("only support format xx/xx or xx/xx/xx")
+		return
+	}
+
+	if len(addr) == 3 {
+		name = addr[2]
+	} else {
+		err = fmt.Errorf("only support format xx/xx or xx/xx/xx")
+	}
+
+	// extract version from name
+	if strings.Contains(name, "@") {
+		nameWithVer := strings.Split(name, "@")
+		name = nameWithVer[0]
+		version = nameWithVer[1]
+
+		url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
+			org, repo, version, name, o.OS, o.Arch)
+	} else {
+		version = "latest"
+		url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
+			org, repo, version, name, o.OS, o.Arch)
+	}
+	return
 }
 
 func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) {
@@ -56,9 +115,22 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 		return fmt.Errorf("no URL provided")
 	}
 
+	if o.OS == "" {
+		o.OS = runtime.GOOS
+	}
+
+	if o.Arch == "" {
+		o.Arch = runtime.GOARCH
+	}
+
 	url := args[0]
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		err = fmt.Errorf("only http:// or https:// supported")
+		if url, err = o.providerURLParse(url); err != nil {
+			err = fmt.Errorf("only http:// or https:// supported, error: %v", err)
+			return
+		} else {
+			cmd.Printf("start to download from %s\n", url)
+		}
 	}
 	o.URL = url
 

@@ -21,4 +21,4 @@ hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-l
 * go library for HTTP
 * multi-thread
 * continuously (TODO)
-* GitHub release asset friendly (TODO)
+* GitHub release asset friendly
