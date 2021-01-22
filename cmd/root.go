@@ -128,9 +128,8 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 		if url, err = o.providerURLParse(url); err != nil {
 			err = fmt.Errorf("only http:// or https:// supported, error: %v", err)
 			return
-		} else {
-			cmd.Printf("start to download from %s\n", url)
 		}
+		cmd.Printf("start to download from %s\n", url)
 	}
 	o.URL = url
 
