@@ -10,6 +10,12 @@
 
 Install it via: `brew install linuxsuren/linuxsuren/hd`
 
+Or download it directly (for Linux):
+```
+curl -L https://github.com/linuxsuren/http-downloader/releases/latest/download/hd-linux-amd64.tar.gz | tar xzv
+mv hd /usr/local/bin
+```
+
 # Usage
 
 ```
@@ -21,4 +27,4 @@ hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-l
 * go library for HTTP
 * multi-thread
 * continuously (TODO)
-* GitHub release asset friendly (TODO)
+* GitHub release asset friendly
