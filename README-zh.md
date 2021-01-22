@@ -10,6 +10,12 @@
 
 通过命令：`brew install linuxsuren/linuxsuren/hd` 来安装
 
+或者，对于 Linux 用户可以直接通过命令下载：
+```
+curl -L https://github.com/linuxsuren/http-downloader/releases/latest/download/hd-linux-amd64.tar.gz | tar xzv
+mv hd /usr/local/bin
+```
+
 # 用法
 
 ```
