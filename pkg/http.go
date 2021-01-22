@@ -5,13 +5,13 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"strconv"
-
-	"github.com/gosuri/uiprogress"
+	"sync"
 )
 
 const (
@@ -38,6 +38,8 @@ type HTTPDownloader struct {
 
 	// PreStart returns false will don't continue
 	PreStart func(*http.Response) bool
+
+	Thread int
 
 	Debug        bool
 	RoundTripper http.RoundTripper
@@ -84,9 +86,6 @@ func (h *HTTPDownloader) fetchProxyFromEnv(scheme string) {
 		}
 	}
 }
-
-//Range: bytes=10-
-//HTTP/1.1 206 Partial Content
 
 // DownloadFile download a file with the progress
 func (h *HTTPDownloader) DownloadFile() error {
@@ -175,52 +174,121 @@ func (h *HTTPDownloader) DownloadFile() error {
 	return err
 }
 
-// ProgressIndicator hold the progress of io operation
-type ProgressIndicator struct {
-	Writer io.Writer
-	Reader io.Reader
-	Title  string
-
-	// bytes.Buffer
-	Total float64
-	count float64
-	bar   *uiprogress.Bar
-}
-
-// Init set the default value for progress indicator
-func (i *ProgressIndicator) Init() {
-	uiprogress.Start()             // start rendering
-	i.bar = uiprogress.AddBar(100) // Add a new bar
-
-	// optionally, append and prepend completion and elapsed time
-	i.bar.AppendCompleted()
-	// i.bar.PrependElapsed()
-
-	if i.Title != "" {
-		i.bar.PrependFunc(func(_ *uiprogress.Bar) string {
-			return fmt.Sprintf("%s: ", i.Title)
-		})
+// DownloadFileWithMultipleThread downloads the files with multiple threads
+func DownloadFileWithMultipleThread(targetURL, targetFilePath string, thread int, showProgress bool) (err error) {
+	// get the total size of the target file
+	var total int64
+	var rangeSupport bool
+	if total, rangeSupport, err = DetectSize(targetURL, targetFilePath, true); err != nil {
+		return
 	}
-}
 
-// Write writes the progress
-func (i *ProgressIndicator) Write(p []byte) (n int, err error) {
-	n, err = i.Writer.Write(p)
-	i.setBar(n)
+	if rangeSupport {
+		unit := total / int64(thread)
+		offset := total - unit*int64(thread)
+		var wg sync.WaitGroup
+
+		fmt.Printf("start to download with %d threads, size: %d, unit: %d\n", thread, total, unit)
+		for i := 0; i < thread; i++ {
+			wg.Add(1)
+			go func(index int, wg *sync.WaitGroup) {
+				defer wg.Done()
+
+				end := unit*int64(index+1) - 1
+				if index == thread-1 {
+					// this is the last part
+					end += offset
+				}
+				start := unit * int64(index)
+
+				if downloadErr := DownloadWithContinue(targetURL, fmt.Sprintf("%s-%d", targetFilePath, index), start, end, showProgress); downloadErr != nil {
+					fmt.Println(downloadErr)
+				}
+			}(i, &wg)
+		}
+
+		wg.Wait()
+
+		// concat all these partial files
+		var f *os.File
+		if f, err = os.OpenFile(targetFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			defer func() {
+				_ = f.Close()
+			}()
+
+			for i := 0; i < thread; i++ {
+				partFile := fmt.Sprintf("%s-%d", targetFilePath, i)
+				if data, ferr := ioutil.ReadFile(partFile); ferr == nil {
+					if _, err = f.Write(data); err != nil {
+						err = fmt.Errorf("failed to write file: '%s'", partFile)
+						break
+					} else {
+						_ = os.RemoveAll(partFile)
+					}
+				} else {
+					err = fmt.Errorf("failed to read file: '%s'", partFile)
+					break
+				}
+			}
+		}
+	} else {
+		fmt.Println("cannot download it using multiple threads, failed to one")
+		err = DownloadWithContinue(targetURL, targetFilePath, 0, 0, true)
+	}
 	return
 }
 
-// Read reads the progress
-func (i *ProgressIndicator) Read(p []byte) (n int, err error) {
-	n, err = i.Reader.Read(p)
-	i.setBar(n)
+// DownloadWithContinue downloads the files continuously
+func DownloadWithContinue(targetURL, output string, continueAt, end int64, showProgress bool) (err error) {
+	downloader := HTTPDownloader{
+		TargetFilePath: output,
+		URL:            targetURL,
+		ShowProgress:   showProgress,
+	}
+
+	if continueAt >= 0 {
+		downloader.Header = make(map[string]string, 1)
+
+		if end > continueAt {
+			downloader.Header["Range"] = fmt.Sprintf("bytes=%d-%d", continueAt, end)
+		} else {
+			downloader.Header["Range"] = fmt.Sprintf("bytes=%d-", continueAt)
+		}
+	}
+
+	if err = downloader.DownloadFile(); err != nil {
+		err = fmt.Errorf("cannot download from %s, error: %v", targetURL, err)
+	}
 	return
 }
 
-func (i *ProgressIndicator) setBar(n int) {
-	i.count += float64(n)
-
-	if i.bar != nil {
-		i.bar.Set((int)(i.count * 100 / i.Total))
+// DetectSize returns the size of target resource
+func DetectSize(targetURL, output string, showProgress bool) (total int64, rangeSupport bool, err error) {
+	downloader := HTTPDownloader{
+		TargetFilePath: output,
+		URL:            targetURL,
+		ShowProgress:   showProgress,
 	}
+
+	var detectOffset int64
+	var lenErr error
+
+	detectOffset = 2
+	downloader.Header = make(map[string]string, 1)
+	downloader.Header["Range"] = fmt.Sprintf("bytes=%d-", detectOffset)
+
+	downloader.PreStart = func(resp *http.Response) bool {
+		rangeSupport = resp.StatusCode == http.StatusPartialContent
+		contentLen := resp.Header.Get("Content-Length")
+		if total, lenErr = strconv.ParseInt(contentLen, 10, 0); lenErr == nil {
+			total += detectOffset
+		}
+		//  always return false because we just want to get the header from response
+		return false
+	}
+
+	if err = downloader.DownloadFile(); err != nil || lenErr != nil {
+		err = fmt.Errorf("cannot download from %s, response error: %v, content length error: %v", targetURL, err, lenErr)
+	}
+	return
 }
