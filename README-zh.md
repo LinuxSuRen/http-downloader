@@ -19,7 +19,13 @@ mv hd /usr/local/bin
 # 用法
 
 ```
-hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-linux-amd64.tar.gz -o jcli.tar.gz --thread 10
+hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-linux-amd64.tar.gz --thread 6
+```
+
+或者，用一个更加简便的办法：
+
+```
+hd get jenkins-zh/jenkins-cli/jcli --thread 6
 ```
 
 # 功能
