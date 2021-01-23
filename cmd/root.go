@@ -5,6 +5,8 @@ import (
 	extver "github.com/linuxsuren/cobra-extension/version"
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/spf13/cobra"
+	"net/url"
+	"path"
 	"runtime"
 	"strings"
 )
@@ -118,18 +120,27 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 		o.Arch = runtime.GOARCH
 	}
 
-	url := args[0]
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		if url, err = o.providerURLParse(url); err != nil {
+	targetURL := args[0]
+	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
+		if targetURL, err = o.providerURLParse(targetURL); err != nil {
 			err = fmt.Errorf("only http:// or https:// supported, error: %v", err)
 			return
 		}
-		cmd.Printf("start to download from %s\n", url)
+		cmd.Printf("start to download from %s\n", targetURL)
 	}
-	o.URL = url
+	o.URL = targetURL
 
 	if o.Output == "" {
-		err = fmt.Errorf("output cannot be empty")
+		var urlObj *url.URL
+		if urlObj, err = url.Parse(o.URL); err == nil {
+			o.Output = path.Base(urlObj.Path)
+
+			if o.Output == "" {
+				err = fmt.Errorf("output cannot be empty")
+			}
+		} else {
+			err = fmt.Errorf("cannot parse the target URL, error: '%v'", err)
+		}
 	}
 	return
 }
