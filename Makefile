@@ -1,4 +1,5 @@
 build: fmt
+	export GOPROXY=https://goproxy.io
 	CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/hd
 
 run:

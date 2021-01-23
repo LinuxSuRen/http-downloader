@@ -5,6 +5,8 @@ import (
 	extver "github.com/linuxsuren/cobra-extension/version"
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/spf13/cobra"
+	"net/url"
+	"path"
 	"runtime"
 	"strings"
 )
@@ -20,7 +22,7 @@ func NewRoot() (cmd *cobra.Command) {
 	getCmd := &cobra.Command{
 		Use:     "get",
 		Short:   "download the file",
-		Example: "hd get jenkins-zh/jenkins-cli/jcli -o jcli.tar.gz --thread 3",
+		Example: "hd get jenkins-zh/jenkins-cli/jcli --thread 6",
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
 	}
@@ -31,6 +33,8 @@ func NewRoot() (cmd *cobra.Command) {
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.Int64VarP(&opt.ContinueAt, "continue-at", "", -1, "ContinueAt")
 	flags.IntVarP(&opt.Thread, "thread", "", 0, "")
+	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
+		"If you want to keep the part files instead of deleting them")
 	flags.StringVarP(&opt.Provider, "provider", "", ProviderGitHub, "The file provider")
 	flags.StringVarP(&opt.OS, "os", "", "", "The OS of target binary file")
 	flags.StringVarP(&opt.Arch, "arch", "", "", "The arch of target binary file")
@@ -52,7 +56,8 @@ type downloadOption struct {
 	Arch     string
 	OS       string
 
-	Thread int
+	Thread   int
+	KeepPart bool
 }
 
 const (
@@ -118,18 +123,27 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 		o.Arch = runtime.GOARCH
 	}
 
-	url := args[0]
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		if url, err = o.providerURLParse(url); err != nil {
+	targetURL := args[0]
+	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
+		if targetURL, err = o.providerURLParse(targetURL); err != nil {
 			err = fmt.Errorf("only http:// or https:// supported, error: %v", err)
 			return
 		}
-		cmd.Printf("start to download from %s\n", url)
+		cmd.Printf("start to download from %s\n", targetURL)
 	}
-	o.URL = url
+	o.URL = targetURL
 
 	if o.Output == "" {
-		err = fmt.Errorf("output cannot be empty")
+		var urlObj *url.URL
+		if urlObj, err = url.Parse(o.URL); err == nil {
+			o.Output = path.Base(urlObj.Path)
+
+			if o.Output == "" {
+				err = fmt.Errorf("output cannot be empty")
+			}
+		} else {
+			err = fmt.Errorf("cannot parse the target URL, error: '%v'", err)
+		}
 	}
 	return
 }
@@ -138,7 +152,7 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	if o.Thread <= 1 {
 		err = pkg.DownloadWithContinue(o.URL, o.Output, o.ContinueAt, 0, o.ShowProgress)
 	} else {
-		err = pkg.DownloadFileWithMultipleThread(o.URL, o.Output, o.Thread, o.ShowProgress)
+		err = pkg.DownloadFileWithMultipleThreadKeepParts(o.URL, o.Output, o.Thread, o.KeepPart, o.ShowProgress)
 	}
 	return
 }
