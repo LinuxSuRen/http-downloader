@@ -179,7 +179,7 @@ func DownloadFileWithMultipleThread(targetURL, targetFilePath string, thread int
 	return DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath, thread, false, showProgress)
 }
 
-// DownloadFileWithMultipleThread downloads the files with multiple threads
+// DownloadFileWithMultipleThreadKeepParts downloads the files with multiple threads
 func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, thread int, keepParts, showProgress bool) (err error) {
 	// get the total size of the target file
 	var total int64
