@@ -22,7 +22,7 @@ func NewRoot() (cmd *cobra.Command) {
 	getCmd := &cobra.Command{
 		Use:     "get",
 		Short:   "download the file",
-		Example: "hd get jenkins-zh/jenkins-cli/jcli -o jcli.tar.gz --thread 3",
+		Example: "hd get jenkins-zh/jenkins-cli/jcli --thread 6",
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
 	}
@@ -33,6 +33,8 @@ func NewRoot() (cmd *cobra.Command) {
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.Int64VarP(&opt.ContinueAt, "continue-at", "", -1, "ContinueAt")
 	flags.IntVarP(&opt.Thread, "thread", "", 0, "")
+	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
+		"If you want to keep the part files instead of deleting them")
 	flags.StringVarP(&opt.Provider, "provider", "", ProviderGitHub, "The file provider")
 	flags.StringVarP(&opt.OS, "os", "", "", "The OS of target binary file")
 	flags.StringVarP(&opt.Arch, "arch", "", "", "The arch of target binary file")
@@ -54,7 +56,8 @@ type downloadOption struct {
 	Arch     string
 	OS       string
 
-	Thread int
+	Thread   int
+	KeepPart bool
 }
 
 const (
@@ -149,7 +152,7 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	if o.Thread <= 1 {
 		err = pkg.DownloadWithContinue(o.URL, o.Output, o.ContinueAt, 0, o.ShowProgress)
 	} else {
-		err = pkg.DownloadFileWithMultipleThread(o.URL, o.Output, o.Thread, o.ShowProgress)
+		err = pkg.DownloadFileWithMultipleThreadKeepParts(o.URL, o.Output, o.Thread, o.KeepPart, o.ShowProgress)
 	}
 	return
 }

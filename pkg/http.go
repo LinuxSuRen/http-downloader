@@ -176,6 +176,11 @@ func (h *HTTPDownloader) DownloadFile() error {
 
 // DownloadFileWithMultipleThread downloads the files with multiple threads
 func DownloadFileWithMultipleThread(targetURL, targetFilePath string, thread int, showProgress bool) (err error) {
+	return DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath, thread, false, showProgress)
+}
+
+// DownloadFileWithMultipleThread downloads the files with multiple threads
+func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, thread int, keepParts, showProgress bool) (err error) {
 	// get the total size of the target file
 	var total int64
 	var rangeSupport bool
@@ -222,7 +227,7 @@ func DownloadFileWithMultipleThread(targetURL, targetFilePath string, thread int
 					if _, err = f.Write(data); err != nil {
 						err = fmt.Errorf("failed to write file: '%s'", partFile)
 						break
-					} else {
+					} else if !keepParts {
 						_ = os.RemoveAll(partFile)
 					}
 				} else {
