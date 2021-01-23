@@ -3,6 +3,7 @@ package pkg
 import (
 	"bytes"
 	"fmt"
+	"github.com/linuxsuren/http-downloader/mock/mhttp"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -10,8 +11,6 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/jenkins-zh/jenkins-cli/mock/mhttp"
 )
 
 var _ = Describe("http test", func() {
