@@ -216,7 +216,7 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 
 		// concat all these partial files
 		var f *os.File
-		if f, err = os.OpenFile(targetFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		if f, err = os.OpenFile(targetFilePath, os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 			defer func() {
 				_ = f.Close()
 			}()
