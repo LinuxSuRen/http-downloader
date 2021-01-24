@@ -25,7 +25,13 @@ hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-l
 Or use a simple way:
 
 ```
-hd get jenkins-zh/jenkins-cli/jcli --thread 6
+hd get jenkins-zh/jenkins-cli/jcli -t 6
+```
+
+Or you can also install a package from GitHub:
+
+```
+hd install jenkins-zh/jenkins-cli/jcli -t 6
 ```
 
 # Features

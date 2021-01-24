@@ -24,8 +24,8 @@ func NewInstallCmd() (cmd *cobra.Command) {
 	}
 
 	flags := cmd.Flags()
-	flags.StringVarP(&opt.Mode, "mode", "m", "package",
-		"If you want to install it via platform package manager")
+	//flags.StringVarP(&opt.Mode, "mode", "m", "package",
+	//	"If you want to install it via platform package manager")
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.IntVarP(&opt.Thread, "thread", "t", 0,
 		`Download file with multi-threads. It only works when its value is bigger than 1`)
