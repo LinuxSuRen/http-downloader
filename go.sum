@@ -162,6 +162,8 @@ github.com/linuxsuren/cobra-extension v0.0.6 h1:JlSmHjE/KCdJBZYGTjQbgvXSpziFwzpI
 github.com/linuxsuren/cobra-extension v0.0.6/go.mod h1:qcEJv7BbL0UpK6MbrTESP/nKf1+z1wQdMAnE1NBl3QQ=
 github.com/linuxsuren/cobra-extension v0.0.9 h1:VojTxx/eROco/fCatmz81L48gyy0AEPu1Tz6oFIaLak=
 github.com/linuxsuren/cobra-extension v0.0.9/go.mod h1:nDsXgvm0lSWVV+byAEfwhIGFDoIp0Sq9wkfNUDBp5do=
+github.com/linuxsuren/cobra-extension v0.0.10 h1:ciZDb2Bp/aAFqr4YoeVuH2uyBaBFfO6pwz1WBih7R4A=
+github.com/linuxsuren/cobra-extension v0.0.10/go.mod h1:nDsXgvm0lSWVV+byAEfwhIGFDoIp0Sq9wkfNUDBp5do=
 github.com/linuxsuren/http-downloader v0.0.2-0.20201207132639-19888a6beaec/go.mod h1:zRZY9FCDBuYNDxbI2Ny5suasZsMk7J6q9ecQ3V3PIqI=
 github.com/linuxsuren/http-downloader v0.0.6/go.mod h1:xxgh2OE7WGL9TwDE9L8Gh7Lqq9fFPuHbh5tofUitEfE=
 github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
