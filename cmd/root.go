@@ -32,12 +32,13 @@ func NewRoot() (cmd *cobra.Command) {
 	flags.StringVarP(&opt.Output, "output", "o", "", "Write output to <file> instead of stdout.")
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.Int64VarP(&opt.ContinueAt, "continue-at", "", -1, "ContinueAt")
-	flags.IntVarP(&opt.Thread, "thread", "", 0, "")
+	flags.IntVarP(&opt.Thread, "thread", "t", 0,
+		`Download file with multi-threads. It only works when its value is bigger than 1`)
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
 	flags.StringVarP(&opt.Provider, "provider", "", ProviderGitHub, "The file provider")
-	flags.StringVarP(&opt.OS, "os", "", "", "The OS of target binary file")
-	flags.StringVarP(&opt.Arch, "arch", "", "", "The arch of target binary file")
+	flags.StringVarP(&opt.OS, "os", "", runtime.GOOS, "The OS of target binary file")
+	flags.StringVarP(&opt.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
 
 	cmd.AddCommand(
 		getCmd,
@@ -113,14 +114,6 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 	if len(args) <= 0 {
 		return fmt.Errorf("no URL provided")
-	}
-
-	if o.OS == "" {
-		o.OS = runtime.GOOS
-	}
-
-	if o.Arch == "" {
-		o.Arch = runtime.GOARCH
 	}
 
 	targetURL := args[0]
