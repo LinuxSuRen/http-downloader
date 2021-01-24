@@ -25,7 +25,13 @@ hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-l
 或者，用一个更加简便的办法：
 
 ```
-hd get jenkins-zh/jenkins-cli/jcli --thread 6
+hd get jenkins-zh/jenkins-cli/jcli -t 6
+```
+
+获取，你也可以安装一个来自 GitHub 的软件包：
+
+```
+hd install jenkins-zh/jenkins-cli/jcli -t 6
 ```
 
 # 功能
@@ -33,4 +39,4 @@ hd get jenkins-zh/jenkins-cli/jcli --thread 6
 * 基于 HTTP 协议下载文件的 Golang 工具库
 * 多线程
 * 断点续传 (TODO)
-* 对 GitHub release 文件下载友好
+* 对 GitHub release 文件下载（安装）友好
