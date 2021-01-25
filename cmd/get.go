@@ -1,10 +1,16 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/ghodss/yaml"
 	"github.com/linuxsuren/http-downloader/pkg"
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
+	"html/template"
+	"io/ioutil"
 	"net/url"
+	"os"
 	"path"
 	"runtime"
 	"strings"
@@ -102,7 +108,61 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 			org, repo, version, name, o.OS, o.Arch)
 	}
 	o.name = name
+
+	// try to parse from config
+	userHome, _ := homedir.Dir()
+	configDir := userHome + "/.config/hd-home"
+	matchedFile := configDir + "/config/" + org + "/" + repo + ".yml"
+	if ok, _ := pathExists(matchedFile); ok {
+		var data []byte
+		if data, err = ioutil.ReadFile(matchedFile); err == nil {
+			cfg := HDConfig{}
+
+			if err = yaml.Unmarshal(data, &cfg); err == nil {
+				o.name = cfg.Name
+
+				hdPackage := &HDPackage{
+					Name:    o.name,
+					Version: version,
+					OS:      runtime.GOOS,
+					Arch:    runtime.GOARCH,
+				}
+				if version == "latest" {
+					ghClient := pkg.ReleaseClient{
+						Org:  org,
+						Repo: repo,
+					}
+					ghClient.Init()
+					if asser, err := ghClient.GetLatestJCLIAsset(); err == nil {
+						hdPackage.Version = asser.TagName
+					} else {
+						fmt.Println(err, "cannot get the asset")
+					}
+				}
+
+				tmp, _ := template.New("hd").Parse(cfg.Filename)
+
+				var buf bytes.Buffer
+				if err = tmp.Execute(&buf, hdPackage); err == nil {
+					url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s",
+						org, repo, version, buf.String())
+				}
+			}
+		}
+	}
 	return
+}
+
+type HDConfig struct {
+	Name     string
+	Filename string
+}
+
+type HDPackage struct {
+	Name    string
+	Version string
+	OS      string
+	Arch    string
 }
 
 func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) {
@@ -142,4 +202,26 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		err = pkg.DownloadFileWithMultipleThreadKeepParts(o.URL, o.Output, o.Thread, o.KeepPart, o.ShowProgress)
 	}
 	return
+}
+
+func (o *downloadOption) fetchHomeConfig() {
+	userHome, _ := homedir.Dir()
+	configDir := userHome + "/.config/hd-home"
+	if ok, _ := pathExists(configDir); ok {
+		execCommand("git", "pull", configDir)
+	} else {
+		os.MkdirAll(configDir, 0644)
+		execCommand("git", "clone", "https://github.com/LinuxSuRen/hd-home", configDir)
+	}
+}
+
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }

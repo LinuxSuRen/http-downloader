@@ -42,6 +42,12 @@ type installOption struct {
 	Mode string
 }
 
+func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
+	o.fetchHomeConfig()
+	err = o.downloadOption.preRunE(cmd, args)
+	return
+}
+
 func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 	if err = o.downloadOption.runE(cmd, args); err != nil {
 		return
