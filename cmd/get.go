@@ -119,7 +119,9 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 			cfg := HDConfig{}
 
 			if err = yaml.Unmarshal(data, &cfg); err == nil {
-				o.name = cfg.Name
+				if cfg.Binary != "" {
+					o.name = cfg.Binary
+				}
 
 				hdPackage := &HDPackage{
 					Name:    o.name,
@@ -156,6 +158,7 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 type HDConfig struct {
 	Name     string
 	Filename string
+	Binary   string
 }
 
 type HDPackage struct {
