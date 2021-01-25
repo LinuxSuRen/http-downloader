@@ -119,10 +119,6 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 			cfg := HDConfig{}
 
 			if err = yaml.Unmarshal(data, &cfg); err == nil {
-				if cfg.Binary != "" {
-					o.name = cfg.Binary
-				}
-
 				hdPackage := &HDPackage{
 					Name:    o.name,
 					Version: version,
@@ -148,6 +144,10 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 				if err = tmp.Execute(&buf, hdPackage); err == nil {
 					url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s",
 						org, repo, version, buf.String())
+				}
+
+				if cfg.Binary != "" {
+					o.name = cfg.Binary
 				}
 			}
 		}
