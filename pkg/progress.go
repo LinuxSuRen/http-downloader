@@ -52,6 +52,6 @@ func (i *ProgressIndicator) setBar(n int) {
 	i.count += float64(n)
 
 	if i.bar != nil {
-		i.bar.Set((int)(i.count * 100 / i.Total))
+		_ = i.bar.Set((int)(i.count * 100 / i.Total))
 	}
 }
