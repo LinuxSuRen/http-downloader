@@ -159,9 +159,9 @@ func (h *HTTPDownloader) DownloadFile() error {
 	// Create the file
 	out, err := os.Create(filepath)
 	if err != nil {
+		_ = out.Close()
 		return err
 	}
-	defer out.Close()
 
 	writer.Writer = out
 
@@ -216,7 +216,7 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 
 		// concat all these partial files
 		var f *os.File
-		if f, err = os.OpenFile(targetFilePath, os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		if f, err = os.OpenFile(targetFilePath, os.O_CREATE|os.O_WRONLY, 0600); err == nil {
 			defer func() {
 				_ = f.Close()
 			}()

@@ -64,7 +64,7 @@ func (o *installOption) overWriteBinary(sourceFile, targetPath string) (err erro
 		}
 	default:
 		sourceF, _ := os.Open(sourceFile)
-		targetF, _ := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, 0664)
+		targetF, _ := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, 0600)
 		if _, err = io.Copy(targetF, sourceF); err != nil {
 			err = fmt.Errorf("cannot copy %s from %s to %v, error: %v", o.name, sourceFile, targetPath, err)
 		}
@@ -119,8 +119,8 @@ func (o *installOption) extractFiles(tarFile, targetName string) (err error) {
 func execCommand(name string, arg ...string) (err error) {
 	command := exec.Command(name, arg...)
 
-	var stdout []byte
-	var errStdout error
+	//var stdout []byte
+	//var errStdout error
 	stdoutIn, _ := command.StdoutPipe()
 	stderrIn, _ := command.StderrPipe()
 	err = command.Start()
@@ -134,11 +134,11 @@ func execCommand(name string, arg ...string) (err error) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		stdout, errStdout = copyAndCapture(os.Stdout, stdoutIn)
+		_, _ = copyAndCapture(os.Stdout, stdoutIn)
 		wg.Done()
 	}()
 
-	copyAndCapture(os.Stderr, stderrIn)
+	_, _ = copyAndCapture(os.Stderr, stderrIn)
 
 	wg.Wait()
 
