@@ -7,13 +7,13 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
-	"html/template"
 	"io/ioutil"
 	"net/url"
 	"os"
 	"path"
 	"runtime"
 	"strings"
+	"text/template"
 )
 
 // NewGetCmd return the get command
@@ -58,6 +58,7 @@ type downloadOption struct {
 
 	// inner fields
 	name string
+	Tar  bool
 }
 
 const (
@@ -116,10 +117,10 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 	if ok, _ := pathExists(matchedFile); ok {
 		var data []byte
 		if data, err = ioutil.ReadFile(matchedFile); err == nil {
-			cfg := HDConfig{}
+			cfg := hdConfig{}
 
 			if err = yaml.Unmarshal(data, &cfg); err == nil {
-				hdPackage := &HDPackage{
+				hdPackage := &hdPackage{
 					Name:    o.name,
 					Version: version,
 					OS:      runtime.GOOS,
@@ -138,14 +139,19 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 					}
 				}
 
-				tmp, _ := template.New("hd").Parse(cfg.Filename)
+				if cfg.Filename != "" {
+					tmp, _ := template.New("hd").Parse(cfg.Filename)
 
-				var buf bytes.Buffer
-				if err = tmp.Execute(&buf, hdPackage); err == nil {
-					url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s",
-						org, repo, version, buf.String())
+					var buf bytes.Buffer
+					if err = tmp.Execute(&buf, hdPackage); err == nil {
+						url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s",
+							org, repo, version, buf.String())
+
+						o.Output = buf.String()
+					}
 				}
 
+				o.Tar = cfg.Tar
 				if cfg.Binary != "" {
 					o.name = cfg.Binary
 				}
@@ -155,13 +161,14 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 	return
 }
 
-type HDConfig struct {
+type hdConfig struct {
 	Name     string
 	Filename string
 	Binary   string
+	Tar      bool
 }
 
-type HDPackage struct {
+type hdPackage struct {
 	Name    string
 	Version string
 	OS      string

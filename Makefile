@@ -2,6 +2,11 @@ build: fmt
 	export GOPROXY=https://goproxy.io
 	CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/hd
 
+build-linux: fmt
+	export GOPROXY=https://goproxy.io
+	CGO_ENABLE=0 GOOS=linux go build -ldflags "-w -s" -o bin/linux/hd
+	upx bin/linux/hd
+
 run:
 	go run main.go
 

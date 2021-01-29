@@ -27,7 +27,7 @@ func NewInstallCmd() (cmd *cobra.Command) {
 	//flags.StringVarP(&opt.Mode, "mode", "m", "package",
 	//	"If you want to install it via platform package manager")
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
-	flags.IntVarP(&opt.Thread, "thread", "t", 0,
+	flags.IntVarP(&opt.Thread, "thread", "t", 4,
 		`Download file with multi-threads. It only works when its value is bigger than 1`)
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
@@ -53,17 +53,38 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	if err = o.extractFiles(o.Output, o.name); err == nil {
-		err = o.overWriteBinary(fmt.Sprintf("%s/%s", filepath.Dir(o.Output), o.name), fmt.Sprintf("/usr/local/bin/%s", o.name))
+	var source string
+	var target string
+	if o.Tar {
+		if err = o.extractFiles(o.Output, o.name); err == nil {
+			source = fmt.Sprintf("%s/%s", filepath.Dir(o.Output), o.name)
+			target = fmt.Sprintf("/usr/local/bin/%s", o.name)
+		} else {
+			err = fmt.Errorf("cannot extract %s from tar file, error: %v", o.Output, err)
+		}
 	} else {
-		err = fmt.Errorf("cannot extract %s from tar file, error: %v", o.Output, err)
+		source = o.downloadOption.Output
+		target = fmt.Sprintf("/usr/local/bin/%s", o.name)
+	}
+
+	if err == nil {
+		fmt.Println("install", source, "to", target)
+		err = o.overWriteBinary(source, target)
 	}
 	return
 }
 
 func (o *installOption) overWriteBinary(sourceFile, targetPath string) (err error) {
 	switch runtime.GOOS {
-	case "linux":
+	case "linux", "darwin":
+		if err = execCommand("chmod", "u+x", sourceFile); err != nil {
+			return
+		}
+
+		if err = execCommand("rm", "-rf", targetPath); err != nil {
+			return
+		}
+
 		var cp string
 		if cp, err = exec.LookPath("cp"); err == nil {
 			err = syscall.Exec(cp, []string{"cp", sourceFile, targetPath}, os.Environ())
