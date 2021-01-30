@@ -121,11 +121,13 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 
 			if err = yaml.Unmarshal(data, &cfg); err == nil {
 				hdPackage := &hdPackage{
-					Name:    o.name,
-					Version: version,
-					OS:      runtime.GOOS,
-					Arch:    runtime.GOARCH,
+					Name:       o.name,
+					Version:    version,
+					OS:         getReplacement(runtime.GOOS, cfg.Replacements),
+					Arch:       getReplacement(runtime.GOARCH, cfg.Replacements),
+					VersionNum: strings.TrimPrefix(version, "v"),
 				}
+
 				if version == "latest" {
 					ghClient := pkg.ReleaseClient{
 						Org:  org,
@@ -134,6 +136,7 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 					ghClient.Init()
 					if asset, err := ghClient.GetLatestJCLIAsset(); err == nil {
 						hdPackage.Version = asset.TagName
+						hdPackage.VersionNum = strings.TrimPrefix(asset.TagName, "v")
 					} else {
 						fmt.Println(err, "cannot get the asset")
 					}
@@ -148,10 +151,12 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 							org, repo, version, buf.String())
 
 						o.Output = buf.String()
+					} else {
+						return
 					}
 				}
 
-				o.Tar = cfg.Tar
+				o.Tar = cfg.Tar != "false"
 				if cfg.Binary != "" {
 					o.name = cfg.Binary
 				}
@@ -162,17 +167,19 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 }
 
 type hdConfig struct {
-	Name     string
-	Filename string
-	Binary   string
-	Tar      bool
+	Name         string
+	Filename     string
+	Binary       string
+	Tar          string
+	Replacements map[string]string
 }
 
 type hdPackage struct {
-	Name    string
-	Version string
-	OS      string
-	Arch    string
+	Name       string
+	Version    string // e.g. v1.0.1
+	VersionNum string // e.g. 1.0.1
+	OS         string // e.g. linux, darwin
+	Arch       string // e.g. amd64
 }
 
 func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) {

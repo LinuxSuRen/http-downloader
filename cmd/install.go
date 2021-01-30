@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 )
@@ -118,6 +119,7 @@ func (o *installOption) extractFiles(tarFile, targetName string) (err error) {
 
 	tarReader := tar.NewReader(gzf)
 	var header *tar.Header
+	var found bool
 	for {
 		if header, err = tarReader.Next(); err == io.EOF {
 			err = nil
@@ -129,19 +131,25 @@ func (o *installOption) extractFiles(tarFile, targetName string) (err error) {
 
 		switch header.Typeflag {
 		case tar.TypeReg:
-			if name != targetName {
+			if name != targetName && !strings.HasSuffix(name, "/"+targetName) {
 				continue
 			}
 			var targetFile *os.File
-			if targetFile, err = os.OpenFile(fmt.Sprintf("%s/%s", filepath.Dir(tarFile), name),
+			if targetFile, err = os.OpenFile(fmt.Sprintf("%s/%s", filepath.Dir(tarFile), targetName),
 				os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)); err != nil {
 				break
 			}
 			if _, err = io.Copy(targetFile, tarReader); err != nil {
 				break
 			}
+			fmt.Println("found ", targetName, header)
+			found = true
 			_ = targetFile.Close()
 		}
+	}
+
+	if err == nil && !found {
+		err = fmt.Errorf("cannot found item '%s' from '%s'", targetName, tarFile)
 	}
 	return
 }
