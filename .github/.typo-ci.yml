@@ -1,0 +1,16 @@
+dictionaries:
+  - en
+  - en_GB
+exclude_fiels:
+  - ".github/**/*"
+  - "go.mod"
+  - "go.sum"
+  - Makefile
+excluded_words:
+  - KubeSphere
+  - kubespheredev
+  - minio
+  - jcli
+  - ioutil
+  - Unmarshal
+  - Errorf

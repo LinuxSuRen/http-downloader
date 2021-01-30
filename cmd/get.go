@@ -132,8 +132,8 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 						Repo: repo,
 					}
 					ghClient.Init()
-					if asser, err := ghClient.GetLatestJCLIAsset(); err == nil {
-						hdPackage.Version = asser.TagName
+					if asset, err := ghClient.GetLatestJCLIAsset(); err == nil {
+						hdPackage.Version = asset.TagName
 					} else {
 						fmt.Println(err, "cannot get the asset")
 					}
