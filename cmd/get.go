@@ -214,15 +214,17 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	return
 }
 
-func (o *downloadOption) fetchHomeConfig() {
+func (o *downloadOption) fetchHomeConfig() (err error) {
 	userHome, _ := homedir.Dir()
 	configDir := userHome + "/.config/hd-home"
 	if ok, _ := pathExists(configDir); ok {
-		execCommand("git", "pull", configDir)
+		err = execCommand("git", "pull", "-C", configDir)
 	} else {
-		os.MkdirAll(configDir, 0644)
-		execCommand("git", "clone", "https://github.com/LinuxSuRen/hd-home", configDir)
+		if err = os.MkdirAll(configDir, 0644); err == nil {
+			err = execCommand("git", "clone", "https://github.com/LinuxSuRen/hd-home", configDir)
+		}
 	}
+	return
 }
 
 func pathExists(path string) (bool, error) {

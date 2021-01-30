@@ -43,7 +43,10 @@ type installOption struct {
 }
 
 func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
-	o.fetchHomeConfig()
+	if err = o.fetchHomeConfig(); err != nil {
+		// this's not a fatal, don't block the process
+		cmd.Printf("Failed with fetching home config: %v\n", err)
+	}
 	err = o.downloadOption.preRunE(cmd, args)
 	return
 }
