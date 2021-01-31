@@ -67,6 +67,7 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v1
   Markdown Link Check:
+    name: Markdown Link Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
