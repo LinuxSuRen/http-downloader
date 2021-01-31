@@ -66,8 +66,8 @@ jobs:
           languages: go
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v1
-  Markdown Link Check:
-    name: Markdown Link Check
+  MarkdownLinkCheck:
+    name: MarkdownLinkCheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
