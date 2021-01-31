@@ -142,7 +142,6 @@ func (o *installOption) extractFiles(tarFile, targetName string) (err error) {
 			if _, err = io.Copy(targetFile, tarReader); err != nil {
 				break
 			}
-			fmt.Println("found ", targetName, header)
 			found = true
 			_ = targetFile.Close()
 		}
