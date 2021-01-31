@@ -66,3 +66,10 @@ jobs:
           languages: go
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v1
+  Markdown Link Check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-verbose-mode: 'yes'

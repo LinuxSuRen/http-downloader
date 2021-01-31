@@ -142,7 +142,17 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 					}
 				}
 
-				if cfg.Filename != "" {
+				if cfg.URL != "" {
+					// it does not come from GitHub release
+					tmp, _ := template.New("hd").Parse(cfg.URL)
+
+					var buf bytes.Buffer
+					if err = tmp.Execute(&buf, hdPackage); err == nil {
+						url = buf.String()
+					} else {
+						return
+					}
+				} else if cfg.Filename != "" {
 					tmp, _ := template.New("hd").Parse(cfg.Filename)
 
 					var buf bytes.Buffer
@@ -170,6 +180,7 @@ type hdConfig struct {
 	Name         string
 	Filename     string
 	Binary       string
+	URL          string `yaml:"url"`
 	Tar          string
 	Replacements map[string]string
 }
