@@ -43,6 +43,16 @@ labels:
     description: Pull requests that update a dependency file
   - name: no-changelog
     color: c2c2fc
+  - name: kind/bug
+    color: c2c2fc
+  - name: kind/feature
+    color: c2c2fc
+  - name: kind/doc
+    color: c2c2fc
+  - name: kind/dep
+    color: c2c2fc
+  - name: kind/chore
+    color: c2c2fc
 branches:
   - name: master
     protection:
