@@ -19,6 +19,7 @@ builds:
     - -X github.com/linuxsuren/cobra-extension/version.commit={{.ShortCommit}}
     - -X github.com/linuxsuren/cobra-extension/version.date={{.Date}}
     - -w
+    - -s
 dist: release
 archives:
 - name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
