@@ -33,13 +33,13 @@ jobs:
       - name: Upload Artifact for darwin
         uses: actions/upload-artifact@v2
         with:
-          name: jcli-darwin-amd64
-          path: release/jcli-darwin-amd64.tar.gz
+          name: hd-darwin-amd64
+          path: release/hd-darwin-amd64.tar.gz
       - name: Upload Artifact for linux
         uses: actions/upload-artifact@v2
         with:
-          name: jcli-linux-amd64
-          path: release/jcli-linux-amd64.tar.gz
+          name: hd-linux-amd64
+          path: release/hd-linux-amd64.tar.gz
   GoLint:
     name: Lint
     runs-on: ubuntu-latest
