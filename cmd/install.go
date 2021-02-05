@@ -28,6 +28,8 @@ func NewInstallCmd() (cmd *cobra.Command) {
 	//flags.StringVarP(&opt.Mode, "mode", "m", "package",
 	//	"If you want to install it via platform package manager")
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
+	flags.BoolVarP(&opt.Fetch, "fetch", "", true,
+		"If fetch the latest config from https://github.com/LinuxSuRen/hd-home")
 	flags.IntVarP(&opt.Thread, "thread", "t", 4,
 		`Download file with multi-threads. It only works when its value is bigger than 1`)
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
@@ -44,9 +46,11 @@ type installOption struct {
 }
 
 func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
-	if err = o.fetchHomeConfig(); err != nil {
-		// this is not a fatal, don't block the process
-		cmd.Printf("Failed with fetching home config: %v\n", err)
+	if o.Fetch {
+		if err = o.fetchHomeConfig(); err != nil {
+			err = fmt.Errorf("failed with fetching home config: %v", err)
+			return
+		}
 	}
 	err = o.downloadOption.preRunE(cmd, args)
 	return
@@ -153,8 +157,11 @@ func (o *installOption) extractFiles(tarFile, targetName string) (err error) {
 	return
 }
 
-func execCommand(name string, arg ...string) (err error) {
+func execCommandInDir(name, dir string, arg ...string) (err error) {
 	command := exec.Command(name, arg...)
+	if dir != "" {
+		command.Dir = dir
+	}
 
 	//var stdout []byte
 	//var errStdout error
@@ -181,6 +188,10 @@ func execCommand(name string, arg ...string) (err error) {
 
 	err = command.Wait()
 	return
+}
+
+func execCommand(name string, arg ...string) (err error) {
+	return execCommandInDir(name, "", arg...)
 }
 
 func copyAndCapture(w io.Writer, r io.Reader) ([]byte, error) {
