@@ -46,6 +46,7 @@ type downloadOption struct {
 	URL          string
 	Output       string
 	ShowProgress bool
+	Fetch        bool
 
 	ContinueAt int64
 
@@ -236,7 +237,10 @@ func (o *downloadOption) fetchHomeConfig() (err error) {
 	userHome, _ := homedir.Dir()
 	configDir := userHome + "/.config/hd-home"
 	if ok, _ := pathExists(configDir); ok {
-		err = execCommand("git", "pull", "-C", configDir)
+		err = execCommandInDir("git", configDir, "reset", "--hard", "origin/master")
+		if err == nil {
+			err = execCommandInDir("git", configDir, "pull")
+		}
 	} else {
 		if err = os.MkdirAll(configDir, 0644); err == nil {
 			err = execCommand("git", "clone", "https://github.com/LinuxSuRen/hd-home", configDir)
