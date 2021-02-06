@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 	"io/ioutil"
 	"net/url"
-	"os"
 	"path"
 	"runtime"
 	"strings"
@@ -30,6 +29,8 @@ func NewGetCmd() (cmd *cobra.Command) {
 	// set flags
 	flags := cmd.Flags()
 	flags.StringVarP(&opt.Output, "output", "o", "", "Write output to <file> instead of stdout.")
+	flags.BoolVarP(&opt.Fetch, "fetch", "", true,
+		"If fetch the latest config from https://github.com/LinuxSuRen/hd-home")
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.Int64VarP(&opt.ContinueAt, "continue-at", "", -1, "ContinueAt")
 	flags.IntVarP(&opt.Thread, "thread", "t", 0,
@@ -199,6 +200,14 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 		return fmt.Errorf("no URL provided")
 	}
 
+	if o.Fetch {
+		cmd.Println("start to fetch the config")
+		if err = fetchHomeConfig(); err != nil {
+			err = fmt.Errorf("failed with fetching home config: %v", err)
+			return
+		}
+	}
+
 	targetURL := args[0]
 	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
 		if targetURL, err = o.providerURLParse(targetURL); err != nil {
@@ -231,31 +240,4 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		err = pkg.DownloadFileWithMultipleThreadKeepParts(o.URL, o.Output, o.Thread, o.KeepPart, o.ShowProgress)
 	}
 	return
-}
-
-func (o *downloadOption) fetchHomeConfig() (err error) {
-	userHome, _ := homedir.Dir()
-	configDir := userHome + "/.config/hd-home"
-	if ok, _ := pathExists(configDir); ok {
-		err = execCommandInDir("git", configDir, "reset", "--hard", "origin/master")
-		if err == nil {
-			err = execCommandInDir("git", configDir, "pull")
-		}
-	} else {
-		if err = os.MkdirAll(configDir, 0644); err == nil {
-			err = execCommand("git", "clone", "https://github.com/LinuxSuRen/hd-home", configDir)
-		}
-	}
-	return
-}
-
-func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
 }
