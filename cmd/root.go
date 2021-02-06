@@ -13,7 +13,7 @@ func NewRoot() (cmd *cobra.Command) {
 	}
 
 	cmd.AddCommand(
-		NewGetCmd(), NewInstallCmd(),
+		NewGetCmd(), NewInstallCmd(), newFetchCmd(), newSearchCmd(),
 		extver.NewVersionCmd("linuxsuren", "http-downloader", "hd", nil))
 	return
 }
