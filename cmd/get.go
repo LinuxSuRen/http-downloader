@@ -59,8 +59,9 @@ type downloadOption struct {
 	KeepPart bool
 
 	// inner fields
-	name string
-	Tar  bool
+	name    string
+	Tar     bool
+	Package *hdConfig
 }
 
 const (
@@ -122,13 +123,14 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 			cfg := hdConfig{}
 
 			if err = yaml.Unmarshal(data, &cfg); err == nil {
-				hdPackage := &hdPackage{
+				hdPkg := &hdPackage{
 					Name:       o.name,
 					Version:    version,
 					OS:         getReplacement(runtime.GOOS, cfg.Replacements),
 					Arch:       getReplacement(runtime.GOARCH, cfg.Replacements),
 					VersionNum: strings.TrimPrefix(version, "v"),
 				}
+				o.Package = &cfg
 
 				if version == "latest" {
 					ghClient := pkg.ReleaseClient{
@@ -137,8 +139,8 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 					}
 					ghClient.Init()
 					if asset, err := ghClient.GetLatestJCLIAsset(); err == nil {
-						hdPackage.Version = asset.TagName
-						hdPackage.VersionNum = strings.TrimPrefix(asset.TagName, "v")
+						hdPkg.Version = asset.TagName
+						hdPkg.VersionNum = strings.TrimPrefix(asset.TagName, "v")
 					} else {
 						fmt.Println(err, "cannot get the asset")
 					}
@@ -149,7 +151,7 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 					tmp, _ := template.New("hd").Parse(cfg.URL)
 
 					var buf bytes.Buffer
-					if err = tmp.Execute(&buf, hdPackage); err == nil {
+					if err = tmp.Execute(&buf, hdPkg); err == nil {
 						url = buf.String()
 					} else {
 						return
@@ -158,7 +160,7 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 					tmp, _ := template.New("hd").Parse(cfg.Filename)
 
 					var buf bytes.Buffer
-					if err = tmp.Execute(&buf, hdPackage); err == nil {
+					if err = tmp.Execute(&buf, hdPkg); err == nil {
 						url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s",
 							org, repo, version, buf.String())
 
@@ -168,11 +170,55 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 					}
 				}
 
+				if err = renderCmdWithArgs(cfg.PreInstall, hdPkg); err != nil {
+					return
+				}
+				if err = renderCmdWithArgs(cfg.Installation, hdPkg); err != nil {
+					return
+				}
+				if err = renderCmdWithArgs(cfg.PostInstall, hdPkg); err != nil {
+					return
+				}
+				if err = renderCmdWithArgs(cfg.TestInstall, hdPkg); err != nil {
+					return
+				}
+
 				o.Tar = cfg.Tar != "false"
 				if cfg.Binary != "" {
+					if cfg.Binary, err = renderTemplate(cfg.Binary, hdPkg); err != nil {
+						return
+					}
 					o.name = cfg.Binary
 				}
 			}
+		}
+	}
+	return
+}
+
+func renderTemplate(text string, hdPkg *hdPackage) (result string, err error) {
+	tmp, _ := template.New("hd").Parse(text)
+
+	var buf bytes.Buffer
+	if err = tmp.Execute(&buf, hdPkg); err == nil {
+		result = buf.String()
+	}
+	return
+}
+
+func renderCmdWithArgs(cmd *cmdWithArgs, hdPkg *hdPackage) (err error) {
+	if cmd == nil {
+		return
+	}
+
+	if cmd.Cmd, err = renderTemplate(cmd.Cmd, hdPkg); err != nil {
+		return
+	}
+
+	for i := range cmd.Args {
+		arg := cmd.Args[i]
+		if cmd.Args[i], err = renderTemplate(arg, hdPkg); err != nil {
+			return
 		}
 	}
 	return
@@ -185,6 +231,15 @@ type hdConfig struct {
 	URL          string `yaml:"url"`
 	Tar          string
 	Replacements map[string]string
+	Installation *cmdWithArgs
+	PreInstall   *cmdWithArgs
+	PostInstall  *cmdWithArgs
+	TestInstall  *cmdWithArgs
+}
+
+type cmdWithArgs struct {
+	Cmd  string
+	Args []string
 }
 
 type hdPackage struct {
