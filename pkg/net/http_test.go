@@ -96,7 +96,7 @@ var _ = Describe("http test", func() {
 				Body:       ioutil.NopCloser(bytes.NewBufferString(responseBody)),
 			}
 			roundTripper.EXPECT().
-				RoundTrip((request)).Return(response, nil)
+				RoundTrip(request).Return(response, nil)
 			err := downloader.DownloadFile()
 			Expect(err).To(BeNil())
 
@@ -125,15 +125,17 @@ var _ = Describe("http test", func() {
 			request, _ := http.NewRequest(http.MethodGet, "", nil)
 			response := &http.Response{}
 			roundTripper.EXPECT().
-				RoundTrip((request)).Return(response, fmt.Errorf("fake error"))
+				RoundTrip(request).Return(response, fmt.Errorf("fake error"))
 			err := downloader.DownloadFile()
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("status code isn't 200", func() {
+			const debugFile = "debug-download.html"
 			downloader = HTTPDownloader{
 				RoundTripper: roundTripper,
 				Debug:        true,
+				TargetFilePath: debugFile,
 			}
 
 			request, _ := http.NewRequest(http.MethodGet, "", nil)
@@ -144,20 +146,12 @@ var _ = Describe("http test", func() {
 				Body:       ioutil.NopCloser(bytes.NewBufferString(responseBody)),
 			}
 			roundTripper.EXPECT().
-				RoundTrip((request)).Return(response, nil)
+				RoundTrip(request).Return(response, nil)
 			err := downloader.DownloadFile()
 			Expect(err).To(HaveOccurred())
 
-			const debugFile = "debug-download.html"
-
 			_, err = os.Stat(debugFile)
-			Expect(err).To(BeNil())
-
-			content, readErr := ioutil.ReadFile(debugFile)
-			Expect(readErr).To(BeNil())
-			Expect(string(content)).To(Equal(responseBody))
-
-			defer os.Remove(debugFile)
+			Expect(err).NotTo(BeNil())
 		})
 
 		It("showProgress", func() {
@@ -175,7 +169,7 @@ var _ = Describe("http test", func() {
 				Body:       ioutil.NopCloser(bytes.NewBufferString(responseBody)),
 			}
 			roundTripper.EXPECT().
-				RoundTrip((request)).Return(response, nil)
+				RoundTrip(request).Return(response, nil)
 			err := downloader.DownloadFile()
 			Expect(err).To(BeNil())
 		})
