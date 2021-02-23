@@ -61,18 +61,24 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
+	targetBinary := o.name
+	if o.Package != nil && o.Package.TargetBinary != "" {
+		// this is the desired binary file
+		targetBinary = o.Package.TargetBinary
+	}
+
 	var source string
 	var target string
 	if o.Tar {
 		if err = o.extractFiles(o.Output, o.name); err == nil {
 			source = fmt.Sprintf("%s/%s", filepath.Dir(o.Output), o.name)
-			target = fmt.Sprintf("/usr/local/bin/%s", o.name)
+			target = fmt.Sprintf("/usr/local/bin/%s", targetBinary)
 		} else {
 			err = fmt.Errorf("cannot extract %s from tar file, error: %v", o.Output, err)
 		}
 	} else {
 		source = o.downloadOption.Output
-		target = fmt.Sprintf("/usr/local/bin/%s", o.name)
+		target = fmt.Sprintf("/usr/local/bin/%s", targetBinary)
 	}
 
 	if err == nil {

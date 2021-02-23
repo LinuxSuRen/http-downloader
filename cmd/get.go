@@ -228,6 +228,7 @@ type hdConfig struct {
 	Name         string
 	Filename     string
 	Binary       string
+	TargetBinary string
 	URL          string `yaml:"url"`
 	Tar          string
 	Replacements map[string]string
