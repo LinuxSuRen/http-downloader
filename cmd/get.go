@@ -252,6 +252,7 @@ type hdPackage struct {
 }
 
 func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) {
+	o.Tar = true
 	if len(args) <= 0 {
 		return fmt.Errorf("no URL provided")
 	}
