@@ -65,7 +65,7 @@ var _ = Describe("http test", func() {
 				Body:       ioutil.NopCloser(bytes.NewBufferString(responseBody)),
 			}
 			roundTripper.EXPECT().
-				RoundTrip((request)).Return(response, nil)
+				RoundTrip(request).Return(response, nil)
 			err := downloader.DownloadFile()
 			Expect(err).To(BeNil())
 

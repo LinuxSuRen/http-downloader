@@ -31,6 +31,10 @@ func NewGetCmd() (cmd *cobra.Command) {
 	flags.StringVarP(&opt.Output, "output", "o", "", "Write output to <file> instead of stdout.")
 	flags.BoolVarP(&opt.Fetch, "fetch", "", true,
 		"If fetch the latest config from https://github.com/LinuxSuRen/hd-home")
+	flags.IntVarP(&opt.Timeout, "time", "", 10,
+		`The default timeout in seconds with the HTTP request`)
+	flags.IntVarP(&opt.MaxAttempts, "max-attempts", "", 10,
+		`Max times to attempt to download, zero means there's no retry action'`)
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.Int64VarP(&opt.ContinueAt, "continue-at", "", -1, "ContinueAt")
 	flags.IntVarP(&opt.Thread, "thread", "t", 0,
@@ -48,6 +52,8 @@ type downloadOption struct {
 	Output       string
 	ShowProgress bool
 	Fetch        bool
+	Timeout      int
+	MaxAttempts  int
 
 	ContinueAt int64
 
@@ -292,7 +298,7 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 
 func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	if o.Thread <= 1 {
-		err = pkg.DownloadWithContinue(o.URL, o.Output, o.ContinueAt, 0, o.ShowProgress)
+		err = pkg.DownloadWithContinue(o.URL, o.Output, o.ContinueAt, -1, 0, o.ShowProgress)
 	} else {
 		err = pkg.DownloadFileWithMultipleThreadKeepParts(o.URL, o.Output, o.Thread, o.KeepPart, o.ShowProgress)
 	}
