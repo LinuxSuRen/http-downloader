@@ -3,10 +3,10 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"github.com/ghodss/yaml"
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net/url"
 	"path"
@@ -44,6 +44,8 @@ func NewGetCmd() (cmd *cobra.Command) {
 	flags.StringVarP(&opt.Provider, "provider", "", ProviderGitHub, "The file provider")
 	flags.StringVarP(&opt.OS, "os", "", runtime.GOOS, "The OS of target binary file")
 	flags.StringVarP(&opt.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
+	flags.BoolVarP(&opt.PrintSchema, "print-schema", "", false,
+		"Print the schema of hdConfig if the flag is true without other function")
 	return
 }
 
@@ -61,8 +63,9 @@ type downloadOption struct {
 	Arch     string
 	OS       string
 
-	Thread   int
-	KeepPart bool
+	Thread      int
+	KeepPart    bool
+	PrintSchema bool
 
 	// inner fields
 	name    string
@@ -74,6 +77,33 @@ const (
 	// ProviderGitHub represents https://github.com
 	ProviderGitHub = "github"
 )
+
+func (o *downloadOption) isSupport(cfg hdConfig) bool {
+	var osSupport, archSupport bool
+
+	if len(cfg.SupportOS) > 0 {
+		for _, item := range cfg.SupportOS {
+			if runtime.GOOS == item {
+				osSupport = true
+				break
+			}
+		}
+	} else {
+		osSupport = true
+	}
+
+	if len(cfg.SupportArch) > 0 {
+		for _, item := range cfg.SupportArch {
+			if runtime.GOARCH == item {
+				archSupport = true
+				break
+			}
+		}
+	} else {
+		archSupport = true
+	}
+	return osSupport && archSupport
+}
 
 func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 	url = path
@@ -127,6 +157,10 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 		var data []byte
 		if data, err = ioutil.ReadFile(matchedFile); err == nil {
 			cfg := hdConfig{}
+			if !o.isSupport(cfg) {
+				err = fmt.Errorf("not support this platform, os: %s, arch: %s", runtime.GOOS, runtime.GOARCH)
+				return
+			}
 
 			if err = yaml.Unmarshal(data, &cfg); err == nil {
 				hdPkg := &hdPackage{
@@ -231,22 +265,24 @@ func renderCmdWithArgs(cmd *cmdWithArgs, hdPkg *hdPackage) (err error) {
 }
 
 type hdConfig struct {
-	Name         string
-	Filename     string
-	Binary       string
-	TargetBinary string
-	URL          string `yaml:"url"`
-	Tar          string
-	Replacements map[string]string
-	Installation *cmdWithArgs
-	PreInstall   *cmdWithArgs
-	PostInstall  *cmdWithArgs
-	TestInstall  *cmdWithArgs
+	Name         string            `yaml:"name"`
+	Filename     string            `yaml:"filename"`
+	Binary       string            `yaml:"binary"`
+	TargetBinary string            `yaml:"targetBinary"`
+	URL          string            `yaml:"url"`
+	Tar          string            `yaml:"tar"`
+	SupportOS    []string          `yaml:"supportOS"`
+	SupportArch  []string          `yaml:"supportArch"`
+	Replacements map[string]string `yaml:"replacements"`
+	Installation *cmdWithArgs      `yaml:"installation"`
+	PreInstall   *cmdWithArgs      `yaml:"preInstall"`
+	PostInstall  *cmdWithArgs      `yaml:"postInstall"`
+	TestInstall  *cmdWithArgs      `yaml:"testInstall"`
 }
 
 type cmdWithArgs struct {
-	Cmd  string
-	Args []string
+	Cmd  string   `yaml:"cmd"`
+	Args []string `yaml:"args"`
 }
 
 type hdPackage struct {
@@ -258,6 +294,11 @@ type hdPackage struct {
 }
 
 func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) {
+	// this might not be the best way to print schema
+	if o.PrintSchema {
+		return
+	}
+
 	o.Tar = true
 	if len(args) <= 0 {
 		return fmt.Errorf("no URL provided")
@@ -297,6 +338,20 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 }
 
 func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
+	// only print the schema for documentation
+	if o.PrintSchema {
+		var data []byte
+		if data, err = yaml.Marshal(hdConfig{
+			Installation: &cmdWithArgs{},
+			PreInstall:   &cmdWithArgs{},
+			PostInstall:  &cmdWithArgs{},
+			TestInstall:  &cmdWithArgs{},
+		}); err == nil {
+			cmd.Print(string(data))
+		}
+		return
+	}
+
 	if o.Thread <= 1 {
 		err = pkg.DownloadWithContinue(o.URL, o.Output, o.ContinueAt, -1, 0, o.ShowProgress)
 	} else {
