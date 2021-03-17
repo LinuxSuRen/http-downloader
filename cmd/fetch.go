@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"path"
+	"strings"
 )
 
 func newFetchCmd() (cmd *cobra.Command) {
@@ -41,6 +42,12 @@ func fetchHomeConfig() (err error) {
 		if err = os.MkdirAll(configDir, 0644); err == nil {
 			err = execCommand("git", "clone", "https://github.com/LinuxSuRen/hd-home", configDir)
 		}
+	}
+
+	if err != nil && strings.Contains(err.Error(), "exit status 128") {
+		// target directory was created accidentally, remove it then try again
+		_ = os.RemoveAll(configDir)
+		return fetchHomeConfig()
 	}
 	return
 }
