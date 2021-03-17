@@ -10,7 +10,9 @@ require (
 	github.com/linuxsuren/cobra-extension v0.0.10
 	github.com/magiconair/properties v1.8.4
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/onsi/ginkgo v1.15.0
-	github.com/onsi/gomega v1.10.4
+	github.com/onsi/gomega v1.11.0
+	github.com/onsi/ginkgo v1.15.1
 	github.com/spf13/cobra v1.1.3
+	github.com/stretchr/testify v1.7.0
+	gopkg.in/yaml.v2 v2.4.0
 )

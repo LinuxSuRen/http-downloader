@@ -12,6 +12,7 @@ import (
 	"path"
 	"strconv"
 	"sync"
+	"time"
 )
 
 const (
@@ -39,7 +40,10 @@ type HTTPDownloader struct {
 	// PreStart returns false will don't continue
 	PreStart func(*http.Response) bool
 
-	Thread int
+	Thread      int
+	Title       string
+	Timeout     int
+	MaxAttempts int
 
 	Debug        bool
 	RoundTripper http.RoundTripper
@@ -121,7 +125,13 @@ func (h *HTTPDownloader) DownloadFile() error {
 		}
 		tr = trp
 	}
-	client := &http.Client{Transport: tr}
+	client := &RetryClient{
+		Client: http.Client{
+			Transport: tr,
+			Timeout:   time.Duration(h.Timeout) * time.Second,
+		},
+		MaxAttempts: h.MaxAttempts,
+	}
 	var resp *http.Response
 
 	if resp, err = client.Do(req); err != nil {
@@ -140,8 +150,11 @@ func (h *HTTPDownloader) DownloadFile() error {
 		return nil
 	}
 
+	if h.Title == "" {
+		h.Title = "Downloading"
+	}
 	writer := &ProgressIndicator{
-		Title: "Downloading",
+		Title: h.Title,
 	}
 	if showProgress {
 		if total, ok := resp.Header["Content-Length"]; ok && len(total) > 0 {
@@ -206,7 +219,7 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 				}
 				start := unit * int64(index)
 
-				if downloadErr := DownloadWithContinue(targetURL, fmt.Sprintf("%s-%d", targetFilePath, index), start, end, showProgress); downloadErr != nil {
+				if downloadErr := DownloadWithContinue(targetURL, fmt.Sprintf("%s-%d", targetFilePath, index), int64(index), start, end, showProgress); downloadErr != nil {
 					fmt.Println(downloadErr)
 				}
 			}(i, &wg)
@@ -238,17 +251,20 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 		}
 	} else {
 		fmt.Println("cannot download it using multiple threads, failed to one")
-		err = DownloadWithContinue(targetURL, targetFilePath, 0, 0, true)
+		err = DownloadWithContinue(targetURL, targetFilePath, -1, 0, 0, true)
 	}
 	return
 }
 
 // DownloadWithContinue downloads the files continuously
-func DownloadWithContinue(targetURL, output string, continueAt, end int64, showProgress bool) (err error) {
+func DownloadWithContinue(targetURL, output string, index, continueAt, end int64, showProgress bool) (err error) {
 	downloader := HTTPDownloader{
 		TargetFilePath: output,
 		URL:            targetURL,
 		ShowProgress:   showProgress,
+	}
+	if index >= 0 {
+		downloader.Title = fmt.Sprintf("Downloading part %d", index)
 	}
 
 	if continueAt >= 0 {
