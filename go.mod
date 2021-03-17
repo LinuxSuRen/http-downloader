@@ -3,7 +3,8 @@ module github.com/linuxsuren/http-downloader
 go 1.15
 
 require (
-	github.com/golang/mock v1.4.4
+	github.com/ghodss/yaml v1.0.0
+	github.com/golang/mock v1.5.0
 	github.com/google/go-github/v29 v29.0.3
 	github.com/gosuri/uiprogress v0.0.1
 	github.com/linuxsuren/cobra-extension v0.0.10
