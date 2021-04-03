@@ -1,13 +1,13 @@
 package cmd
 
 import (
+	"github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
 	"os"
 	"path"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/mitchellh/go-homedir"
-	"github.com/spf13/cobra"
 )
 
 func newFetchCmd() (cmd *cobra.Command) {

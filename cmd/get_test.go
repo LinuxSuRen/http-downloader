@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/magiconair/properties/assert"
 	"runtime"
 	"testing"
@@ -9,29 +10,29 @@ import (
 
 func TestIsSupport(t *testing.T) {
 	table := []struct {
-		cfg     hdConfig
+		cfg     installer.HDConfig
 		expect  bool
 		message string
 	}{{
-		cfg:     hdConfig{},
+		cfg:     installer.HDConfig{},
 		expect:  true,
 		message: "support all os and arch",
 	}, {
-		cfg: hdConfig{
+		cfg: installer.HDConfig{
 			SupportOS:   []string{runtime.GOOS},
 			SupportArch: []string{runtime.GOARCH},
 		},
 		expect:  true,
 		message: "",
 	}, {
-		cfg: hdConfig{
+		cfg: installer.HDConfig{
 			SupportOS:   []string{"fake"},
 			SupportArch: []string{runtime.GOARCH},
 		},
 		expect:  false,
 		message: "not support os",
 	}, {
-		cfg: hdConfig{
+		cfg: installer.HDConfig{
 			SupportOS:   []string{runtime.GOOS},
 			SupportArch: []string{"fake"},
 		},

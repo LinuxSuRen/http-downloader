@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/linuxsuren/http-downloader/pkg"
+	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
@@ -52,7 +53,7 @@ func NewGetCmd() (cmd *cobra.Command) {
 	flags.StringVarP(&opt.OS, "os", "", runtime.GOOS, "The OS of target binary file")
 	flags.StringVarP(&opt.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
 	flags.BoolVarP(&opt.PrintSchema, "print-schema", "", false,
-		"Print the schema of hdConfig if the flag is true without other function")
+		"Print the schema of HDConfig if the flag is true without other function")
 	return
 }
 
@@ -78,7 +79,7 @@ type downloadOption struct {
 	// inner fields
 	name    string
 	Tar     bool
-	Package *hdConfig
+	Package *installer.HDConfig
 }
 
 const (
@@ -86,7 +87,7 @@ const (
 	ProviderGitHub = "github"
 )
 
-func (o *downloadOption) isSupport(cfg hdConfig) bool {
+func (o *downloadOption) isSupport(cfg installer.HDConfig) bool {
 	var osSupport, archSupport bool
 
 	if len(cfg.SupportOS) > 0 {
@@ -201,18 +202,14 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 	if ok, _ := pathExists(matchedFile); ok {
 		var data []byte
 		if data, err = ioutil.ReadFile(matchedFile); err == nil {
-			cfg := hdConfig{}
+			cfg := installer.HDConfig{}
 			if !o.isSupport(cfg) {
 				err = fmt.Errorf("not support this platform, os: %s, arch: %s", runtime.GOOS, runtime.GOARCH)
 				return
 			}
 
 			if err = yaml.Unmarshal(data, &cfg); err == nil {
-				if cfg.Name != "" {
-					o.name = cfg.Name
-				}
-
-				hdPkg := &hdPackage{
+				hdPkg := &installer.HDPackage{
 					Name:       o.name,
 					Version:    version,
 					OS:         getReplacement(runtime.GOOS, cfg.Replacements),
@@ -297,7 +294,7 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 	return
 }
 
-func renderTemplate(text string, hdPkg *hdPackage) (result string, err error) {
+func renderTemplate(text string, hdPkg *installer.HDPackage) (result string, err error) {
 	tmp, _ := template.New("hd").Parse(text)
 
 	var buf bytes.Buffer
@@ -307,7 +304,7 @@ func renderTemplate(text string, hdPkg *hdPackage) (result string, err error) {
 	return
 }
 
-func renderCmdWithArgs(cmd *cmdWithArgs, hdPkg *hdPackage) (err error) {
+func renderCmdWithArgs(cmd *installer.CmdWithArgs, hdPkg *installer.HDPackage) (err error) {
 	if cmd == nil {
 		return
 	}
@@ -323,35 +320,6 @@ func renderCmdWithArgs(cmd *cmdWithArgs, hdPkg *hdPackage) (err error) {
 		}
 	}
 	return
-}
-
-type hdConfig struct {
-	Name         string            `yaml:"name"`
-	Filename     string            `yaml:"filename"`
-	Binary       string            `yaml:"binary"`
-	TargetBinary string            `yaml:"targetBinary"`
-	URL          string            `yaml:"url"`
-	Tar          string            `yaml:"tar"`
-	SupportOS    []string          `yaml:"supportOS"`
-	SupportArch  []string          `yaml:"supportArch"`
-	Replacements map[string]string `yaml:"replacements"`
-	Installation *cmdWithArgs      `yaml:"installation"`
-	PreInstall   *cmdWithArgs      `yaml:"preInstall"`
-	PostInstall  *cmdWithArgs      `yaml:"postInstall"`
-	TestInstall  *cmdWithArgs      `yaml:"testInstall"`
-}
-
-type cmdWithArgs struct {
-	Cmd  string   `yaml:"cmd"`
-	Args []string `yaml:"args"`
-}
-
-type hdPackage struct {
-	Name       string
-	Version    string // e.g. v1.0.1
-	VersionNum string // e.g. 1.0.1
-	OS         string // e.g. linux, darwin
-	Arch       string // e.g. amd64
 }
 
 func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) {
@@ -402,11 +370,11 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	// only print the schema for documentation
 	if o.PrintSchema {
 		var data []byte
-		if data, err = yaml.Marshal(hdConfig{
-			Installation: &cmdWithArgs{},
-			PreInstall:   &cmdWithArgs{},
-			PostInstall:  &cmdWithArgs{},
-			TestInstall:  &cmdWithArgs{},
+		if data, err = yaml.Marshal(installer.HDConfig{
+			Installation: &installer.CmdWithArgs{},
+			PreInstall:   &installer.CmdWithArgs{},
+			PostInstall:  &installer.CmdWithArgs{},
+			TestInstall:  &installer.CmdWithArgs{},
 		}); err == nil {
 			cmd.Print(string(data))
 		}
