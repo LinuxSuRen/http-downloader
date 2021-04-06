@@ -1,11 +1,12 @@
 package cmd
 
 import (
-	"github.com/mitchellh/go-homedir"
-	"github.com/spf13/cobra"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
 )
 
 func newFetchCmd() (cmd *cobra.Command) {
@@ -28,26 +29,34 @@ func getConfigDir() (configDir string, err error) {
 }
 
 func fetchHomeConfig() (err error) {
+	return fetchLatestRepo("https://github.com/LinuxSuRen/hd-home", "master")
+}
+
+func fetchLatestRepo(repo string, branch string) (err error) {
 	var configDir string
 	if configDir, err = getConfigDir(); err != nil {
 		return
 	}
 
 	if ok, _ := pathExists(configDir); ok {
-		err = execCommandInDir("git", configDir, "reset", "--hard", "origin/master")
 		if err == nil {
-			err = execCommandInDir("git", configDir, "pull")
+			// git fetch --depth 1 origin master
+			err = execCommandInDir("git", configDir, "fetch", "--depth", "1", "origin", branch)
+		}
+		if err == nil {
+			// git checkout origin/master
+			err = execCommandInDir("git", configDir, "checkout", "origin/"+branch)
 		}
 	} else {
 		if err = os.MkdirAll(configDir, 0644); err == nil {
-			err = execCommand("git", "clone", "https://github.com/LinuxSuRen/hd-home", configDir)
+			err = execCommand("git", "clone", "--depth", "1", repo, configDir)
 		}
 	}
 
 	if err != nil && strings.Contains(err.Error(), "exit status 128") {
 		// target directory was created accidentally, remove it then try again
 		_ = os.RemoveAll(configDir)
-		return fetchHomeConfig()
+		return fetchLatestRepo(repo, branch)
 	}
 	return
 }
