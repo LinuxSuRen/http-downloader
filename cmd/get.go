@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -10,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"text/template"
@@ -105,6 +107,28 @@ func (o *downloadOption) isSupport(cfg hdConfig) bool {
 	return osSupport && archSupport
 }
 
+func findByRepo(repo string) (result []string) {
+	userHome, _ := homedir.Dir()
+	configDir := userHome + "/.config/hd-home"
+	matchedFile := configDir + "/config/*/" + repo + ".yml"
+
+	if files, err := filepath.Glob(matchedFile); err == nil {
+		for _, metaFile := range files {
+			result = append(result, filepath.Base(filepath.Dir(metaFile)))
+		}
+	}
+	return
+}
+
+func chooseOneFromArray(options []string) (result string, err error) {
+	prompt := &survey.Select{
+		Message: "Please select:",
+		Options: options,
+	}
+	err = survey.AskOne(prompt, &result)
+	return
+}
+
 func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 	url = path
 	if o.Provider != ProviderGitHub {
@@ -123,15 +147,29 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 		org = addr[0]
 		repo = addr[1]
 		name = repo
+	} else if len(addr) > 0 {
+		repo = addr[0]
+
+		if potentialOrgs := findByRepo(repo); len(potentialOrgs) == 0 {
+			err = fmt.Errorf("cannot found the package: %s", repo)
+			return
+		} else if len(potentialOrgs) == 1 {
+			org = potentialOrgs[0]
+		} else {
+			if org, err = chooseOneFromArray(potentialOrgs); err != nil {
+				err = fmt.Errorf("failed to choose the potential organizations of your desired package")
+				return
+			}
+		}
+
+		fmt.Printf("prepare to download %s/%s\n", org, repo)
 	} else {
-		err = fmt.Errorf("only support format xx/xx or xx/xx/xx")
+		err = fmt.Errorf("only support format xx, xx/xx or xx/xx/xx")
 		return
 	}
 
 	if len(addr) == 3 {
 		name = addr[2]
-	} else if len(addr) > 3 {
-		err = fmt.Errorf("only support format xx/xx or xx/xx/xx")
 	}
 
 	// extract version from name
@@ -142,7 +180,7 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 
 		url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
 			org, repo, version, name, o.OS, o.Arch)
-	} else {
+	} else if name != "" {
 		version = "latest"
 		url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
 			org, repo, version, name, o.OS, o.Arch)
@@ -163,6 +201,10 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 			}
 
 			if err = yaml.Unmarshal(data, &cfg); err == nil {
+				if cfg.Name != "" {
+					o.name = cfg.Name
+				}
+
 				hdPkg := &hdPackage{
 					Name:       o.name,
 					Version:    version,
@@ -183,6 +225,16 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 						hdPkg.VersionNum = strings.TrimPrefix(asset.TagName, "v")
 					} else {
 						fmt.Println(err, "cannot get the asset")
+					}
+
+					if url == "" {
+						url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
+							org, repo, version, o.name, o.OS, o.Arch)
+					}
+				} else {
+					if url == "" {
+						url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
+							org, repo, version, name, o.OS, o.Arch)
 					}
 				}
 
