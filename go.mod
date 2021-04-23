@@ -3,7 +3,7 @@ module github.com/linuxsuren/http-downloader
 go 1.15
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.2.2
+	github.com/AlecAivazis/survey/v2 v2.2.12
 	github.com/golang/mock v1.5.0
 	github.com/google/go-github/v29 v29.0.3
 	github.com/gosuri/uiprogress v0.0.1
