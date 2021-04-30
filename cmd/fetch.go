@@ -39,14 +39,7 @@ func fetchLatestRepo(repo string, branch string) (err error) {
 	}
 
 	if ok, _ := pathExists(configDir); ok {
-		if err == nil {
-			// git fetch --depth 1 origin master
-			err = execCommandInDir("git", configDir, "fetch", "--depth", "1", "origin", branch)
-		}
-		if err == nil {
-			// git checkout origin/master
-			err = execCommandInDir("git", configDir, "checkout", "origin/"+branch)
-		}
+		err = execCommandInDir("git", configDir, "pull", "origin", branch)
 	} else {
 		if err = os.MkdirAll(configDir, 0644); err == nil {
 			err = execCommand("git", "clone", "--depth", "1", repo, configDir)

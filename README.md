@@ -15,6 +15,8 @@ curl -L https://github.com/linuxsuren/http-downloader/releases/latest/download/h
 mv hd /usr/local/bin
 ```
 
+Want to go through the code? [GitPod](https://gitpod.io/#https://github.com/linuxsuren/http-downloader) definitely can help you.
+
 # Usage
 
 ## Download

@@ -16,6 +16,8 @@ curl -L https://github.com/linuxsuren/http-downloader/releases/latest/download/h
 mv hd /usr/local/bin
 ```
 
+想要浏览该项目的代码吗？[GitPod](https://gitpod.io/#https://github.com/linuxsuren/http-downloader) 绝对可以帮助你！
+
 # 用法
 
 ```
