@@ -24,3 +24,7 @@ gen-mock:
 	go get github.com/golang/mock/gomock
 	go install github.com/golang/mock/mockgen
 	mockgen -destination ./mock/mhttp/roundtripper.go -package mhttp net/http RoundTripper
+
+update:
+	git fetch
+	git reset --hard origin/$(shell git branch --show-current)
