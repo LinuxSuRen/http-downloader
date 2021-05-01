@@ -27,7 +27,7 @@ categories:
       - 'kind/chore'
       - 'kind/dep'
   - title: 🚦 Tests
-    labels: 
+    labels:
       - test
       - tests
 exclude-labels:
