@@ -146,7 +146,6 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 	if len(addr) >= 2 {
 		org = addr[0]
 		repo = addr[1]
-		name = repo
 	} else if len(addr) > 0 {
 		repo = addr[0]
 
@@ -170,6 +169,8 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 
 	if len(addr) == 3 {
 		name = addr[2]
+	} else {
+		name = repo
 	}
 
 	// extract version from name
@@ -214,7 +215,7 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 				}
 				o.Package = &cfg
 
-				if version == "latest" {
+				if version == "latest" || version == "" {
 					ghClient := pkg.ReleaseClient{
 						Org:  org,
 						Repo: repo,
@@ -223,12 +224,14 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 					if asset, err := ghClient.GetLatestJCLIAsset(); err == nil {
 						hdPkg.Version = asset.TagName
 						hdPkg.VersionNum = strings.TrimPrefix(asset.TagName, "v")
+
+						version = hdPkg.Version
 					} else {
 						fmt.Println(err, "cannot get the asset")
 					}
 
 					if url == "" {
-						url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
+						url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
 							org, repo, version, o.name, o.OS, o.Arch)
 					}
 				} else {
@@ -253,7 +256,7 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 
 					var buf bytes.Buffer
 					if err = tmp.Execute(&buf, hdPkg); err == nil {
-						url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s",
+						url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s",
 							org, repo, version, buf.String())
 
 						o.Output = buf.String()

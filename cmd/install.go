@@ -107,8 +107,12 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 		}
 
 		if err == nil && o.CleanPackage {
-			if cleanErr := os.RemoveAll(tarFile); cleanErr != nil {
+			fmt.Println("start to clean", tarFile, "and", source)
+			if cleanErr := os.Remove(tarFile); cleanErr != nil {
 				cmd.Println("cannot remove file", tarFile, ", error:", cleanErr)
+			}
+			if cleanErr := os.Remove(source); cleanErr != nil {
+				cmd.Println("cannot remove file", source, ", error:", cleanErr)
 			}
 		}
 	}
