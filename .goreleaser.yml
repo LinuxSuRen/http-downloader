@@ -1,39 +1,39 @@
 # Official documentation at http://goreleaser.com
 project_name: http-downloader
 builds:
-- env:
-  - CGO_ENABLED=0
-  binary: hd
-  goarch:
-    - amd64
-    - arm64
-  goos:
-    - windows
-    - linux
-    - darwin
-  hooks:
-    post:
-      - upx "{{ .Path }}"
-  ldflags:
-    - -X github.com/linuxsuren/cobra-extension/version.version={{.Version}}
-    - -X github.com/linuxsuren/cobra-extension/version.commit={{.ShortCommit}}
-    - -X github.com/linuxsuren/cobra-extension/version.date={{.Date}}
-    - -w
-    - -s
+  - env:
+      - CGO_ENABLED=0
+    binary: hd
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - windows
+      - linux
+      - darwin
+    hooks:
+      post:
+        - upx "{{ .Path }}"
+    ldflags:
+      - -X github.com/linuxsuren/cobra-extension/version.version={{.Version}}
+      - -X github.com/linuxsuren/cobra-extension/version.commit={{.ShortCommit}}
+      - -X github.com/linuxsuren/cobra-extension/version.date={{.Date}}
+      - -w
+      - -s
 dist: release
 archives:
-- name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
-  replacements:
-    darwin: darwin
-    linux: linux
-    windows: windows
-    amd64: amd64
-    arm64: arm64
-  format_overrides:
-    - goos: windows
-      format: zip
-  files:
-    - README.md
+  - name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
+    replacements:
+      darwin: darwin
+      linux: linux
+      windows: windows
+      amd64: amd64
+      arm64: arm64
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
 checksum:
   name_template: 'checksums.txt'
 snapshot:
@@ -43,11 +43,10 @@ changelog:
   sort: asc
   filters:
     exclude:
-    - '^docs:'
-    - '^test:'
+      - '^docs:'
+      - '^test:'
 brews:
-  -
-    name: hd
+  - name: hd
     tap:
       owner: linuxsuren
       name: homebrew-linuxsuren
