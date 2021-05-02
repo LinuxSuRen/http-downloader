@@ -1,44 +1,15 @@
 package pkg
 
+/**
+ * This file was deprecated, please use the following package instead
+ * github.com/linuxsuren/http-downloader/pkg/net
+ */
+
 import (
-	"errors"
-	"net"
+	"github.com/linuxsuren/http-downloader/pkg/net"
 )
 
-//GetExternalIP returns an external ip of current machine
+// GetExternalIP returns an external ip of current machine
 func GetExternalIP() (string, error) {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return "", err
-	}
-	for _, iface := range ifaces {
-		if iface.Flags&net.FlagUp == 0 {
-			continue // interface down
-		}
-		if iface.Flags&net.FlagLoopback != 0 {
-			continue // loopback interface
-		}
-		addrs, err := iface.Addrs()
-		if err != nil {
-			return "", err
-		}
-		for _, addr := range addrs {
-			var ip net.IP
-			switch v := addr.(type) {
-			case *net.IPNet:
-				ip = v.IP
-			case *net.IPAddr:
-				ip = v.IP
-			}
-			if ip == nil || ip.IsLoopback() {
-				continue
-			}
-			ip = ip.To4()
-			if ip == nil {
-				continue // not an ipv4 address
-			}
-			return ip.String(), nil
-		}
-	}
-	return "", errors.New("are you connected to the network?")
+	return net.GetExternalIP()
 }

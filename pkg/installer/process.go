@@ -5,14 +5,16 @@ import (
 	"compress/gzip"
 	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
+	"golang.org/x/sys/unix"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 )
 
+// Install installs a package
 func (o *Installer) Install() (err error) {
 	targetBinary := o.Name
 	if o.Package != nil && o.Package.TargetBinary != "" {
@@ -77,9 +79,10 @@ func (o *Installer) overWriteBinary(sourceFile, targetPath string) (err error) {
 			return
 		}
 
-		var cp string
-		if cp, err = exec.LookPath("mv"); err == nil {
-			err = syscall.Exec(cp, []string{"mv", sourceFile, targetPath}, os.Environ())
+		if unix.Access(path.Dir(targetPath), unix.W_OK) != nil {
+			err = exec.ExecCommand("sudo", "mv", sourceFile, targetPath)
+		} else {
+			err = exec.ExecCommand("mv", sourceFile, targetPath)
 		}
 	default:
 		sourceF, _ := os.Open(sourceFile)

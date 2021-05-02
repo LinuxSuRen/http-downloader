@@ -1,5 +1,6 @@
 package installer
 
+// HDConfig is the config of http-downloader
 type HDConfig struct {
 	Name         string            `yaml:"Name"`
 	Filename     string            `yaml:"filename"`
@@ -16,11 +17,13 @@ type HDConfig struct {
 	TestInstall  *CmdWithArgs      `yaml:"testInstall"`
 }
 
+// CmdWithArgs is a command with arguments
 type CmdWithArgs struct {
 	Cmd  string   `yaml:"cmd"`
 	Args []string `yaml:"args"`
 }
 
+// HDPackage represents a package of http-downloader
 type HDPackage struct {
 	Name       string
 	Version    string // e.g. v1.0.1
@@ -29,6 +32,7 @@ type HDPackage struct {
 	Arch       string // e.g. amd64
 }
 
+// Installer is a tool to install a package
 type Installer struct {
 	Package      *HDConfig
 	Tar          bool
@@ -36,4 +40,8 @@ type Installer struct {
 	Source       string
 	Name         string
 	CleanPackage bool
+	Provider     string
+	OS           string
+	Arch         string
+	Fetch        bool
 }

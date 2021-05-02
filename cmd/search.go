@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"path"
 	"path/filepath"
@@ -22,9 +23,12 @@ func newSearchCmd() (cmd *cobra.Command) {
 }
 
 func search(keyword string) (err error) {
+	if err = installer.FetchConfig(); err != nil {
+		return
+	}
+
 	var configDir string
-	if configDir, err = getConfigDir(); err != nil {
-		// TODO consider how to deal with the situation when config repo is not exists
+	if configDir, err = installer.GetConfigDir(); err != nil {
 		return
 	}
 

@@ -70,58 +70,6 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
-	targetBinary := o.name
-	if o.Package != nil && o.Package.TargetBinary != "" {
-		// this is the desired binary file
-		targetBinary = o.Package.TargetBinary
-	}
-
-	var source string
-	var target string
-	tarFile := o.Output
-	if o.Tar {
-		if err = o.extractFiles(tarFile, o.name); err == nil {
-			source = fmt.Sprintf("%s/%s", filepath.Dir(tarFile), o.name)
-			target = fmt.Sprintf("/usr/local/bin/%s", targetBinary)
-		} else {
-			err = fmt.Errorf("cannot extract %s from tar file, error: %v", tarFile, err)
-		}
-	} else {
-		source = o.downloadOption.Output
-		target = fmt.Sprintf("/usr/local/bin/%s", targetBinary)
-	}
-
-	if err == nil {
-		if o.Package != nil && o.Package.PreInstall != nil {
-			if err = exec.ExecCommand(o.Package.PreInstall.Cmd, o.Package.PreInstall.Args...); err != nil {
-				return
-			}
-		}
-
-		if o.Package != nil && o.Package.Installation != nil {
-			err = exec.ExecCommand(o.Package.Installation.Cmd, o.Package.Installation.Args...)
-		} else {
-			err = o.overWriteBinary(source, target)
-		}
-
-		if err == nil && o.Package != nil && o.Package.PostInstall != nil {
-			err = exec.ExecCommand(o.Package.PostInstall.Cmd, o.Package.PostInstall.Args...)
-		}
-
-		if err == nil && o.Package != nil && o.Package.TestInstall != nil {
-			err = exec.ExecCommand(o.Package.TestInstall.Cmd, o.Package.TestInstall.Args...)
-		}
-
-		if err == nil && o.CleanPackage {
-			fmt.Println("start to clean", tarFile, "and", source)
-			if cleanErr := os.Remove(tarFile); cleanErr != nil {
-				cmd.Println("cannot remove file", tarFile, ", error:", cleanErr)
-			}
-			if cleanErr := os.Remove(source); cleanErr != nil {
-				cmd.Println("cannot remove file", source, ", error:", cleanErr)
-			}
-		}
-	}
 	process := &installer.Installer{
 		Source:       o.downloadOption.Output,
 		Name:         o.name,

@@ -1,4 +1,4 @@
-package cmd
+package common
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ func TestGetOrDefault(t *testing.T) {
 	}
 
 	for index, item := range table {
-		result := getOrDefault(item.key, item.def, item.data)
+		result := GetOrDefault(item.key, item.def, item.data)
 		assert.Equal(t, result, item.expected, fmt.Sprintf("test failed with '%d'", index))
 	}
 }
@@ -31,7 +31,7 @@ func TestGetReplacement(t *testing.T) {
 	}
 
 	for index, item := range table {
-		result := getReplacement(item.key, item.data)
+		result := GetReplacement(item.key, item.data)
 		assert.Equal(t, result, item.expected, fmt.Sprintf("test failed with '%d'", index))
 	}
 }
