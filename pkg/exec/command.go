@@ -12,7 +12,8 @@ func LookPath(file string) (string, error) {
 	return exec.LookPath(file)
 }
 
-func ExecCommandInDir(name, dir string, arg ...string) (err error) {
+// RunCommandInDir runs a command
+func RunCommandInDir(name, dir string, arg ...string) (err error) {
 	command := exec.Command(name, arg...)
 	if dir != "" {
 		command.Dir = dir
@@ -45,8 +46,9 @@ func ExecCommandInDir(name, dir string, arg ...string) (err error) {
 	return
 }
 
-func ExecCommand(name string, arg ...string) (err error) {
-	return ExecCommandInDir(name, "", arg...)
+// RunCommand runs a command
+func RunCommand(name string, arg ...string) (err error) {
+	return RunCommandInDir(name, "", arg...)
 }
 
 func copyAndCapture(w io.Writer, r io.Reader) ([]byte, error) {

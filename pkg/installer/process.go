@@ -3,9 +3,10 @@ package installer
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
-	"golang.org/x/sys/unix"
 	"io"
 	"os"
 	"path"
@@ -39,23 +40,23 @@ func (o *Installer) Install() (err error) {
 
 	if err == nil {
 		if o.Package != nil && o.Package.PreInstall != nil {
-			if err = exec.ExecCommand(o.Package.PreInstall.Cmd, o.Package.PreInstall.Args...); err != nil {
+			if err = exec.RunCommand(o.Package.PreInstall.Cmd, o.Package.PreInstall.Args...); err != nil {
 				return
 			}
 		}
 
 		if o.Package != nil && o.Package.Installation != nil {
-			err = exec.ExecCommand(o.Package.Installation.Cmd, o.Package.Installation.Args...)
+			err = exec.RunCommand(o.Package.Installation.Cmd, o.Package.Installation.Args...)
 		} else {
 			err = o.overWriteBinary(source, target)
 		}
 
 		if err == nil && o.Package != nil && o.Package.PostInstall != nil {
-			err = exec.ExecCommand(o.Package.PostInstall.Cmd, o.Package.PostInstall.Args...)
+			err = exec.RunCommand(o.Package.PostInstall.Cmd, o.Package.PostInstall.Args...)
 		}
 
 		if err == nil && o.Package != nil && o.Package.TestInstall != nil {
-			err = exec.ExecCommand(o.Package.TestInstall.Cmd, o.Package.TestInstall.Args...)
+			err = exec.RunCommand(o.Package.TestInstall.Cmd, o.Package.TestInstall.Args...)
 		}
 
 		if err == nil && o.CleanPackage {
@@ -71,18 +72,18 @@ func (o *Installer) overWriteBinary(sourceFile, targetPath string) (err error) {
 	fmt.Println("install", sourceFile, "to", targetPath)
 	switch runtime.GOOS {
 	case "linux", "darwin":
-		if err = exec.ExecCommand("chmod", "u+x", sourceFile); err != nil {
+		if err = exec.RunCommand("chmod", "u+x", sourceFile); err != nil {
 			return
 		}
 
-		if err = exec.ExecCommand("rm", "-rf", targetPath); err != nil {
+		if err = exec.RunCommand("rm", "-rf", targetPath); err != nil {
 			return
 		}
 
-		if unix.Access(path.Dir(targetPath), unix.W_OK) != nil {
-			err = exec.ExecCommand("sudo", "mv", sourceFile, targetPath)
+		if common.IsDirWriteable(path.Dir(targetPath)) != nil {
+			err = exec.RunCommand("sudo", "mv", sourceFile, targetPath)
 		} else {
-			err = exec.ExecCommand("mv", sourceFile, targetPath)
+			err = exec.RunCommand("mv", sourceFile, targetPath)
 		}
 	default:
 		sourceF, _ := os.Open(sourceFile)
@@ -99,6 +100,11 @@ func (o *Installer) overWriteBinary(sourceFile, targetPath string) (err error) {
 }
 
 func (o *Installer) extractFiles(tarFile, targetName string) (err error) {
+	if targetName == "" {
+		err = errors.New("target filename is empty")
+		return
+	}
+
 	var f *os.File
 	var gzf *gzip.Reader
 	if f, err = os.Open(tarFile); err != nil {

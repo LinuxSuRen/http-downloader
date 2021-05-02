@@ -60,6 +60,7 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 	return
 }
 
+// ProviderURLParse parse the URL
 func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url string, err error) {
 	url = path
 	if o.Provider != ProviderGitHub {
@@ -225,6 +226,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 	return
 }
 
+// IsSupport checks if support
 func IsSupport(cfg HDConfig) bool {
 	var osSupport, archSupport bool
 

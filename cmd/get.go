@@ -94,7 +94,7 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 
 	targetURL := args[0]
 	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
-		ins := installer.Installer{
+		ins := &installer.Installer{
 			Provider: o.Provider,
 			OS:       o.OS,
 			Arch:     o.Arch,
@@ -104,6 +104,7 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 			err = fmt.Errorf("only http:// or https:// supported, error: %v", err)
 			return
 		}
+		o.name = ins.Name
 		cmd.Printf("start to download from %s\n", targetURL)
 	}
 	o.URL = targetURL

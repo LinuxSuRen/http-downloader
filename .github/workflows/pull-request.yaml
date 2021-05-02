@@ -32,7 +32,7 @@ jobs:
           args: release --skip-publish --rm-dist
       - name: Test against the cmd
         run: |
-          sudo ./release/http-downloader_linux_amd64/hd install -t 8 jenkins-zh/jenkins-cli/jcli
+          sudo ./release/http-downloader_linux_amd64/hd install jenkins-zh/jenkins-cli/jcli
           jcli version
       - name: Upload Artifact for darwin
         uses: actions/upload-artifact@v2

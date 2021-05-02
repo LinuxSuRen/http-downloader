@@ -1,18 +1,10 @@
 package cmd
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
-	"io"
-	"os"
-	"path/filepath"
 	"runtime"
-	"strings"
-	"syscall"
 )
 
 // NewInstallCmd returns the install command
@@ -78,86 +70,7 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 		Output:       o.Output,
 		CleanPackage: o.CleanPackage,
 	}
+	fmt.Println(process)
 	err = process.Install()
-	return
-}
-
-func (o *installOption) overWriteBinary(sourceFile, targetPath string) (err error) {
-	fmt.Println("install", sourceFile, "to", targetPath)
-	switch runtime.GOOS {
-	case "linux", "darwin":
-		if err = exec.ExecCommand("chmod", "u+x", sourceFile); err != nil {
-			return
-		}
-
-		if err = exec.ExecCommand("rm", "-rf", targetPath); err != nil {
-			return
-		}
-
-		var cp string
-		if cp, err = exec.LookPath("mv"); err == nil {
-			err = syscall.Exec(cp, []string{"mv", sourceFile, targetPath}, os.Environ())
-		}
-	default:
-		sourceF, _ := os.Open(sourceFile)
-		targetF, _ := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, 0600)
-		if _, err = io.Copy(targetF, sourceF); err != nil {
-			err = fmt.Errorf("cannot copy %s from %s to %v, error: %v", o.name, sourceFile, targetPath, err)
-		}
-
-		if err == nil {
-			_ = os.RemoveAll(sourceFile)
-		}
-	}
-	return
-}
-
-func (o *installOption) extractFiles(tarFile, targetName string) (err error) {
-	var f *os.File
-	var gzf *gzip.Reader
-	if f, err = os.Open(tarFile); err != nil {
-		return
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-
-	if gzf, err = gzip.NewReader(f); err != nil {
-		return
-	}
-
-	tarReader := tar.NewReader(gzf)
-	var header *tar.Header
-	var found bool
-	for {
-		if header, err = tarReader.Next(); err == io.EOF {
-			err = nil
-			break
-		} else if err != nil {
-			break
-		}
-		name := header.Name
-
-		switch header.Typeflag {
-		case tar.TypeReg:
-			if name != targetName && !strings.HasSuffix(name, "/"+targetName) {
-				continue
-			}
-			var targetFile *os.File
-			if targetFile, err = os.OpenFile(fmt.Sprintf("%s/%s", filepath.Dir(tarFile), targetName),
-				os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)); err != nil {
-				break
-			}
-			if _, err = io.Copy(targetFile, tarReader); err != nil {
-				break
-			}
-			found = true
-			_ = targetFile.Close()
-		}
-	}
-
-	if err == nil && !found {
-		err = fmt.Errorf("cannot found item '%s' from '%s'", targetName, tarFile)
-	}
 	return
 }
