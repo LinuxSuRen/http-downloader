@@ -24,8 +24,34 @@ func (g *ReleaseClient) Init() {
 }
 
 // GetLatestJCLIAsset returns the latest jcli asset
+// deprecated, please use GetLatestAsset instead
 func (g *ReleaseClient) GetLatestJCLIAsset() (*ReleaseAsset, error) {
 	return g.GetLatestReleaseAsset(g.Org, g.Repo)
+}
+
+// GetLatestAsset returns the latest release asset which can accept preRelease or not
+func (g *ReleaseClient) GetLatestAsset(acceptPreRelease bool) (*ReleaseAsset, error) {
+	if acceptPreRelease {
+		return g.GetLatestPreReleaseAsset(g.Org, g.Repo)
+	}
+	return g.GetLatestReleaseAsset(g.Org, g.Repo)
+}
+
+// GetLatestPreReleaseAsset returns the release asset that could be preRelease
+func (g *ReleaseClient) GetLatestPreReleaseAsset(owner, repo string) (ra *ReleaseAsset, err error) {
+	ctx := context.Background()
+
+	var list []*github.RepositoryRelease
+	if list, _, err = g.Client.Repositories.ListReleases(ctx, owner, repo, &github.ListOptions{
+		Page:    1,
+		PerPage: 5,
+	}); err == nil {
+		ra = &ReleaseAsset{
+			TagName: list[0].GetTagName(),
+			Body:    list[0].GetBody(),
+		}
+	}
+	return
 }
 
 // GetLatestReleaseAsset returns the latest release asset

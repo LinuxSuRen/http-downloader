@@ -35,6 +35,13 @@ hd get jenkins-zh/jenkins-cli/jcli -t 6
 ```
 hd install jenkins-zh/jenkins-cli/jcli -t 6
 ```
+```
+
+或者，你也可以从 GitHub 上下载预发布的二进制包：
+
+```
+hd get --pre ks
+```
 
 # 功能
 

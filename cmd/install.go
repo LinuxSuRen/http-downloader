@@ -31,6 +31,11 @@ func NewInstallCmd() (cmd *cobra.Command) {
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.BoolVarP(&opt.Fetch, "fetch", "", true,
 		"If fetch the latest config from https://github.com/LinuxSuRen/hd-home")
+	flags.BoolVarP(&opt.AcceptPreRelease, "accept-preRelease", "", false,
+		"If you accept preRelease as the binary asset from GitHub")
+	flags.BoolVarP(&opt.AcceptPreRelease, "pre", "", false,
+		"Same with option --accept-preRelease")
+
 	flags.BoolVarP(&opt.Download, "download", "", true,
 		"If download the package")
 	flags.BoolVarP(&opt.CleanPackage, "clean-package", "", true,

@@ -30,6 +30,12 @@ Or use a simple way instead of typing the whole URL:
 hd get jenkins-zh/jenkins-cli/jcli -t 6
 ```
 
+Or you might want to download a pre-released binary package from GitHub:
+
+```
+hd get --pre ks
+```
+
 ## Install
 You can also install a package from GitHub:
 

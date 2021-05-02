@@ -33,6 +33,11 @@ func NewGetCmd() (cmd *cobra.Command) {
 	flags.StringVarP(&opt.Output, "output", "o", "", "Write output to <file> instead of stdout.")
 	flags.BoolVarP(&opt.Fetch, "fetch", "", true,
 		"If fetch the latest config from https://github.com/LinuxSuRen/hd-home")
+	flags.BoolVarP(&opt.AcceptPreRelease, "accept-preRelease", "", false,
+		"If you accept preRelease as the binary asset from GitHub")
+	flags.BoolVarP(&opt.AcceptPreRelease, "pre", "", false,
+		"Same with option --accept-preRelease")
+
 	flags.IntVarP(&opt.Timeout, "time", "", 10,
 		`The default timeout in seconds with the HTTP request`)
 	flags.IntVarP(&opt.MaxAttempts, "max-attempts", "", 10,
@@ -52,12 +57,13 @@ func NewGetCmd() (cmd *cobra.Command) {
 }
 
 type downloadOption struct {
-	URL          string
-	Output       string
-	ShowProgress bool
-	Fetch        bool
-	Timeout      int
-	MaxAttempts  int
+	URL              string
+	Output           string
+	ShowProgress     bool
+	Fetch            bool
+	Timeout          int
+	MaxAttempts      int
+	AcceptPreRelease bool
 
 	ContinueAt int64
 
@@ -221,7 +227,7 @@ func (o *downloadOption) providerURLParse(path string) (url string, err error) {
 						Repo: repo,
 					}
 					ghClient.Init()
-					if asset, err := ghClient.GetLatestJCLIAsset(); err == nil {
+					if asset, err := ghClient.GetLatestAsset(o.AcceptPreRelease); err == nil {
 						hdPkg.Version = asset.TagName
 						hdPkg.VersionNum = strings.TrimPrefix(asset.TagName, "v")
 
