@@ -51,6 +51,22 @@ When you first run it, please init via: `hd fetch`
 
 then you can search it by a keyword: `hd search jenkins`
 
+## As a library
+You can import it from `github.com/linuxsuren/http-downloader/pkg/installer`, then put the following code to your CLI. 
+It can help you to download desired tools:
+
+```
+is := installer.Installer{
+    Provider: "github",
+}
+if err = is.CheckDepAndInstall(map[string]string{
+    "ks": "linuxsuren/ks",
+    "kk": "kubekey",
+}); err != nil {
+    return
+}
+```
+
 # Features
 * go library for HTTP
 * multi-thread

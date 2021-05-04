@@ -1,20 +1,15 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/linuxsuren/http-downloader/pkg"
-	"github.com/mitchellh/go-homedir"
+	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
 	"net/url"
 	"path"
-	"path/filepath"
 	"runtime"
 	"strings"
-	"text/template"
 )
 
 // NewGetCmd return the get command
@@ -52,7 +47,7 @@ func NewGetCmd() (cmd *cobra.Command) {
 	flags.StringVarP(&opt.OS, "os", "", runtime.GOOS, "The OS of target binary file")
 	flags.StringVarP(&opt.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
 	flags.BoolVarP(&opt.PrintSchema, "print-schema", "", false,
-		"Print the schema of hdConfig if the flag is true without other function")
+		"Print the schema of HDConfig if the flag is true without other function")
 	return
 }
 
@@ -78,281 +73,13 @@ type downloadOption struct {
 	// inner fields
 	name    string
 	Tar     bool
-	Package *hdConfig
+	Package *installer.HDConfig
 }
 
 const (
 	// ProviderGitHub represents https://github.com
 	ProviderGitHub = "github"
 )
-
-func (o *downloadOption) isSupport(cfg hdConfig) bool {
-	var osSupport, archSupport bool
-
-	if len(cfg.SupportOS) > 0 {
-		for _, item := range cfg.SupportOS {
-			if runtime.GOOS == item {
-				osSupport = true
-				break
-			}
-		}
-	} else {
-		osSupport = true
-	}
-
-	if len(cfg.SupportArch) > 0 {
-		for _, item := range cfg.SupportArch {
-			if runtime.GOARCH == item {
-				archSupport = true
-				break
-			}
-		}
-	} else {
-		archSupport = true
-	}
-	return osSupport && archSupport
-}
-
-func findByRepo(repo string) (result []string) {
-	userHome, _ := homedir.Dir()
-	configDir := userHome + "/.config/hd-home"
-	matchedFile := configDir + "/config/*/" + repo + ".yml"
-
-	if files, err := filepath.Glob(matchedFile); err == nil {
-		for _, metaFile := range files {
-			result = append(result, filepath.Base(filepath.Dir(metaFile)))
-		}
-	}
-	return
-}
-
-func chooseOneFromArray(options []string) (result string, err error) {
-	prompt := &survey.Select{
-		Message: "Please select:",
-		Options: options,
-	}
-	err = survey.AskOne(prompt, &result)
-	return
-}
-
-func (o *downloadOption) providerURLParse(path string) (url string, err error) {
-	url = path
-	if o.Provider != ProviderGitHub {
-		return
-	}
-
-	var (
-		org     string
-		repo    string
-		name    string
-		version string
-	)
-
-	addr := strings.Split(url, "/")
-	if len(addr) >= 2 {
-		org = addr[0]
-		repo = addr[1]
-	} else if len(addr) > 0 {
-		repo = addr[0]
-
-		if potentialOrgs := findByRepo(repo); len(potentialOrgs) == 0 {
-			err = fmt.Errorf("cannot found the package: %s", repo)
-			return
-		} else if len(potentialOrgs) == 1 {
-			org = potentialOrgs[0]
-		} else {
-			if org, err = chooseOneFromArray(potentialOrgs); err != nil {
-				err = fmt.Errorf("failed to choose the potential organizations of your desired package")
-				return
-			}
-		}
-
-		fmt.Printf("prepare to download %s/%s\n", org, repo)
-	} else {
-		err = fmt.Errorf("only support format xx, xx/xx or xx/xx/xx")
-		return
-	}
-
-	if len(addr) == 3 {
-		name = addr[2]
-	} else {
-		name = repo
-	}
-
-	// extract version from name
-	if strings.Contains(name, "@") {
-		nameWithVer := strings.Split(name, "@")
-		name = nameWithVer[0]
-		version = nameWithVer[1]
-
-		url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-			org, repo, version, name, o.OS, o.Arch)
-	} else if name != "" {
-		version = "latest"
-		url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
-			org, repo, version, name, o.OS, o.Arch)
-	}
-	o.name = name
-
-	// try to parse from config
-	userHome, _ := homedir.Dir()
-	configDir := userHome + "/.config/hd-home"
-	matchedFile := configDir + "/config/" + org + "/" + repo + ".yml"
-	if ok, _ := pathExists(matchedFile); ok {
-		var data []byte
-		if data, err = ioutil.ReadFile(matchedFile); err == nil {
-			cfg := hdConfig{}
-			if !o.isSupport(cfg) {
-				err = fmt.Errorf("not support this platform, os: %s, arch: %s", runtime.GOOS, runtime.GOARCH)
-				return
-			}
-
-			if err = yaml.Unmarshal(data, &cfg); err == nil {
-				if cfg.Name != "" {
-					o.name = cfg.Name
-				}
-
-				hdPkg := &hdPackage{
-					Name:       o.name,
-					Version:    version,
-					OS:         getReplacement(runtime.GOOS, cfg.Replacements),
-					Arch:       getReplacement(runtime.GOARCH, cfg.Replacements),
-					VersionNum: strings.TrimPrefix(version, "v"),
-				}
-				o.Package = &cfg
-
-				if version == "latest" || version == "" {
-					ghClient := pkg.ReleaseClient{
-						Org:  org,
-						Repo: repo,
-					}
-					ghClient.Init()
-					if asset, err := ghClient.GetLatestAsset(o.AcceptPreRelease); err == nil {
-						hdPkg.Version = asset.TagName
-						hdPkg.VersionNum = strings.TrimPrefix(asset.TagName, "v")
-
-						version = hdPkg.Version
-					} else {
-						fmt.Println(err, "cannot get the asset")
-					}
-
-					if url == "" {
-						url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-							org, repo, version, o.name, o.OS, o.Arch)
-					}
-				} else {
-					if url == "" {
-						url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-							org, repo, version, name, o.OS, o.Arch)
-					}
-				}
-
-				if cfg.URL != "" {
-					// it does not come from GitHub release
-					tmp, _ := template.New("hd").Parse(cfg.URL)
-
-					var buf bytes.Buffer
-					if err = tmp.Execute(&buf, hdPkg); err == nil {
-						url = buf.String()
-					} else {
-						return
-					}
-				} else if cfg.Filename != "" {
-					tmp, _ := template.New("hd").Parse(cfg.Filename)
-
-					var buf bytes.Buffer
-					if err = tmp.Execute(&buf, hdPkg); err == nil {
-						url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s",
-							org, repo, version, buf.String())
-
-						o.Output = buf.String()
-					} else {
-						return
-					}
-				}
-
-				if err = renderCmdWithArgs(cfg.PreInstall, hdPkg); err != nil {
-					return
-				}
-				if err = renderCmdWithArgs(cfg.Installation, hdPkg); err != nil {
-					return
-				}
-				if err = renderCmdWithArgs(cfg.PostInstall, hdPkg); err != nil {
-					return
-				}
-				if err = renderCmdWithArgs(cfg.TestInstall, hdPkg); err != nil {
-					return
-				}
-
-				o.Tar = cfg.Tar != "false"
-				if cfg.Binary != "" {
-					if cfg.Binary, err = renderTemplate(cfg.Binary, hdPkg); err != nil {
-						return
-					}
-					o.name = cfg.Binary
-				}
-			}
-		}
-	}
-	return
-}
-
-func renderTemplate(text string, hdPkg *hdPackage) (result string, err error) {
-	tmp, _ := template.New("hd").Parse(text)
-
-	var buf bytes.Buffer
-	if err = tmp.Execute(&buf, hdPkg); err == nil {
-		result = buf.String()
-	}
-	return
-}
-
-func renderCmdWithArgs(cmd *cmdWithArgs, hdPkg *hdPackage) (err error) {
-	if cmd == nil {
-		return
-	}
-
-	if cmd.Cmd, err = renderTemplate(cmd.Cmd, hdPkg); err != nil {
-		return
-	}
-
-	for i := range cmd.Args {
-		arg := cmd.Args[i]
-		if cmd.Args[i], err = renderTemplate(arg, hdPkg); err != nil {
-			return
-		}
-	}
-	return
-}
-
-type hdConfig struct {
-	Name         string            `yaml:"name"`
-	Filename     string            `yaml:"filename"`
-	Binary       string            `yaml:"binary"`
-	TargetBinary string            `yaml:"targetBinary"`
-	URL          string            `yaml:"url"`
-	Tar          string            `yaml:"tar"`
-	SupportOS    []string          `yaml:"supportOS"`
-	SupportArch  []string          `yaml:"supportArch"`
-	Replacements map[string]string `yaml:"replacements"`
-	Installation *cmdWithArgs      `yaml:"installation"`
-	PreInstall   *cmdWithArgs      `yaml:"preInstall"`
-	PostInstall  *cmdWithArgs      `yaml:"postInstall"`
-	TestInstall  *cmdWithArgs      `yaml:"testInstall"`
-}
-
-type cmdWithArgs struct {
-	Cmd  string   `yaml:"cmd"`
-	Args []string `yaml:"args"`
-}
-
-type hdPackage struct {
-	Name       string
-	Version    string // e.g. v1.0.1
-	VersionNum string // e.g. 1.0.1
-	OS         string // e.g. linux, darwin
-	Arch       string // e.g. amd64
-}
 
 func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 	// this might not be the best way to print schema
@@ -365,20 +92,19 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 		return fmt.Errorf("no URL provided")
 	}
 
-	if o.Fetch {
-		cmd.Println("start to fetch the config")
-		if err = fetchHomeConfig(); err != nil {
-			err = fmt.Errorf("failed with fetching home config: %v", err)
-			return
-		}
-	}
-
 	targetURL := args[0]
 	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
-		if targetURL, err = o.providerURLParse(targetURL); err != nil {
+		ins := &installer.Installer{
+			Provider: o.Provider,
+			OS:       o.OS,
+			Arch:     o.Arch,
+			Fetch:    o.Fetch,
+		}
+		if targetURL, err = ins.ProviderURLParse(targetURL, o.AcceptPreRelease); err != nil {
 			err = fmt.Errorf("only http:// or https:// supported, error: %v", err)
 			return
 		}
+		o.name = ins.Name
 		cmd.Printf("start to download from %s\n", targetURL)
 	}
 	o.URL = targetURL
@@ -402,11 +128,11 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	// only print the schema for documentation
 	if o.PrintSchema {
 		var data []byte
-		if data, err = yaml.Marshal(hdConfig{
-			Installation: &cmdWithArgs{},
-			PreInstall:   &cmdWithArgs{},
-			PostInstall:  &cmdWithArgs{},
-			TestInstall:  &cmdWithArgs{},
+		if data, err = yaml.Marshal(installer.HDConfig{
+			Installation: &installer.CmdWithArgs{},
+			PreInstall:   &installer.CmdWithArgs{},
+			PostInstall:  &installer.CmdWithArgs{},
+			TestInstall:  &installer.CmdWithArgs{},
 		}); err == nil {
 			cmd.Print(string(data))
 		}

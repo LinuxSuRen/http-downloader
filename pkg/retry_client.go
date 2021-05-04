@@ -1,25 +1,19 @@
 package pkg
 
+/**
+ * This file was deprecated, please use the following package instead
+ * github.com/linuxsuren/http-downloader/pkg/net
+ */
+
 import (
+	"github.com/linuxsuren/http-downloader/pkg/net"
 	"net/http"
-	"net/url"
 )
 
 // RetryClient is the wrap of http.Client
-type RetryClient struct {
-	http.Client
-	MaxAttempts     int
-	currentAttempts int
-}
+type RetryClient net.RetryClient
 
 // Do is the wrap of http.Client.Do
 func (c *RetryClient) Do(req *http.Request) (rsp *http.Response, err error) {
-	rsp, err = c.Client.Do(req)
-	if _, ok := err.(*url.Error); ok {
-		if c.currentAttempts < c.MaxAttempts {
-			c.currentAttempts++
-			return c.Do(req)
-		}
-	}
-	return
+	return (*net.RetryClient)(c).Do(req)
 }

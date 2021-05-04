@@ -1,57 +1,28 @@
 package pkg
 
+/**
+ * This file was deprecated, please use the following package instead
+ * github.com/linuxsuren/http-downloader/pkg/net
+ */
+
 import (
-	"fmt"
-	"github.com/gosuri/uiprogress"
-	"io"
+	"github.com/linuxsuren/http-downloader/pkg/net"
 )
 
 // ProgressIndicator hold the progress of io operation
-type ProgressIndicator struct {
-	Writer io.Writer
-	Reader io.Reader
-	Title  string
-
-	// bytes.Buffer
-	Total float64
-	count float64
-	bar   *uiprogress.Bar
-}
+type ProgressIndicator net.ProgressIndicator
 
 // Init set the default value for progress indicator
 func (i *ProgressIndicator) Init() {
-	uiprogress.Start()             // start rendering
-	i.bar = uiprogress.AddBar(100) // Add a new bar
-
-	// optionally, append and prepend completion and elapsed time
-	i.bar.AppendCompleted()
-	// i.bar.PrependElapsed()
-
-	if i.Title != "" {
-		i.bar.PrependFunc(func(_ *uiprogress.Bar) string {
-			return fmt.Sprintf("%s: ", i.Title)
-		})
-	}
+	(*net.ProgressIndicator)(i).Init()
 }
 
 // Write writes the progress
 func (i *ProgressIndicator) Write(p []byte) (n int, err error) {
-	n, err = i.Writer.Write(p)
-	i.setBar(n)
-	return
+	return (*net.ProgressIndicator)(i).Write(p)
 }
 
 // Read reads the progress
 func (i *ProgressIndicator) Read(p []byte) (n int, err error) {
-	n, err = i.Reader.Read(p)
-	i.setBar(n)
-	return
-}
-
-func (i *ProgressIndicator) setBar(n int) {
-	i.count += float64(n)
-
-	if i.bar != nil {
-		_ = i.bar.Set((int)(i.count * 100 / i.Total))
-	}
+	return (*net.ProgressIndicator)(i).Read(p)
 }

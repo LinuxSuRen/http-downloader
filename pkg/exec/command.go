@@ -1,4 +1,4 @@
-package cmd
+package exec
 
 import (
 	"io"
@@ -7,30 +7,13 @@ import (
 	"sync"
 )
 
-func getOrDefault(key, def string, data map[string]string) (result string) {
-	var ok bool
-	if result, ok = data[key]; !ok {
-		result = def
-	}
-	return
+// LookPath is the wrapper of os/exec.LookPath
+func LookPath(file string) (string, error) {
+	return exec.LookPath(file)
 }
 
-func getReplacement(key string, data map[string]string) (result string) {
-	return getOrDefault(key, key, data)
-}
-
-func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
-}
-
-func execCommandInDir(name, dir string, arg ...string) (err error) {
+// RunCommandInDir runs a command
+func RunCommandInDir(name, dir string, arg ...string) (err error) {
 	command := exec.Command(name, arg...)
 	if dir != "" {
 		command.Dir = dir
@@ -63,8 +46,9 @@ func execCommandInDir(name, dir string, arg ...string) (err error) {
 	return
 }
 
-func execCommand(name string, arg ...string) (err error) {
-	return execCommandInDir(name, "", arg...)
+// RunCommand runs a command
+func RunCommand(name string, arg ...string) (err error) {
+	return RunCommandInDir(name, "", arg...)
 }
 
 func copyAndCapture(w io.Writer, r io.Reader) ([]byte, error) {
