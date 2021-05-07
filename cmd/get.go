@@ -105,7 +105,6 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 			return
 		}
 		o.name = ins.Name
-		cmd.Printf("start to download from %s\n", targetURL)
 	}
 	o.URL = targetURL
 
@@ -139,6 +138,7 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
+	cmd.Printf("start to download from %s\n", o.URL)
 	if o.Thread <= 1 {
 		err = pkg.DownloadWithContinue(o.URL, o.Output, o.ContinueAt, -1, 0, o.ShowProgress)
 	} else {
