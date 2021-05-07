@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"runtime"
@@ -70,7 +69,6 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 		Output:       o.Output,
 		CleanPackage: o.CleanPackage,
 	}
-	fmt.Println(process)
 	err = process.Install()
 	return
 }

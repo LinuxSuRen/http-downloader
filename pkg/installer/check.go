@@ -93,7 +93,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 			}
 		}
 
-		fmt.Printf("prepare to download %s/%s\n", org, repo)
+		fmt.Printf("target package is %s/%s\n", org, repo)
 	} else {
 		err = fmt.Errorf("only support format xx, xx/xx or xx/xx/xx")
 		return
@@ -120,11 +120,13 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 	}
 	o.Name = name
 
-	// fetch the latest config
-	fmt.Println("start to fetch the config")
-	if err = FetchConfig(); err != nil {
-		err = fmt.Errorf("unable to fetch the latest config, error: %v", err)
-		return
+	if o.Fetch {
+		// fetch the latest config
+		fmt.Println("start to fetch the config")
+		if err = FetchConfig(); err != nil {
+			err = fmt.Errorf("unable to fetch the latest config, error: %v", err)
+			return
+		}
 	}
 
 	// try to parse from config
