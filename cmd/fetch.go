@@ -20,7 +20,7 @@ func newFetchCmd() (cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.StringVarP(&opt.provider, "provider", "p", "github",
 		"The provider of hd-home repository. You can pass it a name (github, gitee) or a public git repository URI. Please use option --reset=true if you want to change the provider.")
-	flags.StringVarP(&opt.branch, "branch", "b", installer.CFG_BRANCH,
+	flags.StringVarP(&opt.branch, "branch", "b", installer.ConfigBranch,
 		"The branch of git repository (not support currently)")
 	flags.BoolVarP(&opt.reset, "reset", "", false,
 		"If you want to reset the hd-config which means delete and clone it again")
@@ -30,7 +30,7 @@ func newFetchCmd() (cmd *cobra.Command) {
 func (o *fetchOption) preRunE(_ *cobra.Command, _ []string) (err error) {
 	switch o.provider {
 	case "github":
-		o.provider = installer.CFG_GITHUB
+		o.provider = installer.ConfigGitHub
 	case "gitee":
 		o.provider = "https://gitee.com/LinuxSuRen/hd-home"
 	case "":

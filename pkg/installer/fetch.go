@@ -12,15 +12,15 @@ import (
 )
 
 const (
-	// CFG_GITHUB is the default git repository URI
-	CFG_GITHUB = "https://github.com/LinuxSuRen/hd-home"
-	// CFG_BRANCH is the default branch name of hd-home git repository
-	CFG_BRANCH = "master"
+	// ConfigGitHub is the default git repository URI
+	ConfigGitHub = "https://github.com/LinuxSuRen/hd-home"
+	// ConfigBranch is the default branch name of hd-home git repository
+	ConfigBranch = "master"
 )
 
 // FetchConfig fetches the hd-home as the config
 func FetchConfig() (err error) {
-	return FetchLatestRepo(CFG_GITHUB, CFG_BRANCH, os.Stdout)
+	return FetchLatestRepo(ConfigGitHub, ConfigBranch, os.Stdout)
 }
 
 // GetConfigDir returns the directory of the config
