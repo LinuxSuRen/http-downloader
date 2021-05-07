@@ -1,17 +1,26 @@
 package installer
 
 import (
+	"fmt"
 	"github.com/go-git/go-git/v5"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/mitchellh/go-homedir"
+	"io"
 	"os"
 	"path"
 	"strings"
 )
 
+const (
+	// ConfigGitHub is the default git repository URI
+	ConfigGitHub = "https://github.com/LinuxSuRen/hd-home"
+	// ConfigBranch is the default branch name of hd-home git repository
+	ConfigBranch = "master"
+)
+
 // FetchConfig fetches the hd-home as the config
 func FetchConfig() (err error) {
-	return fetchLatestRepo("https://github.com/LinuxSuRen/hd-home", "master")
+	return FetchLatestRepo(ConfigGitHub, ConfigBranch, os.Stdout)
 }
 
 // GetConfigDir returns the directory of the config
@@ -23,7 +32,8 @@ func GetConfigDir() (configDir string, err error) {
 	return
 }
 
-func fetchLatestRepo(repo string, branch string) (err error) {
+// FetchLatestRepo fetches the hd-home as the config
+func FetchLatestRepo(repoAddr string, branch string, progress io.Writer) (err error) {
 	var configDir string
 	if configDir, err = GetConfigDir(); err != nil {
 		return
@@ -31,30 +41,35 @@ func fetchLatestRepo(repo string, branch string) (err error) {
 
 	if ok, _ := common.PathExists(configDir); ok {
 		var repo *git.Repository
-		if repo, err = git.PlainOpen(""); err == nil {
+		if repo, err = git.PlainOpen(configDir); err == nil {
 			var wd *git.Worktree
+
 			if wd, err = repo.Worktree(); err == nil {
 				if err = wd.Pull(&git.PullOptions{
-					RemoteName: "origin",
-					Progress:   os.Stdout,
-					Force:      true,
+					Progress: progress,
+					Force:    true,
 				}); err != nil && err != git.NoErrAlreadyUpToDate {
+					err = fmt.Errorf("failed to pull git repository '%s', error: %v", repo, err)
 					return
 				}
 				err = nil
 			}
+		} else {
+			err = fmt.Errorf("failed to open git local repository, error: %v", err)
 		}
 	} else {
-		_, err = git.PlainClone(configDir, false, &git.CloneOptions{
-			URL:      repo,
-			Progress: os.Stdout,
-		})
+		if _, err = git.PlainClone(configDir, false, &git.CloneOptions{
+			URL:      repoAddr,
+			Progress: progress,
+		}); err != nil {
+			err = fmt.Errorf("failed to clone git repository '%s' into '%s', error: %v", repoAddr, configDir, err)
+		}
 	}
 
 	if err != nil && strings.Contains(err.Error(), "exit status 128") {
 		// target directory was created accidentally, remove it then try again
 		_ = os.RemoveAll(configDir)
-		return fetchLatestRepo(repo, branch)
+		return FetchLatestRepo(repoAddr, branch, progress)
 	}
 	return
 }

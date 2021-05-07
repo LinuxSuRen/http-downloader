@@ -34,6 +34,9 @@ jobs:
         run: |
           sudo ./release/http-downloader_linux_amd64/hd install jenkins-zh/jenkins-cli/jcli
           jcli version
+
+          sudo ./release/http-downloader_linux_amd64/hd install ks
+          ks version
       - name: Upload Artifact for darwin
         uses: actions/upload-artifact@v2
         with:
