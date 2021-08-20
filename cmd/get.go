@@ -104,6 +104,7 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 			err = fmt.Errorf("only http:// or https:// supported, error: %v", err)
 			return
 		}
+		o.Tar = ins.Tar
 		o.name = ins.Name
 	}
 	o.URL = targetURL
