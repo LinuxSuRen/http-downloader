@@ -1,6 +1,7 @@
 package exec
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"os/exec"
@@ -12,9 +13,30 @@ func LookPath(file string) (string, error) {
 	return exec.LookPath(file)
 }
 
-// RunCommandInDir runs a command
-func RunCommandInDir(name, dir string, arg ...string) (err error) {
-	command := exec.Command(name, arg...)
+// RunCommandAndReturn runs a command, then returns the output
+func RunCommandAndReturn(name, dir string, args ...string) (result string, err error) {
+	stdout := &bytes.Buffer{}
+	if err = RunCommandWithBuffer(name, dir, stdout, nil, args...); err == nil {
+		result = stdout.String()
+	}
+	return
+}
+
+// RunCommandWithBuffer runs a command with buffer
+// stdout and stderr could be nil
+func RunCommandWithBuffer(name, dir string, stdout, stderr *bytes.Buffer, args ...string) error {
+	if stdout == nil {
+		stdout = &bytes.Buffer{}
+	}
+	if stderr != nil {
+		stderr = &bytes.Buffer{}
+	}
+	return RunCommandWithIO(name, dir, stdout, stderr, args...)
+}
+
+// RunCommandWithIO runs a command with given IO
+func RunCommandWithIO(name, dir string, stdout, stderr io.Writer, args ...string) (err error) {
+	command := exec.Command(name, args...)
 	if dir != "" {
 		command.Dir = dir
 	}
@@ -25,7 +47,7 @@ func RunCommandInDir(name, dir string, arg ...string) (err error) {
 	stderrIn, _ := command.StderrPipe()
 	err = command.Start()
 	if err != nil {
-		return err
+		return
 	}
 
 	// cmd.Wait() should be called only after we finish reading
@@ -34,16 +56,21 @@ func RunCommandInDir(name, dir string, arg ...string) (err error) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		_, _ = copyAndCapture(os.Stdout, stdoutIn)
+		_, _ = copyAndCapture(stdout, stdoutIn)
 		wg.Done()
 	}()
 
-	_, _ = copyAndCapture(os.Stderr, stderrIn)
+	_, _ = copyAndCapture(stderr, stderrIn)
 
 	wg.Wait()
 
 	err = command.Wait()
 	return
+}
+
+// RunCommandInDir runs a command
+func RunCommandInDir(name, dir string, args ...string) error {
+	return RunCommandWithIO(name, dir, os.Stdout, os.Stderr, args...)
 }
 
 // RunCommand runs a command
