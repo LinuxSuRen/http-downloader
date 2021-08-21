@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/spf13/cobra"
 	"runtime"
 )
@@ -13,6 +14,7 @@ func NewInstallCmd() (cmd *cobra.Command) {
 		Use:     "install",
 		Short:   "Install a package from https://github.com/LinuxSuRen/hd-home",
 		Example: "hd install jenkins-zh/jenkins-cli/jcli -t 6",
+		Args:    cobra.MinimumNArgs(1),
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
 	}
@@ -47,14 +49,28 @@ type installOption struct {
 	Download     bool
 	CleanPackage bool
 	Mode         string
+
+	// inner fields
+	nativePackage bool
 }
 
 func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
-	err = o.downloadOption.preRunE(cmd, args)
+	// try to find if it's a native package
+	o.nativePackage = os.HasPackage(args[0])
+	if !o.nativePackage {
+		err = o.downloadOption.preRunE(cmd, args)
+	}
 	return
 }
 
 func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
+	if o.nativePackage {
+		// install a package
+		err = os.Install(args[0])
+		return
+	}
+
+	// install a package from hd-home
 	if o.Download {
 		if err = o.downloadOption.runE(cmd, args); err != nil {
 			return
