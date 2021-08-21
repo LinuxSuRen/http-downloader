@@ -7,14 +7,17 @@ build-linux: fmt test
 	CGO_ENABLE=0 GOOS=linux go build -ldflags "-w -s" -o bin/linux/hd
 	upx bin/linux/hd
 
-test:
-	go test ./cmd/...
+test: fmt lint
+	go test ./...
 
 run:
 	go run main.go
 
 fmt:
 	go fmt ./...
+
+lint:
+	golint ./...
 
 copy: build
 	sudo cp bin/hd /usr/local/bin/

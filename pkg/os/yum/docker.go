@@ -5,9 +5,11 @@ import (
 	"runtime"
 )
 
+// DockerInstallerInCentOS is the installer of Docker in CentOS
 type DockerInstallerInCentOS struct {
 }
 
+// Available check if support current platform
 func (d *DockerInstallerInCentOS) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
 		_, err := exec.LookPath("yum")
@@ -16,6 +18,7 @@ func (d *DockerInstallerInCentOS) Available() (ok bool) {
 	return
 }
 
+// Install installs the Docker
 func (d *DockerInstallerInCentOS) Install() (err error) {
 	if err = exec.RunCommand("yum", "install", "-y",
 		"yum-utils"); err != nil {
@@ -34,6 +37,7 @@ func (d *DockerInstallerInCentOS) Install() (err error) {
 	return
 }
 
+// Uninstall uninstalls the Docker
 func (d *DockerInstallerInCentOS) Uninstall() (err error) {
 	err = exec.RunCommand("yum", "remove", "-y",
 		"docker",

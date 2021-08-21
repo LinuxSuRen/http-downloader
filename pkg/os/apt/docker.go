@@ -8,9 +8,11 @@ import (
 	"strings"
 )
 
+// DockerInstallerInUbuntu is the installer of Docker in Ubuntu
 type DockerInstallerInUbuntu struct {
 }
 
+// Available check if support current platform
 func (d *DockerInstallerInUbuntu) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
 		_, err := exec.LookPath("apt-get")
@@ -19,6 +21,7 @@ func (d *DockerInstallerInUbuntu) Available() (ok bool) {
 	return
 }
 
+// Install installs the Docker
 func (d *DockerInstallerInUbuntu) Install() (err error) {
 	if err = exec.RunCommand("apt-get", "update", "-y"); err != nil {
 		return
@@ -73,6 +76,7 @@ func (d *DockerInstallerInUbuntu) Install() (err error) {
 	return
 }
 
+// Uninstall uninstalls the Docker
 func (d *DockerInstallerInUbuntu) Uninstall() (err error) {
 	if err = exec.RunCommand("apt-get", "remove", "-y",
 		"docker",

@@ -6,6 +6,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/os/yum"
 )
 
+// DefaultInstallerRegistry is the default installer registry
 type DefaultInstallerRegistry struct {
 	installerMap map[string][]core.Installer
 }
@@ -30,6 +31,7 @@ func (r *DefaultInstallerRegistry) Registry(name string, installer core.Installe
 	}
 }
 
+// GetInstallers returns all the installers belong to a package
 func GetInstallers(name string) (installers []core.Installer, ok bool) {
 	installers, ok = defaultInstallerRegistry.installerMap[name]
 	return
@@ -47,6 +49,7 @@ func HasPackage(name string) bool {
 	return false
 }
 
+// Install installs a package with name
 func Install(name string) (err error) {
 	if installers, ok := GetInstallers(name); ok {
 		for _, installer := range installers {
@@ -59,6 +62,7 @@ func Install(name string) (err error) {
 	return
 }
 
+// Uninstall uninstalls a package with name
 func Uninstall(name string) (err error) {
 	if installers, ok := GetInstallers(name); ok {
 		for _, installer := range installers {
