@@ -32,6 +32,8 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 			continue
 		}
 
+		fmt.Printf("start to install missing tool: %s\n", tool)
+
 		// check if it's a native package
 		if os.HasPackage(tool) {
 			if err = os.Install(tool); err != nil {
