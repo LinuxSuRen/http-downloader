@@ -102,7 +102,9 @@ func (d *DockerInstallerInUbuntu) WaitForStart() (ok bool, err error) {
 		return
 	} else if strings.Contains(result, "Unit docker.service could not be found") {
 		err = fmt.Errorf("unit docker.service could not be found")
-	} else if strings.Contains(result, "Active: failed") {
+	} else if strings.Contains(result, "Active: active") {
+		ok = true
+	} else {
 		if d.count > 0 {
 			fmt.Println("waiting for Docker service start")
 		} else if d.count > 4 {
@@ -111,8 +113,6 @@ func (d *DockerInstallerInUbuntu) WaitForStart() (ok bool, err error) {
 
 		time.Sleep(time.Second * 1)
 		return d.WaitForStart()
-	} else if strings.Contains(result, "Active: active") {
-		ok = true
 	}
 	return
 }
