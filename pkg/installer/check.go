@@ -8,6 +8,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/net"
+	"github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
@@ -29,6 +30,15 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 	for tool, formula := range tools {
 		if _, lookErr := exec.LookPath(tool); lookErr == nil {
 			continue
+		}
+
+		fmt.Printf("start to install missing tool: %s\n", tool)
+
+		// check if it's a native package
+		if os.HasPackage(tool) {
+			if err = os.Install(tool); err != nil {
+				return
+			}
 		}
 
 		var targetURL string
