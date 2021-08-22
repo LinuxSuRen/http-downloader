@@ -4,7 +4,8 @@ go 1.15
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.2.16
-	github.com/go-git/go-git/v5 v5.3.0
+	github.com/go-git/go-git/v5 v5.4.2
+	github.com/golang/mock v1.5.0
 	github.com/golang/mock v1.6.0
 	github.com/google/go-github/v29 v29.0.3
 	github.com/gosuri/uiprogress v0.0.1
