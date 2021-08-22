@@ -70,7 +70,7 @@ func (d *DockerInstallerInCentOS) WaitForStart() (ok bool, err error) {
 	} else {
 		if d.count > 0 {
 			fmt.Println("waiting for Docker service start")
-		} else if d.count > 4 {
+		} else if d.count > 9 {
 			return
 		}
 
