@@ -38,9 +38,8 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 		if os.HasPackage(tool) {
 			if err = os.Install(tool); err != nil {
 				return
-			} else {
-				continue
 			}
+			continue
 		}
 
 		var targetURL string
