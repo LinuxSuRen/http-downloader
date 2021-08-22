@@ -36,9 +36,7 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 
 		// check if it's a native package
 		if os.HasPackage(tool) {
-			if err = os.Install(tool); err != nil {
-				return
-			}
+			return os.Install(tool)
 		}
 
 		var targetURL string
