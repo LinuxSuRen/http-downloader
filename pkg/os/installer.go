@@ -69,10 +69,10 @@ func Install(name string) (err error) {
 		}
 
 		var ok bool
-		if ok, err = installer.WaitForStart(); !ok {
-			err = fmt.Errorf("%s was not started yet, please check it manually", name)
-		} else if err != nil {
+		if ok, err = installer.WaitForStart(); err != nil {
 			err = fmt.Errorf("failed to check the service status of %s, error: %v", name, err)
+		} else if !ok {
+			err = fmt.Errorf("%s was not started yet, please check it manually", name)
 		}
 	}
 	return
