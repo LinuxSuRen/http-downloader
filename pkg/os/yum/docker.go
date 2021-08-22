@@ -74,6 +74,7 @@ func (d *DockerInstallerInCentOS) WaitForStart() (ok bool, err error) {
 			return
 		}
 
+		d.count ++
 		time.Sleep(time.Second * 1)
 		return d.WaitForStart()
 	}
@@ -82,12 +83,10 @@ func (d *DockerInstallerInCentOS) WaitForStart() (ok bool, err error) {
 
 // Start starts the Docker service
 func (d *DockerInstallerInCentOS) Start() error {
-	fmt.Println("not implemented yet")
-	return nil
+	return exec.RunCommand("systemctl", "start", "docker")
 }
 
 // Stop stops the Docker service
 func (d *DockerInstallerInCentOS) Stop() error {
-	fmt.Println("not implemented yet")
-	return nil
+	return exec.RunCommand("systemctl", "stop", "docker")
 }

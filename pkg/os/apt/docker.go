@@ -111,6 +111,7 @@ func (d *DockerInstallerInUbuntu) WaitForStart() (ok bool, err error) {
 			return
 		}
 
+		d.count ++
 		time.Sleep(time.Second * 1)
 		return d.WaitForStart()
 	}
@@ -125,6 +126,5 @@ func (d *DockerInstallerInUbuntu) Start() error {
 
 // Stop stops the Docker service
 func (d *DockerInstallerInUbuntu) Stop() error {
-	fmt.Println("not implemented yet")
-	return nil
+	return exec.RunCommand("systemctl", "start", "docker")
 }
