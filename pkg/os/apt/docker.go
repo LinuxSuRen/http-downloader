@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // DockerInstallerInUbuntu is the installer of Docker in Ubuntu
@@ -107,6 +108,8 @@ func (d *DockerInstallerInUbuntu) WaitForStart() (ok bool, err error) {
 		} else if d.count > 4 {
 			return
 		}
+
+		time.Sleep(time.Second * 1)
 		return d.WaitForStart()
 	} else if strings.Contains(result, "Active: active") {
 		ok = true

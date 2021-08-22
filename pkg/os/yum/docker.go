@@ -5,6 +5,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // DockerInstallerInCentOS is the installer of Docker in CentOS
@@ -70,6 +71,8 @@ func (d *DockerInstallerInCentOS) WaitForStart() (ok bool, err error) {
 		} else if d.count > 4 {
 			return
 		}
+
+		time.Sleep(time.Second * 1)
 		return d.WaitForStart()
 	} else if strings.Contains(result, "Active: active") {
 		ok = true
