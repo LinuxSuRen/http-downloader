@@ -88,4 +88,3 @@ func (d *DockerInstallerInCentOS) Stop() error {
 	fmt.Println("not implemented yet")
 	return nil
 }
-

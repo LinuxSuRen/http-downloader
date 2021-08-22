@@ -1,6 +1,7 @@
 package os
 
 import (
+	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 	"github.com/linuxsuren/http-downloader/pkg/os/yum"
@@ -51,12 +52,22 @@ func HasPackage(name string) bool {
 
 // Install installs a package with name
 func Install(name string) (err error) {
+	var installer core.Installer
 	if installers, ok := GetInstallers(name); ok {
-		for _, installer := range installers {
+		for _, installer = range installers {
 			if installer.Available() {
 				err = installer.Install()
 				break
 			}
+		}
+	}
+
+	if installer != nil && err == nil {
+		var ok bool
+		if ok, err = installer.WaitForStart(); !ok {
+			err = fmt.Errorf("%s was not started yet, please check it manually.\n", name)
+		} else {
+			err = fmt.Errorf("failed to check the service status of %s, error: %v", name, err)
 		}
 	}
 	return
