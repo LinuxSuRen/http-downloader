@@ -40,11 +40,10 @@ func (i *ProgressIndicator) Init() {
 }
 
 // Close shutdowns the ui process
-func (i *ProgressIndicator) Close() error {
+func (i ProgressIndicator) Close() {
 	if started {
 		uiprogress.Stop()
 	}
-	return nil
 }
 
 // Write writes the progress

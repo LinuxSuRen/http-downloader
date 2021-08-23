@@ -229,6 +229,7 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 		}
 
 		wg.Wait()
+		ProgressIndicator{}.Close()
 
 		// concat all these partial files
 		var f *os.File
