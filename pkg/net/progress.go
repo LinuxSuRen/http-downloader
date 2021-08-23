@@ -24,6 +24,7 @@ var started bool
 func (i *ProgressIndicator) Init() {
 	// start rendering
 	if !started {
+		started = true
 		uiprogress.Start()
 	}
 	i.bar = uiprogress.AddBar(100) // Add a new bar
@@ -43,6 +44,7 @@ func (i *ProgressIndicator) Init() {
 func (i ProgressIndicator) Close() {
 	if started {
 		uiprogress.Stop()
+		started = false
 	}
 }
 
