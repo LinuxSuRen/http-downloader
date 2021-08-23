@@ -45,8 +45,9 @@ type HTTPDownloader struct {
 	Timeout     int
 	MaxAttempts int
 
-	Debug        bool
-	RoundTripper http.RoundTripper
+	Debug             bool
+	RoundTripper      http.RoundTripper
+	progressIndicator *ProgressIndicator
 }
 
 // SetProxy set the proxy for a http
@@ -153,14 +154,14 @@ func (h *HTTPDownloader) DownloadFile() error {
 	if h.Title == "" {
 		h.Title = "Downloading"
 	}
-	writer := &ProgressIndicator{
+	h.progressIndicator = &ProgressIndicator{
 		Title: h.Title,
 	}
 	if showProgress {
 		if total, ok := resp.Header["Content-Length"]; ok && len(total) > 0 {
 			fileLength, err := strconv.ParseInt(total[0], 10, 64)
 			if err == nil {
-				writer.Total = float64(fileLength)
+				h.progressIndicator.Total = float64(fileLength)
 			}
 		}
 	}
@@ -176,14 +177,14 @@ func (h *HTTPDownloader) DownloadFile() error {
 		return err
 	}
 
-	writer.Writer = out
+	h.progressIndicator.Writer = out
 
 	if showProgress {
-		writer.Init()
+		h.progressIndicator.Init()
 	}
 
 	// Write the body to file
-	_, err = io.Copy(writer, resp.Body)
+	_, err = io.Copy(h.progressIndicator, resp.Body)
 	return err
 }
 
@@ -219,7 +220,9 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 				}
 				start := unit * int64(index)
 
-				if downloadErr := DownloadWithContinue(targetURL, fmt.Sprintf("%s-%d", targetFilePath, index), int64(index), start, end, showProgress); downloadErr != nil {
+				downloader := &ContinueDownloader{}
+				if downloadErr := downloader.DownloadWithContinue(targetURL, fmt.Sprintf("%s-%d", targetFilePath, index),
+					int64(index), start, end, showProgress); downloadErr != nil {
 					fmt.Println(downloadErr)
 				}
 			}(i, &wg)
@@ -251,33 +254,38 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 		}
 	} else {
 		fmt.Println("cannot download it using multiple threads, failed to one")
-		err = DownloadWithContinue(targetURL, targetFilePath, -1, 0, 0, true)
+		downloader := &ContinueDownloader{}
+		err = downloader.DownloadWithContinue(targetURL, targetFilePath, -1, 0, 0, true)
 	}
 	return
 }
 
+type ContinueDownloader struct {
+	downloader *HTTPDownloader
+}
+
 // DownloadWithContinue downloads the files continuously
-func DownloadWithContinue(targetURL, output string, index, continueAt, end int64, showProgress bool) (err error) {
-	downloader := HTTPDownloader{
+func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, index, continueAt, end int64, showProgress bool) (err error) {
+	c.downloader = &HTTPDownloader{
 		TargetFilePath: output,
 		URL:            targetURL,
 		ShowProgress:   showProgress,
 	}
 	if index >= 0 {
-		downloader.Title = fmt.Sprintf("Downloading part %d", index)
+		c.downloader.Title = fmt.Sprintf("Downloading part %d", index)
 	}
 
 	if continueAt >= 0 {
-		downloader.Header = make(map[string]string, 1)
+		c.downloader.Header = make(map[string]string, 1)
 
 		if end > continueAt {
-			downloader.Header["Range"] = fmt.Sprintf("bytes=%d-%d", continueAt, end)
+			c.downloader.Header["Range"] = fmt.Sprintf("bytes=%d-%d", continueAt, end)
 		} else {
-			downloader.Header["Range"] = fmt.Sprintf("bytes=%d-", continueAt)
+			c.downloader.Header["Range"] = fmt.Sprintf("bytes=%d-", continueAt)
 		}
 	}
 
-	if err = downloader.DownloadFile(); err != nil {
+	if err = c.downloader.DownloadFile(); err != nil {
 		err = fmt.Errorf("cannot download from %s, error: %v", targetURL, err)
 	}
 	return
