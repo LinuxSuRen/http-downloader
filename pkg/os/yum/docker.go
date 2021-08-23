@@ -1,12 +1,16 @@
 package yum
 
 import (
+	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"runtime"
+	"strings"
+	"time"
 )
 
 // DockerInstallerInCentOS is the installer of Docker in CentOS
 type DockerInstallerInCentOS struct {
+	count int
 }
 
 // Available check if support current platform
@@ -52,4 +56,37 @@ func (d *DockerInstallerInCentOS) Uninstall() (err error) {
 		"docker-ce-cli",
 		"containerd.io")
 	return
+}
+
+// WaitForStart waits for the service be started
+func (d *DockerInstallerInCentOS) WaitForStart() (ok bool, err error) {
+	var result string
+	if result, err = exec.RunCommandAndReturn("systemctl", "", "status", "docker"); err != nil {
+		return
+	} else if strings.Contains(result, "Unit docker.service could not be found") {
+		err = fmt.Errorf("unit docker.service could not be found")
+	} else if strings.Contains(result, "Active: active") {
+		ok = true
+	} else {
+		if d.count > 0 {
+			fmt.Println("waiting for Docker service start")
+		} else if d.count > 9 {
+			return
+		}
+
+		d.count ++
+		time.Sleep(time.Second * 1)
+		return d.WaitForStart()
+	}
+	return
+}
+
+// Start starts the Docker service
+func (d *DockerInstallerInCentOS) Start() error {
+	return exec.RunCommand("systemctl", "start", "docker")
+}
+
+// Stop stops the Docker service
+func (d *DockerInstallerInCentOS) Stop() error {
+	return exec.RunCommand("systemctl", "stop", "docker")
 }

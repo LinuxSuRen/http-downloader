@@ -5,6 +5,10 @@ type Installer interface {
 	Available() bool
 	Install() error
 	Uninstall() error
+
+	WaitForStart() (bool, error)
+	Start() error
+	Stop() error
 }
 
 // InstallerRegistry is the interface of install registry
