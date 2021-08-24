@@ -155,11 +155,12 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 
 			if err = yaml.Unmarshal(data, &cfg); err == nil {
 				hdPkg := &HDPackage{
-					Name:       o.Name,
-					Version:    version,
-					OS:         common.GetReplacement(runtime.GOOS, cfg.Replacements),
-					Arch:       common.GetReplacement(runtime.GOARCH, cfg.Replacements),
-					VersionNum: strings.TrimPrefix(version, "v"),
+					Name:             o.Name,
+					Version:          version,
+					OS:               common.GetReplacement(runtime.GOOS, cfg.Replacements),
+					Arch:             common.GetReplacement(runtime.GOARCH, cfg.Replacements),
+					AdditionBinaries: cfg.AdditionBinaries,
+					VersionNum:       strings.TrimPrefix(version, "v"),
 				}
 				o.Package = &cfg
 
