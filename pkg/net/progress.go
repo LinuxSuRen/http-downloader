@@ -18,19 +18,33 @@ type ProgressIndicator struct {
 	bar   *uiprogress.Bar
 }
 
+var process *uiprogress.Progress
+
 // Init set the default value for progress indicator
 func (i *ProgressIndicator) Init() {
-	uiprogress.Start()             // start rendering
-	i.bar = uiprogress.AddBar(100) // Add a new bar
+	// start rendering
+	if process == nil {
+		process = uiprogress.New()
+		process.Start()
+	}
+	i.bar = process.AddBar(100) // Add a new bar
 
 	// optionally, append and prepend completion and elapsed time
 	i.bar.AppendCompleted()
-	// i.bar.PrependElapsed()
+	//i.bar.PrependElapsed()
 
 	if i.Title != "" {
 		i.bar.PrependFunc(func(_ *uiprogress.Bar) string {
 			return fmt.Sprintf("%s: ", i.Title)
 		})
+	}
+}
+
+// Close shutdowns the ui process
+func (i ProgressIndicator) Close() {
+	if process != nil {
+		process.Stop()
+		process = nil
 	}
 }
 

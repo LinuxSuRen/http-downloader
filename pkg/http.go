@@ -43,7 +43,8 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 
 // DownloadWithContinue downloads the files continuously
 func DownloadWithContinue(targetURL, output string, index, continueAt, end int64, showProgress bool) (err error) {
-	return net.DownloadWithContinue(targetURL, output, index, continueAt, end, showProgress)
+	downloader := &net.ContinueDownloader{}
+	return downloader.DownloadWithContinue(targetURL, output, index, continueAt, end, showProgress)
 }
 
 // DetectSize returns the size of target resource
