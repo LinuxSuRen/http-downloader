@@ -78,12 +78,13 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	process := &installer.Installer{
-		Source:       o.downloadOption.Output,
-		Name:         o.name,
-		Package:      o.Package,
-		Tar:          o.Tar,
-		Output:       o.Output,
-		CleanPackage: o.CleanPackage,
+		Source:           o.downloadOption.Output,
+		Name:             o.name,
+		Package:          o.Package,
+		Tar:              o.Tar,
+		Output:           o.Output,
+		CleanPackage:     o.CleanPackage,
+		AdditionBinaries: o.Package.AdditionBinaries,
 	}
 	err = process.Install()
 	return

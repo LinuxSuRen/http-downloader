@@ -2,7 +2,7 @@ build: fmt test
 	export GOPROXY=https://goproxy.io
 	CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/hd
 
-build-linux: fmt test
+build-linux: fmt lint
 	export GOPROXY=https://goproxy.io
 	CGO_ENABLE=0 GOOS=linux go build -ldflags "-w -s" -o bin/linux/hd
 	upx bin/linux/hd

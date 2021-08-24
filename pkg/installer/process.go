@@ -48,7 +48,16 @@ func (o *Installer) Install() (err error) {
 		if o.Package != nil && o.Package.Installation != nil {
 			err = exec.RunCommand(o.Package.Installation.Cmd, o.Package.Installation.Args...)
 		} else {
-			err = o.overWriteBinary(source, target)
+			if err = o.overWriteBinary(source, target); err != nil {
+				return
+			}
+
+			for i := range o.AdditionBinaries {
+				addition := o.AdditionBinaries[i]
+				if err = o.overWriteBinary(addition, fmt.Sprintf("/usr/local/bin/%s", filepath.Base(addition))); err != nil {
+					return
+				}
+			}
 		}
 
 		if err == nil && o.Package != nil && o.Package.PostInstall != nil {
@@ -132,24 +141,39 @@ func (o *Installer) extractFiles(tarFile, targetName string) (err error) {
 
 		switch header.Typeflag {
 		case tar.TypeReg:
-			if name != targetName && !strings.HasSuffix(name, "/"+targetName) {
-				continue
-			}
-			var targetFile *os.File
-			if targetFile, err = os.OpenFile(fmt.Sprintf("%s/%s", filepath.Dir(tarFile), targetName),
-				os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)); err != nil {
+			if err = extraFile(name, targetName, tarFile, header, tarReader); err == nil {
+				found = true
+			} else {
 				break
 			}
-			if _, err = io.Copy(targetFile, tarReader); err != nil {
-				break
+
+			for i := range o.AdditionBinaries {
+				addition := o.AdditionBinaries[i]
+				if err = extraFile(addition, addition, tarFile, header, tarReader); err != nil {
+					return
+				}
 			}
-			found = true
-			_ = targetFile.Close()
 		}
 	}
 
 	if err == nil && !found {
 		err = fmt.Errorf("cannot found item '%s' from '%s'", targetName, tarFile)
 	}
+	return
+}
+
+func extraFile(name, targetName, tarFile string, header *tar.Header, tarReader *tar.Reader) (err error) {
+	if name != targetName && !strings.HasSuffix(name, "/"+targetName) {
+		return
+	}
+	var targetFile *os.File
+	if targetFile, err = os.OpenFile(fmt.Sprintf("%s/%s", filepath.Dir(tarFile), targetName),
+		os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)); err != nil {
+		return
+	}
+	if _, err = io.Copy(targetFile, tarReader); err != nil {
+		return
+	}
+	_ = targetFile.Close()
 	return
 }

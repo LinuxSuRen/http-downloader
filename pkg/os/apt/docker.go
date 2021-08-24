@@ -111,7 +111,7 @@ func (d *DockerInstallerInUbuntu) WaitForStart() (ok bool, err error) {
 			return
 		}
 
-		d.count ++
+		d.count++
 		time.Sleep(time.Second * 1)
 		return d.WaitForStart()
 	}
