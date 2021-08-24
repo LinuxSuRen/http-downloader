@@ -261,6 +261,7 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 	return
 }
 
+// ContinueDownloader is a downloader which support continuously download
 type ContinueDownloader struct {
 	downloader *HTTPDownloader
 }
