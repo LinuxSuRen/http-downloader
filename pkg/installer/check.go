@@ -163,6 +163,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 					VersionNum:       strings.TrimPrefix(version, "v"),
 				}
 				o.Package = &cfg
+				o.AdditionBinaries = cfg.AdditionBinaries
 
 				if version == "latest" || version == "" {
 					ghClient := pkg.ReleaseClient{
