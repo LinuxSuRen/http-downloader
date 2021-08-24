@@ -9,13 +9,13 @@ import (
 	"time"
 )
 
-// DockerInstallerInUbuntu is the installer of Docker in Ubuntu
-type DockerInstallerInUbuntu struct {
+// dockerInstallerInUbuntu is the installer of Docker in Ubuntu
+type dockerInstallerInUbuntu struct {
 	count int
 }
 
 // Available check if support current platform
-func (d *DockerInstallerInUbuntu) Available() (ok bool) {
+func (d *dockerInstallerInUbuntu) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
 		_, err := exec.LookPath("apt-get")
 		ok = err == nil
@@ -24,7 +24,7 @@ func (d *DockerInstallerInUbuntu) Available() (ok bool) {
 }
 
 // Install installs the Docker
-func (d *DockerInstallerInUbuntu) Install() (err error) {
+func (d *dockerInstallerInUbuntu) Install() (err error) {
 	if err = exec.RunCommand("apt-get", "update", "-y"); err != nil {
 		return
 	}
@@ -79,7 +79,7 @@ func (d *DockerInstallerInUbuntu) Install() (err error) {
 }
 
 // Uninstall uninstalls the Docker
-func (d *DockerInstallerInUbuntu) Uninstall() (err error) {
+func (d *dockerInstallerInUbuntu) Uninstall() (err error) {
 	if err = exec.RunCommand("apt-get", "remove", "-y",
 		"docker",
 		"docker-engine",
@@ -96,7 +96,7 @@ func (d *DockerInstallerInUbuntu) Uninstall() (err error) {
 }
 
 // WaitForStart waits for the service be started
-func (d *DockerInstallerInUbuntu) WaitForStart() (ok bool, err error) {
+func (d *dockerInstallerInUbuntu) WaitForStart() (ok bool, err error) {
 	var result string
 	if result, err = exec.RunCommandAndReturn("systemctl", "", "status", "docker"); err != nil {
 		return
@@ -119,12 +119,12 @@ func (d *DockerInstallerInUbuntu) WaitForStart() (ok bool, err error) {
 }
 
 // Start starts the Docker service
-func (d *DockerInstallerInUbuntu) Start() error {
+func (d *dockerInstallerInUbuntu) Start() error {
 	fmt.Println("not implemented yet")
 	return nil
 }
 
 // Stop stops the Docker service
-func (d *DockerInstallerInUbuntu) Stop() error {
+func (d *dockerInstallerInUbuntu) Stop() error {
 	return exec.RunCommand("systemctl", "start", "docker")
 }

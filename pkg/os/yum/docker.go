@@ -8,13 +8,13 @@ import (
 	"time"
 )
 
-// DockerInstallerInCentOS is the installer of Docker in CentOS
-type DockerInstallerInCentOS struct {
+// dockerInstallerInCentOS is the installer of Docker in CentOS
+type dockerInstallerInCentOS struct {
 	count int
 }
 
 // Available check if support current platform
-func (d *DockerInstallerInCentOS) Available() (ok bool) {
+func (d *dockerInstallerInCentOS) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
 		_, err := exec.LookPath("yum")
 		ok = err == nil
@@ -23,7 +23,7 @@ func (d *DockerInstallerInCentOS) Available() (ok bool) {
 }
 
 // Install installs the Docker
-func (d *DockerInstallerInCentOS) Install() (err error) {
+func (d *dockerInstallerInCentOS) Install() (err error) {
 	if err = exec.RunCommand("yum", "install", "-y",
 		"yum-utils"); err != nil {
 		return
@@ -42,7 +42,7 @@ func (d *DockerInstallerInCentOS) Install() (err error) {
 }
 
 // Uninstall uninstalls the Docker
-func (d *DockerInstallerInCentOS) Uninstall() (err error) {
+func (d *dockerInstallerInCentOS) Uninstall() (err error) {
 	err = exec.RunCommand("yum", "remove", "-y",
 		"docker",
 		"docker-client",
@@ -59,7 +59,7 @@ func (d *DockerInstallerInCentOS) Uninstall() (err error) {
 }
 
 // WaitForStart waits for the service be started
-func (d *DockerInstallerInCentOS) WaitForStart() (ok bool, err error) {
+func (d *dockerInstallerInCentOS) WaitForStart() (ok bool, err error) {
 	var result string
 	if result, err = exec.RunCommandAndReturn("systemctl", "", "status", "docker"); err != nil {
 		return
@@ -82,11 +82,11 @@ func (d *DockerInstallerInCentOS) WaitForStart() (ok bool, err error) {
 }
 
 // Start starts the Docker service
-func (d *DockerInstallerInCentOS) Start() error {
+func (d *dockerInstallerInCentOS) Start() error {
 	return exec.RunCommand("systemctl", "start", "docker")
 }
 
 // Stop stops the Docker service
-func (d *DockerInstallerInCentOS) Stop() error {
+func (d *dockerInstallerInCentOS) Stop() error {
 	return exec.RunCommand("systemctl", "stop", "docker")
 }
