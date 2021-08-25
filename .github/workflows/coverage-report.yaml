@@ -14,5 +14,7 @@ jobs:
         run: |
           go test ./... -coverprofile coverage.out
       - name: Report
+        env:
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
         run: |
           bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r coverage.out --force-coverage-parser go
