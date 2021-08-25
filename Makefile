@@ -8,7 +8,7 @@ build-linux: fmt lint
 	upx bin/linux/hd
 
 test: fmt lint
-	go test ./...
+	go test ./... -coverprofile coverage.out
 
 run:
 	go run main.go

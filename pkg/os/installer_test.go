@@ -1,8 +1,16 @@
 package os
 
-import "testing"
+import (
+	"runtime"
+	"testing"
+)
 
 func TestHasPackage(t *testing.T) {
+	// currently, this function only support Linux
+	if runtime.GOOS != "linux" {
+		return
+	}
+
 	type args struct {
 		name string
 	}
