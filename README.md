@@ -1,6 +1,8 @@
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/LinuxSuRen/http-downloader)
 [![](https://goreportcard.com/badge/linuxsuren/http-downloader)](https://goreportcard.com/report/linuxsuren/github-go)
 [![](http://img.shields.io/badge/godoc-reference-5272B4.svg?style=flat-square)](https://godoc.org/github.com/linuxsuren/http-downloader)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/7cc20ea84e0543068c320e471bde560e)](https://www.codacy.com/gh/LinuxSuRen/http-downloader/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=LinuxSuRen/http-downloader&amp;utm_campaign=Badge_Grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/7cc20ea84e0543068c320e471bde560e)](https://www.codacy.com/gh/LinuxSuRen/http-downloader/dashboard?utm_source=github.com&utm_medium=referral&utm_content=LinuxSuRen/http-downloader&utm_campaign=Badge_Coverage)
 [![Contributors](https://img.shields.io/github/contributors/linuxsuren/http-downloader.svg)](https://github.com/linuxsuren/github-go/graphs/contributors)
 [![GitHub release](https://img.shields.io/github/release/linuxsuren/http-downloader.svg?label=release)](https://github.com/linuxsuren/github-go/releases/latest)
 ![GitHub All Releases](https://img.shields.io/github/downloads/linuxsuren/http-downloader/total)
