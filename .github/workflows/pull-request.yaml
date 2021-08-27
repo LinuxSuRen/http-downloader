@@ -37,9 +37,6 @@ jobs:
 
           sudo ./release/http-downloader_linux_amd64/hd install ks
           ks version
-      - name: Unit Test
-        run: |
-          make test
       - name: Upload Artifact for darwin
         uses: actions/upload-artifact@v2
         with:
