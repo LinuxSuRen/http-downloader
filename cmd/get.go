@@ -14,8 +14,8 @@ import (
 	"strings"
 )
 
-// NewGetCmd return the get command
-func NewGetCmd(ctx context.Context) (cmd *cobra.Command) {
+// newGetCmd return the get command
+func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &downloadOption{
 		RoundTripper: *getRoundTripper(ctx),
 	}

@@ -8,8 +8,8 @@ import (
 	"runtime"
 )
 
-// NewInstallCmd returns the install command
-func NewInstallCmd(ctx context.Context) (cmd *cobra.Command) {
+// newInstallCmd returns the install command
+func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &installOption{
 		downloadOption: downloadOption{
 			RoundTripper: *getRoundTripper(ctx),

@@ -14,7 +14,7 @@ func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 	}
 
 	cmd.AddCommand(
-		NewGetCmd(cxt), NewInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt) , newTestCmd(),
+		newGetCmd(cxt), newInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt), newTestCmd(),
 		extver.NewVersionCmd("linuxsuren", "http-downloader", "hd", nil))
 	return
 }

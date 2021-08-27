@@ -1,12 +1,15 @@
-package net
+package net_test
 
 import (
 	"bytes"
 	"fmt"
 	"github.com/linuxsuren/http-downloader/mock/mhttp"
+	"github.com/linuxsuren/http-downloader/pkg/net"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"testing"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -17,7 +20,7 @@ var _ = Describe("http test", func() {
 	var (
 		ctrl           *gomock.Controller
 		roundTripper   *mhttp.MockRoundTripper
-		downloader     HTTPDownloader
+		downloader     net.HTTPDownloader
 		targetFilePath string
 		responseBody   string
 	)
@@ -26,7 +29,7 @@ var _ = Describe("http test", func() {
 		ctrl = gomock.NewController(GinkgoT())
 		roundTripper = mhttp.NewMockRoundTripper(ctrl)
 		targetFilePath = "test.log"
-		downloader = HTTPDownloader{
+		downloader = net.HTTPDownloader{
 			TargetFilePath: targetFilePath,
 			RoundTripper:   roundTripper,
 		}
@@ -43,13 +46,13 @@ var _ = Describe("http test", func() {
 			proxy, proxyAuth := "http://localhost", "admin:admin"
 
 			tr := &http.Transport{}
-			err := SetProxy(proxy, proxyAuth, tr)
+			err := net.SetProxy(proxy, proxyAuth, tr)
 			Expect(err).To(BeNil())
 			Expect(tr.ProxyConnectHeader.Get("Proxy-Authorization")).To(Equal("Basic YWRtaW46YWRtaW4="))
 		})
 
 		It("empty proxy", func() {
-			err := SetProxy("", "", nil)
+			err := net.SetProxy("", "", nil)
 			Expect(err).To(BeNil())
 		})
 	})
@@ -79,7 +82,7 @@ var _ = Describe("http test", func() {
 		})
 
 		It("with BasicAuth", func() {
-			downloader = HTTPDownloader{
+			downloader = net.HTTPDownloader{
 				TargetFilePath: targetFilePath,
 				RoundTripper:   roundTripper,
 				UserName:       "UserName",
@@ -110,7 +113,7 @@ var _ = Describe("http test", func() {
 		})
 
 		It("with error request", func() {
-			downloader = HTTPDownloader{
+			downloader = net.HTTPDownloader{
 				URL: "fake url",
 			}
 			err := downloader.DownloadFile()
@@ -118,7 +121,7 @@ var _ = Describe("http test", func() {
 		})
 
 		It("with error response", func() {
-			downloader = HTTPDownloader{
+			downloader = net.HTTPDownloader{
 				RoundTripper: roundTripper,
 			}
 
@@ -132,9 +135,9 @@ var _ = Describe("http test", func() {
 
 		It("status code isn't 200", func() {
 			const debugFile = "debug-download.html"
-			downloader = HTTPDownloader{
-				RoundTripper: roundTripper,
-				Debug:        true,
+			downloader = net.HTTPDownloader{
+				RoundTripper:   roundTripper,
+				Debug:          true,
 				TargetFilePath: debugFile,
 			}
 
@@ -155,7 +158,7 @@ var _ = Describe("http test", func() {
 		})
 
 		It("showProgress", func() {
-			downloader = HTTPDownloader{
+			downloader = net.HTTPDownloader{
 				RoundTripper:   roundTripper,
 				ShowProgress:   true,
 				TargetFilePath: targetFilePath,
@@ -175,3 +178,57 @@ var _ = Describe("http test", func() {
 		})
 	})
 })
+
+func TestSetProxy(t *testing.T) {
+	type args struct {
+		proxy     string
+		proxyAuth string
+		tr        *http.Transport
+	}
+	tests := []struct {
+		name    string
+		args    args
+		verify func(transport *http.Transport, t *testing.T) error
+		wantErr bool
+	}{{
+		name: "empty proxy",
+		args: args{},
+		wantErr: false,
+	}, {
+		name: "abc.com as proxy",
+		args: args{
+			proxy: "http://abc.com",
+			proxyAuth: "user:password",
+			tr: &http.Transport{},
+		},
+		verify: func(tr *http.Transport, t *testing.T) error {
+			proxy, err := tr.Proxy(&http.Request{})
+			if proxy.Host != "abc.com" {
+				err = fmt.Errorf("expect proxy host is: %s, got %s", "abc.com", proxy.Host)
+			}
+			auth := tr.ProxyConnectHeader.Get("Proxy-Authorization")
+			assert.Equal(t, "Basic dXNlcjpwYXNzd29yZA==", auth)
+			return err
+		},
+		wantErr: false,
+	}, {
+		name: "invalid proxy",
+		args: args{
+			proxy: "http://foo\u007F.com/",
+		},
+		wantErr: true,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := net.SetProxy(tt.args.proxy, tt.args.proxyAuth, tt.args.tr); (err != nil) != tt.wantErr {
+				t.Errorf("SetProxy() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.verify != nil {
+				if err := tt.verify(tt.args.tr, t); err != nil {
+					t.Errorf("SetProxy() error %v", err)
+				}
+			}
+		})
+	}
+}
