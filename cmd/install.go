@@ -1,15 +1,20 @@
 package cmd
 
 import (
+	"context"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/spf13/cobra"
 	"runtime"
 )
 
-// NewInstallCmd returns the install command
-func NewInstallCmd() (cmd *cobra.Command) {
-	opt := &installOption{}
+// newInstallCmd returns the install command
+func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
+	opt := &installOption{
+		downloadOption: downloadOption{
+			RoundTripper: *getRoundTripper(ctx),
+		},
+	}
 	cmd = &cobra.Command{
 		Use:     "install",
 		Short:   "Install a package from https://github.com/LinuxSuRen/hd-home",

@@ -1,15 +1,15 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"os"
 )
 
-func newFetchCmd() (cmd *cobra.Command) {
+func newFetchCmd(context.Context) (cmd *cobra.Command) {
 	opt := &fetchOption{}
-
 	cmd = &cobra.Command{
 		Use:     "fetch",
 		Short:   "Fetch the latest hd config",

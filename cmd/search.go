@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
@@ -9,7 +10,7 @@ import (
 	"strings"
 )
 
-func newSearchCmd() (cmd *cobra.Command) {
+func newSearchCmd(context.Context) (cmd *cobra.Command) {
 	cmd = &cobra.Command{
 		Use:   "search",
 		Short: "Search packages from the hd config repo",
