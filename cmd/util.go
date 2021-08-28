@@ -17,12 +17,14 @@ func getOrDefault(key, def string, data map[string]string) (result string) {
 	return
 }
 
+type contextRoundTripper string
+
 func getRoundTripper(ctx context.Context) (tripper http.RoundTripper) {
 	if ctx == nil {
 		return
 	}
+	roundTripper := ctx.Value(contextRoundTripper("roundTripper"))
 
-	roundTripper := ctx.Value("roundTripper")
 	switch v := roundTripper.(type) {
 	case *http.Transport:
 		tripper = v

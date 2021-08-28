@@ -116,6 +116,9 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 		name = repo
 	}
 
+	o.Org = org
+	o.Repo = repo
+
 	// extract version from name
 	if strings.Contains(name, "@") {
 		nameWithVer := strings.Split(name, "@")

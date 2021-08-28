@@ -79,6 +79,8 @@ type downloadOption struct {
 	name    string
 	Tar     bool
 	Package *installer.HDConfig
+	org     string
+	repo    string
 }
 
 const (
@@ -112,6 +114,8 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 		o.Package = ins.Package
 		o.Tar = ins.Tar
 		o.name = ins.Name
+		o.org = ins.Org
+		o.repo = ins.Repo
 	}
 	o.URL = targetURL
 

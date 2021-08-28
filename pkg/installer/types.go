@@ -7,6 +7,7 @@ type HDConfig struct {
 	Binary           string            `yaml:"binary"`
 	TargetBinary     string            `yaml:"targetBinary"`
 	AdditionBinaries []string          `yaml:"additionBinaries"`
+	FromSource       bool              `yaml:"fromSource"`
 	URL              string            `yaml:"url"`
 	Tar              string            `yaml:"tar"`
 	SupportOS        []string          `yaml:"supportOS"`
@@ -47,4 +48,7 @@ type Installer struct {
 	Arch             string
 	Fetch            bool
 	AdditionBinaries []string
+
+	Org  string
+	Repo string
 }
