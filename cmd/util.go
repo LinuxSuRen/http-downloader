@@ -17,29 +17,17 @@ func getOrDefault(key, def string, data map[string]string) (result string) {
 	return
 }
 
-func getReplacement(key string, data map[string]string) (result string) {
-	return getOrDefault(key, key, data)
-}
+func getRoundTripper(ctx context.Context) (tripper http.RoundTripper) {
+	if ctx == nil {
+		return
+	}
 
-func getRoundTripper(ctx context.Context) (tripper *http.RoundTripper) {
 	roundTripper := ctx.Value("roundTripper")
-
-	var ok bool
-	if tripper, ok = roundTripper.(*http.RoundTripper); ok {
-		tripper = nil
+	switch v := roundTripper.(type) {
+	case *http.Transport:
+		tripper = v
 	}
 	return
-}
-
-func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
 }
 
 func execCommandInDir(name, dir string, arg ...string) (err error) {
@@ -73,10 +61,6 @@ func execCommandInDir(name, dir string, arg ...string) (err error) {
 
 	err = command.Wait()
 	return
-}
-
-func execCommand(name string, arg ...string) (err error) {
-	return execCommandInDir(name, "", arg...)
 }
 
 func copyAndCapture(w io.Writer, r io.Reader) ([]byte, error) {

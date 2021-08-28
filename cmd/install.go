@@ -12,7 +12,7 @@ import (
 func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &installOption{
 		downloadOption: downloadOption{
-			RoundTripper: *getRoundTripper(ctx),
+			RoundTripper: getRoundTripper(ctx),
 		},
 	}
 	cmd = &cobra.Command{

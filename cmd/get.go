@@ -17,7 +17,7 @@ import (
 // newGetCmd return the get command
 func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &downloadOption{
-		RoundTripper: *getRoundTripper(ctx),
+		RoundTripper: getRoundTripper(ctx),
 	}
 	cmd = &cobra.Command{
 		Use:     "get",
