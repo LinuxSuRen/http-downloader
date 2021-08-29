@@ -19,7 +19,7 @@ jobs:
         run: |
           bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r coverage.out --force-coverage-parser go
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v2.0.3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.out
