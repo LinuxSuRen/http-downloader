@@ -140,7 +140,11 @@ func (o *installOption) installFromSource() (err error) {
 	sourcePath := path.Join(gopath, fmt.Sprintf("bin/%s", o.name))
 	if common.Exist(sourcePath) {
 		is := &installer.Installer{}
-		err = is.OverWriteBinary(sourcePath, fmt.Sprintf("/usr/local/bin/%s", o.name))
+		targetName := o.name
+		if o.Package != nil && o.Package.TargetBinary != "" {
+			targetName = o.Package.TargetBinary
+		}
+		err = is.OverWriteBinary(sourcePath, fmt.Sprintf("/usr/local/bin/%s", targetName))
 	} else {
 		err = fmt.Errorf("no found %s from GOPATH", o.name)
 	}
