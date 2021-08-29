@@ -152,5 +152,5 @@ func (o *installOption) installFromSource() (err error) {
 }
 
 func (o *installOption) buildGoGetCmd() string {
-	return fmt.Sprintf("go get -u github.com/%s/%s@%s", o.org, o.repo, o.fromBranch)
+	return fmt.Sprintf("go get github.com/%s/%s@%s", o.org, o.repo, o.fromBranch)
 }
