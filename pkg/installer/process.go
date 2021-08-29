@@ -86,12 +86,18 @@ func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 			return
 		}
 
-		if err = exec.RunCommand("rm", "-rf", targetPath); err != nil {
-			return
+		if common.IsDirWriteable(path.Dir(targetPath)) != nil {
+			if err = exec.RunCommandWithSudo("rm", "-rf", targetPath); err != nil {
+				return
+			}
+		} else {
+			if err = exec.RunCommand("rm", "-rf", targetPath); err != nil {
+				return
+			}
 		}
 
 		if common.IsDirWriteable(path.Dir(targetPath)) != nil {
-			err = exec.RunCommand("sudo", "mv", sourceFile, targetPath)
+			err = exec.RunCommandWithSudo("mv", sourceFile, targetPath)
 		} else {
 			err = exec.RunCommand("mv", sourceFile, targetPath)
 		}

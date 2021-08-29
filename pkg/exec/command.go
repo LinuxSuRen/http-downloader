@@ -78,6 +78,14 @@ func RunCommand(name string, arg ...string) (err error) {
 	return RunCommandInDir(name, "", arg...)
 }
 
+// RunCommandWithSudo runs a command with sudo
+func RunCommandWithSudo(name string, args ...string) (err error) {
+	newArgs := make([]string, 0)
+	newArgs = append(newArgs, name)
+	newArgs = append(newArgs, args...)
+	return RunCommand("sudo", newArgs...)
+}
+
 func copyAndCapture(w io.Writer, r io.Reader) ([]byte, error) {
 	var out []byte
 	buf := make([]byte, 1024, 1024)
