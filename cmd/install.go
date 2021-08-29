@@ -39,7 +39,7 @@ func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 	flags.BoolVarP(&opt.AcceptPreRelease, "pre", "", false,
 		"Same with option --accept-preRelease")
 	flags.BoolVarP(&opt.fromSource, "from-source", "", false,
-		"Indicate if install it via go get github.com/xxx/xxx")
+		"Indicate if install it via go install github.com/xxx/xxx")
 	flags.StringVarP(&opt.fromBranch, "from-branch", "", "master",
 		"Only works if the flag --from-source is true")
 
@@ -132,8 +132,8 @@ func (o *installOption) installFromSource() (err error) {
 		return
 	}
 
-	if err = exec.RunCommand("go", strings.Split(o.buildGoGetCmd(), " ")[1:]...); err != nil {
-		err = fmt.Errorf("faield to run go get command, error: %v", err)
+	if err = exec.RunCommand("go", strings.Split(o.buildGoInstallCmd(), " ")[1:]...); err != nil {
+		err = fmt.Errorf("faield to run go install command, error: %v", err)
 		return
 	}
 
@@ -151,6 +151,6 @@ func (o *installOption) installFromSource() (err error) {
 	return
 }
 
-func (o *installOption) buildGoGetCmd() string {
-	return fmt.Sprintf("go get github.com/%s/%s@%s", o.org, o.repo, o.fromBranch)
+func (o *installOption) buildGoInstallCmd() string {
+	return fmt.Sprintf("go install github.com/%s/%s@%s", o.org, o.repo, o.fromBranch)
 }
