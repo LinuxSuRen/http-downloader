@@ -8,7 +8,7 @@ import (
 
 func TestError(t *testing.T) {
 	err := net.DownloadError{
-		Message: "message",
+		Message:    "message",
 		StatusCode: 200,
 	}
 	assert.Contains(t, err.Error(), "message")

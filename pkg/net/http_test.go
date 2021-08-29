@@ -188,18 +188,18 @@ func TestSetProxy(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		verify func(transport *http.Transport, t *testing.T) error
+		verify  func(transport *http.Transport, t *testing.T) error
 		wantErr bool
 	}{{
-		name: "empty proxy",
-		args: args{},
+		name:    "empty proxy",
+		args:    args{},
 		wantErr: false,
 	}, {
 		name: "abc.com as proxy",
 		args: args{
-			proxy: "http://abc.com",
+			proxy:     "http://abc.com",
 			proxyAuth: "user:password",
-			tr: &http.Transport{},
+			tr:        &http.Transport{},
 		},
 		verify: func(tr *http.Transport, t *testing.T) error {
 			proxy, err := tr.Proxy(&http.Request{})

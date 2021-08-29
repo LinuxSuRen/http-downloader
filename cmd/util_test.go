@@ -21,13 +21,13 @@ func Test_getRoundTripper(t *testing.T) {
 	}, {
 		name: "invalid type of RounderTripper in the context",
 		args: args{
-			ctx: context.WithValue(context.TODO(), "roundTripper", "invalid"),
+			ctx: context.WithValue(context.TODO(), contextRoundTripper("roundTripper"), "invalid"),
 		},
 		wantTripper: nil,
 	}, {
 		name: "valid type of RounderTripper in the context",
 		args: args{
-			ctx: context.WithValue(context.TODO(), "roundTripper", &http.Transport{}),
+			ctx: context.WithValue(context.TODO(), contextRoundTripper("roundTripper"), &http.Transport{}),
 		},
 		wantTripper: &http.Transport{},
 	}}
@@ -53,8 +53,8 @@ func Test_getOrDefault(t *testing.T) {
 	}{{
 		name: "no key exist",
 		args: args{
-			key: "key",
-			def: "def",
+			key:  "key",
+			def:  "def",
 			data: map[string]string{},
 		},
 		wantResult: "def",

@@ -2,10 +2,16 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/common"
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/spf13/cobra"
+	sysos "os"
+	"path"
 	"runtime"
+	"strings"
 )
 
 // newInstallCmd returns the install command
@@ -25,8 +31,6 @@ func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 	}
 
 	flags := cmd.Flags()
-	//flags.StringVarP(&opt.Mode, "mode", "m", "package",
-	//	"If you want to install it via platform package manager")
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.BoolVarP(&opt.Fetch, "fetch", "", true,
 		"If fetch the latest config from https://github.com/LinuxSuRen/hd-home")
@@ -34,6 +38,10 @@ func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 		"If you accept preRelease as the binary asset from GitHub")
 	flags.BoolVarP(&opt.AcceptPreRelease, "pre", "", false,
 		"Same with option --accept-preRelease")
+	flags.BoolVarP(&opt.fromSource, "from-source", "", false,
+		"Indicate if install it via go get github.com/xxx/xxx")
+	flags.StringVarP(&opt.fromBranch, "from-branch", "", "master",
+		"Only works if the flag --from-source is true")
 
 	flags.BoolVarP(&opt.Download, "download", "", true,
 		"If download the package")
@@ -53,7 +61,8 @@ type installOption struct {
 	downloadOption
 	Download     bool
 	CleanPackage bool
-	Mode         string
+	fromSource   bool
+	fromBranch   string
 
 	// inner fields
 	nativePackage bool
@@ -75,6 +84,12 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
+	// aka go get github.com/xxx/xxx
+	if o.fromSource {
+		err = o.installFromSource()
+		return
+	}
+
 	// install a package from hd-home
 	if o.Download {
 		if err = o.downloadOption.runE(cmd, args); err != nil {
@@ -93,4 +108,45 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 	}
 	err = process.Install()
 	return
+}
+
+func (o *installOption) installFromSource() (err error) {
+	if !o.Package.FromSource {
+		err = fmt.Errorf("not support install it from source")
+		return
+	}
+
+	if o.Provider != "github" {
+		err = fmt.Errorf("only support github.com")
+		return
+	}
+
+	gopath := sysos.Getenv("GOPATH")
+	if gopath == "" {
+		err = fmt.Errorf("GOPATH is required")
+		return
+	}
+
+	if o.org == "" || o.repo == "" {
+		err = fmt.Errorf("org: '%s' or repo: '%s' is empty", o.org, o.repo)
+		return
+	}
+
+	if err = exec.RunCommand("go", strings.Split(o.buildGoGetCmd(), " ")[1:]...); err != nil {
+		err = fmt.Errorf("faield to run go get command, error: %v", err)
+		return
+	}
+
+	sourcePath := path.Join(gopath, fmt.Sprintf("bin/%s", o.name))
+	if common.Exist(sourcePath) {
+		is := &installer.Installer{}
+		err = is.OverWriteBinary(sourcePath, fmt.Sprintf("/usr/local/bin/%s", o.name))
+	} else {
+		err = fmt.Errorf("no found %s from GOPATH", o.name)
+	}
+	return
+}
+
+func (o *installOption) buildGoGetCmd() string {
+	return fmt.Sprintf("go get -u github.com/%s/%s@%s", o.org, o.repo, o.fromBranch)
 }

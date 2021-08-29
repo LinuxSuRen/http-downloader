@@ -96,4 +96,3 @@ jobs:
       - uses: gaurav-nelson/github-action-markdown-link-check@1.0.13
         with:
           use-verbose-mode: 'yes'
-  bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r coverage.out --force-coverage-parser go

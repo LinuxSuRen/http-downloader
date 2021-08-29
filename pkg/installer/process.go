@@ -48,13 +48,13 @@ func (o *Installer) Install() (err error) {
 		if o.Package != nil && o.Package.Installation != nil {
 			err = exec.RunCommand(o.Package.Installation.Cmd, o.Package.Installation.Args...)
 		} else {
-			if err = o.overWriteBinary(source, target); err != nil {
+			if err = o.OverWriteBinary(source, target); err != nil {
 				return
 			}
 
 			for i := range o.AdditionBinaries {
 				addition := o.AdditionBinaries[i]
-				if err = o.overWriteBinary(addition, fmt.Sprintf("/usr/local/bin/%s", filepath.Base(addition))); err != nil {
+				if err = o.OverWriteBinary(addition, fmt.Sprintf("/usr/local/bin/%s", filepath.Base(addition))); err != nil {
 					return
 				}
 			}
@@ -77,7 +77,8 @@ func (o *Installer) Install() (err error) {
 	return
 }
 
-func (o *Installer) overWriteBinary(sourceFile, targetPath string) (err error) {
+// OverWriteBinary install a binrary file
+func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 	fmt.Println("install", sourceFile, "to", targetPath)
 	switch runtime.GOOS {
 	case "linux", "darwin":
