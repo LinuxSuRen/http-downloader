@@ -45,9 +45,9 @@ func TestHasPackage(t *testing.T) {
 		},
 		want: true,
 	}, {
-		name: "vim",
+		name: "kubectl",
 		args: args{
-			name: "vim",
+			name: "kubectl",
 		},
 		want: true,
 	}}
