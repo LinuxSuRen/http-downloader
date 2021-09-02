@@ -1,6 +1,8 @@
 package os
 
 import (
+	"github.com/linuxsuren/http-downloader/pkg/os/fake"
+	"github.com/stretchr/testify/assert"
 	"runtime"
 	"testing"
 )
@@ -30,6 +32,12 @@ func TestHasPackage(t *testing.T) {
 			name: "docker",
 		},
 		want: true,
+	}, {
+		name: "golang",
+		args: args{
+			name: "golang",
+		},
+		want: true,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -40,7 +48,7 @@ func TestHasPackage(t *testing.T) {
 	}
 }
 
-func TestPackageIntallInAllPlatforms(t *testing.T) {
+func TestPackageInstallInAllPlatforms(t *testing.T) {
 	type args struct {
 		name string
 	}
@@ -62,4 +70,21 @@ func TestPackageIntallInAllPlatforms(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWithFakeInstaller(t *testing.T) {
+	// test uninstall a fake package
+	err := Uninstall("fake")
+	assert.Nil(t, err)
+	assert.False(t, HasPackage("fake"))
+
+	defaultInstallerRegistry.Registry("fake", fake.NewFakeInstaller(true, false))
+	err = Uninstall("fake")
+	assert.Nil(t, err)
+	err = Install("fake")
+	assert.Nil(t, err)
+
+	defaultInstallerRegistry.Registry("fake-with-err", fake.NewFakeInstaller(true, true))
+	err = Uninstall("fake-with-err")
+	assert.NotNil(t, err)
 }
