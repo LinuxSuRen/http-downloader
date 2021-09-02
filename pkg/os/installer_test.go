@@ -21,9 +21,9 @@ func TestHasPackage(t *testing.T) {
 		args args
 		want bool
 	}{{
-		name: "fake",
+		name: "fake-package",
 		args: args{
-			name: "fake",
+			name: "fake-package",
 		},
 		want: false,
 	}, {
@@ -42,7 +42,7 @@ func TestHasPackage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := HasPackage(tt.args.name); got != tt.want {
-				t.Errorf("HasPackage() = %v, want %v", got, tt.want)
+				t.Errorf("test: %s, HasPackage() = %v, want %v", tt.name, got, tt.want)
 			}
 		})
 	}
