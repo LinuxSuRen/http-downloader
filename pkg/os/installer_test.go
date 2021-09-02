@@ -38,6 +38,18 @@ func TestHasPackage(t *testing.T) {
 			name: "golang",
 		},
 		want: true,
+	}, {
+		name: "git",
+		args: args{
+			name: "git",
+		},
+		want: true,
+	}, {
+		name: "vim",
+		args: args{
+			name: "vim",
+		},
+		want: true,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
