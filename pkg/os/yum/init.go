@@ -8,4 +8,5 @@ func SetInstallerRegistry(registry core.InstallerRegistry) {
 	registry.Registry("conntrack", &conntrackInstallerInCentOS{})
 	registry.Registry("socat", &socatInstallerInCentOS{})
 	registry.Registry("vim", &vimInstallerInCentOS{})
+	registry.Registry("golang", &golangInstallerInCentOS{})
 }
