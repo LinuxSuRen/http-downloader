@@ -9,4 +9,5 @@ func SetInstallerRegistry(registry core.InstallerRegistry) {
 	registry.Registry("socat", &socatInstallerInUbuntu{})
 	registry.Registry("vim", &vimInstallerInUbuntu{})
 	registry.Registry("golang", &golangInstallerInUbuntu{})
+	registry.Registry("git", &gitInstallerInUbuntu{})
 }
