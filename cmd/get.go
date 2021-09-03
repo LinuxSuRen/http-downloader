@@ -127,7 +127,7 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 	o.URL = targetURL
 
 	if o.ProxyGitHub != "" {
-		o.URL = strings.ReplaceAll(o.URL, "github.com", fmt.Sprintf("%s/github.com", o.ProxyGitHub))
+		o.URL = strings.Replace(o.URL, "github.com", fmt.Sprintf("%s/github.com", o.ProxyGitHub), 1)
 	}
 
 	if o.Output == "" {
