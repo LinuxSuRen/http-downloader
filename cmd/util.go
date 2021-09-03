@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"github.com/spf13/cobra"
 	"io"
 	"net/http"
 	"os"
@@ -85,5 +86,15 @@ func copyAndCapture(w io.Writer, r io.Reader) ([]byte, error) {
 			}
 			return out, err
 		}
+	}
+}
+
+// CompletionFunc is the function for command completion
+type CompletionFunc func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)
+
+// ArrayCompletion return a completion  which base on an array
+func ArrayCompletion(array ...string) CompletionFunc {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return array, cobra.ShellCompDirectiveNoFileComp
 	}
 }
