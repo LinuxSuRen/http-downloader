@@ -42,6 +42,10 @@ func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 		"Indicate if install it via go install github.com/xxx/xxx")
 	flags.StringVarP(&opt.fromBranch, "from-branch", "", "master",
 		"Only works if the flag --from-source is true")
+	flags.StringVarP(&opt.ProxyGitHub, "proxy-github", "", "",
+		`The proxy address of github.com, the proxy address will be the prefix of the final address.
+Available proxy: gh.api.99988866.xyz
+Thanks to https://github.com/hunshcn/gh-proxy`)
 
 	flags.BoolVarP(&opt.Download, "download", "", true,
 		"If download the package")

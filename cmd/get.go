@@ -36,6 +36,10 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 		"If you accept preRelease as the binary asset from GitHub")
 	flags.BoolVarP(&opt.AcceptPreRelease, "pre", "", false,
 		"Same with option --accept-preRelease")
+	flags.StringVarP(&opt.ProxyGitHub, "proxy-github", "", "",
+		`The proxy address of github.com, the proxy address will be the prefix of the final address.
+Available proxy: gh.api.99988866.xyz
+Thanks to https://github.com/hunshcn/gh-proxy`)
 
 	flags.IntVarP(&opt.Timeout, "time", "", 10,
 		`The default timeout in seconds with the HTTP request`)
@@ -52,6 +56,8 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 	flags.StringVarP(&opt.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
 	flags.BoolVarP(&opt.PrintSchema, "print-schema", "", false,
 		"Print the schema of HDConfig if the flag is true without other function")
+
+	_ = cmd.RegisterFlagCompletionFunc("proxy-github", ArrayCompletion("gh.api.99988866.xyz"))
 	return
 }
 
@@ -64,6 +70,7 @@ type downloadOption struct {
 	MaxAttempts      int
 	AcceptPreRelease bool
 	RoundTripper     http.RoundTripper
+	ProxyGitHub      string
 
 	ContinueAt int64
 
@@ -118,6 +125,10 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 		o.repo = ins.Repo
 	}
 	o.URL = targetURL
+
+	if o.ProxyGitHub != "" {
+		o.URL = strings.ReplaceAll(o.URL, "github.com", fmt.Sprintf("%s/github.com", o.ProxyGitHub))
+	}
 
 	if o.Output == "" {
 		var urlObj *url.URL
