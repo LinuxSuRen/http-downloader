@@ -49,6 +49,8 @@ Thanks to https://github.com/hunshcn/gh-proxy`)
 
 	flags.BoolVarP(&opt.Download, "download", "", true,
 		"If download the package")
+	flags.BoolVarP(&opt.force, "force", "f", false,
+		"Indicate if force to download the package even it is exist")
 	flags.BoolVarP(&opt.CleanPackage, "clean-package", "", true,
 		"Clean the package if the installation is success")
 	flags.IntVarP(&opt.Thread, "thread", "t", 4,
@@ -67,14 +69,26 @@ type installOption struct {
 	CleanPackage bool
 	fromSource   bool
 	fromBranch   string
+	force        bool
 
 	// inner fields
 	nativePackage bool
+	tool          string
+}
+
+func (o *installOption) shouldInstall() (should, exist bool) {
+	if _, lookErr := exec.LookPath(o.tool); lookErr == nil {
+		exist = true
+	}
+	should = o.force || !exist
+	return
 }
 
 func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
+	o.tool = args[0]
+
 	// try to find if it's a native package
-	o.nativePackage = os.HasPackage(args[0])
+	o.nativePackage = os.HasPackage(o.tool)
 	if !o.nativePackage {
 		err = o.downloadOption.preRunE(cmd, args)
 	}
@@ -82,6 +96,13 @@ func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 }
 
 func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
+	if should, exist := o.shouldInstall(); !should {
+		if exist {
+			cmd.Printf("%s is already exist\n", o.tool)
+		}
+		return
+	}
+
 	if o.nativePackage {
 		// install a package
 		err = os.Install(args[0])
@@ -136,7 +157,7 @@ func (o *installOption) installFromSource() (err error) {
 		return
 	}
 
-	if err = exec.RunCommand("go", strings.Split(o.buildGoInstallCmd(), " ")[1:]...); err != nil {
+	if err = exec.RunCommandInDir("go", sysos.TempDir(), strings.Split(o.buildGoInstallCmd(), " ")[1:]...); err != nil {
 		err = fmt.Errorf("faield to run go install command, error: %v", err)
 		return
 	}
