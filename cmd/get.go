@@ -151,9 +151,9 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		var data []byte
 		if data, err = yaml.Marshal(installer.HDConfig{
 			Installation: &installer.CmdWithArgs{},
-			PreInstall:   &installer.CmdWithArgs{},
-			PostInstall:  &installer.CmdWithArgs{},
-			TestInstall:  &installer.CmdWithArgs{},
+			PreInstalls:  []installer.CmdWithArgs{},
+			PostInstalls: []installer.CmdWithArgs{},
+			TestInstalls: []installer.CmdWithArgs{},
 		}); err == nil {
 			cmd.Print(string(data))
 		}

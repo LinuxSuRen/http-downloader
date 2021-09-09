@@ -110,6 +110,19 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 		CleanPackage:     o.CleanPackage,
 		AdditionBinaries: o.Package.AdditionBinaries,
 	}
+	// install requirements tools in the post phase
+	if len(o.Package.Requirements) > 0 {
+		if len(o.Package.PostInstalls) == 0 {
+			o.Package.PostInstalls = make([]installer.CmdWithArgs, 0)
+		}
+		for i := range o.Package.Requirements {
+			tool := o.Package.Requirements[i]
+			o.Package.PostInstalls = append(o.Package.PostInstalls, installer.CmdWithArgs{
+				Cmd:  "hd",
+				Args: []string{"install", tool},
+			})
+		}
+	}
 	err = process.Install()
 	return
 }
