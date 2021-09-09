@@ -11,4 +11,5 @@ func SetInstallerRegistry(registry core.InstallerRegistry) {
 	registry.Registry("golang", &golangInstallerInUbuntu{})
 	registry.Registry("git", &gitInstallerInUbuntu{})
 	registry.Registry("kubectl", &kubectlInstallerInUbuntu{})
+	registry.Registry("bash-completion", &bashCompletionInstallerInUbuntu{})
 }

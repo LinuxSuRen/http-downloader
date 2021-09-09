@@ -50,6 +50,12 @@ func TestHasPackage(t *testing.T) {
 			name: "kubectl",
 		},
 		want: true,
+	}, {
+		name: "bash-completion",
+		args: args{
+			name: "bash-completion",
+		},
+		want: true,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
