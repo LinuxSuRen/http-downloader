@@ -39,8 +39,8 @@ func (o *Installer) Install() (err error) {
 	}
 
 	if err == nil {
-		if o.Package != nil && o.Package.PreInstall != nil {
-			if err = exec.RunCommand(o.Package.PreInstall.Cmd, o.Package.PreInstall.Args...); err != nil {
+		if o.Package != nil && o.Package.PreInstalls != nil {
+			if err = runCommandList(o.Package.PreInstalls); err != nil {
 				return
 			}
 		}
@@ -60,12 +60,12 @@ func (o *Installer) Install() (err error) {
 			}
 		}
 
-		if err == nil && o.Package != nil && o.Package.PostInstall != nil {
-			err = exec.RunCommand(o.Package.PostInstall.Cmd, o.Package.PostInstall.Args...)
+		if err == nil && o.Package != nil && o.Package.PostInstalls != nil {
+			err = runCommandList(o.Package.PostInstalls)
 		}
 
-		if err == nil && o.Package != nil && o.Package.TestInstall != nil {
-			err = exec.RunCommand(o.Package.TestInstall.Cmd, o.Package.TestInstall.Args...)
+		if err == nil && o.Package != nil && o.Package.TestInstalls != nil {
+			err = runCommandList(o.Package.TestInstalls)
 		}
 
 		if err == nil && o.CleanPackage {

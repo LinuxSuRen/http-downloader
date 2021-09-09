@@ -218,16 +218,16 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 					}
 				}
 
-				if err = renderCmdWithArgs(cfg.PreInstall, hdPkg); err != nil {
+				if err = renderCmdsWithArgs(cfg.PreInstalls, hdPkg); err != nil {
 					return
 				}
 				if err = renderCmdWithArgs(cfg.Installation, hdPkg); err != nil {
 					return
 				}
-				if err = renderCmdWithArgs(cfg.PostInstall, hdPkg); err != nil {
+				if err = renderCmdsWithArgs(cfg.PostInstalls, hdPkg); err != nil {
 					return
 				}
-				if err = renderCmdWithArgs(cfg.TestInstall, hdPkg); err != nil {
+				if err = renderCmdsWithArgs(cfg.TestInstalls, hdPkg); err != nil {
 					return
 				}
 
@@ -278,6 +278,16 @@ func renderTemplate(text string, hdPkg *HDPackage) (result string, err error) {
 	var buf bytes.Buffer
 	if err = tmp.Execute(&buf, hdPkg); err == nil {
 		result = buf.String()
+	}
+	return
+}
+
+func renderCmdsWithArgs(cmds []CmdWithArgs, hdPkg *HDPackage) (err error) {
+	for i := range cmds {
+		cmd := cmds[i]
+		if err = renderCmdWithArgs(&cmd, hdPkg); err != nil {
+			return
+		}
 	}
 	return
 }

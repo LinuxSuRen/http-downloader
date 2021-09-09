@@ -46,8 +46,8 @@ package pkg
 //	}
 //
 //	if err == nil {
-//		if o.Package != nil && o.Package.PreInstall != nil {
-//			if err = execCommand(o.Package.PreInstall.Cmd, o.Package.PreInstall.Args...); err != nil {
+//		if o.Package != nil && o.Package.PreInstalls != nil {
+//			if err = execCommand(o.Package.PreInstalls.Cmd, o.Package.PreInstalls.Args...); err != nil {
 //				return
 //			}
 //		}
@@ -58,12 +58,12 @@ package pkg
 //			err = o.overWriteBinary(source, target)
 //		}
 //
-//		if err == nil && o.Package != nil && o.Package.PostInstall != nil {
-//			err = execCommand(o.Package.PostInstall.Cmd, o.Package.PostInstall.Args...)
+//		if err == nil && o.Package != nil && o.Package.PostInstalls != nil {
+//			err = execCommand(o.Package.PostInstalls.Cmd, o.Package.PostInstalls.Args...)
 //		}
 //
-//		if err == nil && o.Package != nil && o.Package.TestInstall != nil {
-//			err = execCommand(o.Package.TestInstall.Cmd, o.Package.TestInstall.Args...)
+//		if err == nil && o.Package != nil && o.Package.TestInstalls != nil {
+//			err = execCommand(o.Package.TestInstalls.Cmd, o.Package.TestInstalls.Args...)
 //		}
 //
 //		if err == nil && o.CleanPackage {

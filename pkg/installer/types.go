@@ -13,10 +13,11 @@ type HDConfig struct {
 	SupportOS        []string          `yaml:"supportOS"`
 	SupportArch      []string          `yaml:"supportArch"`
 	Replacements     map[string]string `yaml:"replacements"`
+	Requirements     []string          `yaml:"requirements"`
 	Installation     *CmdWithArgs      `yaml:"installation"`
-	PreInstall       *CmdWithArgs      `yaml:"preInstall"`
-	PostInstall      *CmdWithArgs      `yaml:"postInstall"`
-	TestInstall      *CmdWithArgs      `yaml:"testInstall"`
+	PreInstalls      []CmdWithArgs     `yaml:"preInstalls"`
+	PostInstalls     []CmdWithArgs     `yaml:"postInstalls"`
+	TestInstalls     []CmdWithArgs     `yaml:"testInstalls"`
 }
 
 // CmdWithArgs is a command with arguments
