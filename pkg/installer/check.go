@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net/url"
+	sysos "os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -74,8 +75,13 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 // ProviderURLParse parse the URL
 func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url string, err error) {
 	url = path
-	if o.Provider != ProviderGitHub {
-		return
+	if o.Fetch {
+		// fetch the latest config
+		fmt.Println("start to fetch the config")
+		if err = FetchLatestRepo(o.Provider, ConfigBranch, sysos.Stdout); err != nil {
+			err = fmt.Errorf("unable to fetch the latest config, error: %v", err)
+			return
+		}
 	}
 
 	var (
@@ -133,15 +139,6 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 			org, repo, version, name, o.OS, o.Arch)
 	}
 	o.Name = name
-
-	if o.Fetch {
-		// fetch the latest config
-		fmt.Println("start to fetch the config")
-		if err = FetchConfig(); err != nil {
-			err = fmt.Errorf("unable to fetch the latest config, error: %v", err)
-			return
-		}
-	}
 
 	// try to parse from config
 	userHome, _ := homedir.Dir()

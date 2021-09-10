@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
+	sysos "os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -24,7 +25,7 @@ func newSearchCmd(context.Context) (cmd *cobra.Command) {
 }
 
 func search(keyword string) (err error) {
-	if err = installer.FetchConfig(); err != nil {
+	if err = installer.FetchLatestRepo("", "", sysos.Stdout); err != nil {
 		return
 	}
 
