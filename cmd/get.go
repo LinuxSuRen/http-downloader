@@ -57,7 +57,9 @@ Thanks to https://github.com/hunshcn/gh-proxy`)
 	flags.BoolVarP(&opt.PrintSchema, "print-schema", "", false,
 		"Print the schema of HDConfig if the flag is true without other function")
 
-	_ = cmd.RegisterFlagCompletionFunc("proxy-github", ArrayCompletion("gh.api.99988866.xyz"))
+	_ = cmd.RegisterFlagCompletionFunc("proxy-github", ArrayCompletion("gh.api.99988866.xyz",
+		"ghproxy.com", "mirror.ghproxy.com"))
+	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, "gitee"))
 	return
 }
 

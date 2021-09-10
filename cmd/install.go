@@ -60,6 +60,8 @@ Thanks to https://github.com/hunshcn/gh-proxy`)
 	flags.StringVarP(&opt.Provider, "provider", "", ProviderGitHub, "The file provider")
 	flags.StringVarP(&opt.OS, "os", "", runtime.GOOS, "The OS of target binary file")
 	flags.StringVarP(&opt.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
+
+	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, "gitee"))
 	return
 }
 
