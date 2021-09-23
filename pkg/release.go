@@ -10,6 +10,8 @@ type ReleaseClient struct {
 	Client *github.Client
 	Org    string
 	Repo   string
+
+	ctx context.Context
 }
 
 // ReleaseAsset is the asset from GitHub release
@@ -21,6 +23,25 @@ type ReleaseAsset struct {
 // Init init the GitHub client
 func (g *ReleaseClient) Init() {
 	g.Client = github.NewClient(nil)
+	g.ctx = context.TODO()
+}
+
+// ListReleases returns the release list
+func (g *ReleaseClient) ListReleases(owner, repo string, count int) (list []ReleaseAsset, err error) {
+	opt := &github.ListOptions{
+		PerPage: count,
+	}
+
+	var releaseList []*github.RepositoryRelease
+	if releaseList, _, err = g.Client.Repositories.ListReleases(g.ctx, owner, repo, opt); err == nil {
+		for i := range releaseList {
+			list = append(list, ReleaseAsset{
+				TagName: releaseList[i].GetTagName(),
+				Body:    releaseList[i].GetBody(),
+			})
+		}
+	}
+	return
 }
 
 // GetLatestJCLIAsset returns the latest jcli asset
@@ -75,19 +96,13 @@ func (g *ReleaseClient) GetJCLIAsset(tagName string) (*ReleaseAsset, error) {
 
 // GetReleaseAssetByTagName returns the release asset by tag name
 func (g *ReleaseClient) GetReleaseAssetByTagName(owner, repo, tagName string) (ra *ReleaseAsset, err error) {
-	ctx := context.Background()
-
-	opt := &github.ListOptions{
-		PerPage: 99999,
-	}
-
-	var releaseList []*github.RepositoryRelease
-	if releaseList, _, err = g.Client.Repositories.ListReleases(ctx, owner, repo, opt); err == nil {
-		for _, item := range releaseList {
-			if item.GetTagName() == tagName {
+	var list []ReleaseAsset
+	if list, err = g.ListReleases(owner, repo, 99999); err == nil {
+		for _, item := range list {
+			if item.TagName == tagName {
 				ra = &ReleaseAsset{
-					TagName: item.GetTagName(),
-					Body:    item.GetBody(),
+					TagName: item.TagName,
+					Body:    item.Body,
 				}
 				break
 			}
