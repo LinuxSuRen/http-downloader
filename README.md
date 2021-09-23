@@ -15,7 +15,7 @@ Install it via: `brew install linuxsuren/linuxsuren/hd`
 Or download it directly (for Linux):
 ```
 curl -L https://github.com/linuxsuren/http-downloader/releases/latest/download/hd-linux-amd64.tar.gz | tar xzv
-mv hd /usr/local/bin
+mv hd /usr/bin/hd
 ```
 
 Want to go through the code? [GitPod](https://gitpod.io/#https://github.com/linuxsuren/http-downloader) definitely can help you.
