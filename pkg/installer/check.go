@@ -16,6 +16,7 @@ import (
 	sysos "os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"text/template"
@@ -73,8 +74,8 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 }
 
 // ProviderURLParse parse the URL
-func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url string, err error) {
-	url = path
+func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packageURL string, err error) {
+	packageURL = path
 	if o.Fetch {
 		// fetch the latest config
 		fmt.Println("start to fetch the config")
@@ -91,7 +92,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 		version string
 	)
 
-	addr := strings.Split(url, "/")
+	addr := strings.Split(packageURL, "/")
 	if len(addr) >= 2 {
 		org = addr[0]
 		repo = addr[1]
@@ -131,11 +132,11 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 		name = nameWithVer[0]
 		version = nameWithVer[1]
 
-		url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
+		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
 			org, repo, version, name, o.OS, o.Arch)
 	} else if name != "" {
 		version = "latest"
-		url = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
+		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
 			org, repo, version, name, o.OS, o.Arch)
 	}
 	o.Name = name
@@ -172,21 +173,21 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 					}
 					ghClient.Init()
 					if asset, err := ghClient.GetLatestAsset(acceptPreRelease); err == nil {
-						hdPkg.Version = asset.TagName
-						hdPkg.VersionNum = strings.TrimPrefix(asset.TagName, "v")
+						hdPkg.Version = url.QueryEscape(asset.TagName) // the version name might have some special string
+						hdPkg.VersionNum = regexp.MustCompile(`^.*v`).ReplaceAllString(asset.TagName, "")
 
 						version = hdPkg.Version
 					} else {
 						fmt.Println(err, "cannot get the asset")
 					}
 
-					if url == "" {
-						url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
+					if packageURL == "" {
+						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
 							org, repo, version, o.Name, o.OS, o.Arch)
 					}
 				} else {
-					if url == "" {
-						url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
+					if packageURL == "" {
+						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
 							org, repo, version, name, o.OS, o.Arch)
 					}
 				}
@@ -197,7 +198,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 
 					var buf bytes.Buffer
 					if err = tmp.Execute(&buf, hdPkg); err == nil {
-						url = buf.String()
+						packageURL = buf.String()
 					} else {
 						return
 					}
@@ -206,7 +207,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (url st
 
 					var buf bytes.Buffer
 					if err = tmp.Execute(&buf, hdPkg); err == nil {
-						url = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s",
+						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s",
 							org, repo, version, buf.String())
 
 						o.Output = buf.String()
