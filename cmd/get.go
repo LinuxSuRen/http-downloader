@@ -56,6 +56,10 @@ Thanks to https://github.com/hunshcn/gh-proxy`)
 	flags.StringVarP(&opt.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
 	flags.BoolVarP(&opt.PrintSchema, "print-schema", "", false,
 		"Print the schema of HDConfig if the flag is true without other function")
+	flags.BoolVarP(&opt.PrintVersion, "print-version", "", false,
+		"Print the version list")
+	flags.IntVarP(&opt.PrintVersionCount, "print-version-count", "", 20,
+		"The number of the version list")
 
 	_ = cmd.RegisterFlagCompletionFunc("proxy-github", ArrayCompletion("gh.api.99988866.xyz",
 		"ghproxy.com", "mirror.ghproxy.com"))
@@ -80,9 +84,11 @@ type downloadOption struct {
 	Arch     string
 	OS       string
 
-	Thread      int
-	KeepPart    bool
-	PrintSchema bool
+	Thread            int
+	KeepPart          bool
+	PrintSchema       bool
+	PrintVersion      bool
+	PrintVersionCount int
 
 	// inner fields
 	name    string
@@ -158,6 +164,18 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 			TestInstalls: []installer.CmdWithArgs{},
 		}); err == nil {
 			cmd.Print(string(data))
+		}
+		return
+	}
+
+	if o.PrintVersion {
+		client := &pkg.ReleaseClient{}
+		client.Init()
+		var list []pkg.ReleaseAsset
+		if list, err = client.ListReleases(o.org, o.repo, o.PrintVersionCount); err == nil {
+			for _, item := range list {
+				cmd.Println(item.TagName)
+			}
 		}
 		return
 	}
