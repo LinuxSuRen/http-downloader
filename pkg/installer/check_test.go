@@ -17,10 +17,10 @@ func TestGetVersion(t *testing.T) {
 	}{
 		{
 			name:    "empty version, repo as default name",
-			appInfo: "kubernetes-sig/kustomize",
+			appInfo: "kubernetes-sigs/kustomize",
 			verify: func(o *Installer, version string, t *testing.T) error {
 				assert.Equal(t, version, "latest")
-				assert.Equal(t, o.Org, "kubernetes-sig")
+				assert.Equal(t, o.Org, "kubernetes-sigs")
 				assert.Equal(t, o.Repo, "kustomize")
 				assert.Equal(t, o.Name, "kustomize")
 				return nil
@@ -29,10 +29,10 @@ func TestGetVersion(t *testing.T) {
 		},
 		{
 			name:    "empty version, specific app name",
-			appInfo: "kubernetes-sig/kustomize/kustomize",
+			appInfo: "kubernetes-sigs/kustomize/kustomize",
 			verify: func(o *Installer, version string, t *testing.T) error {
 				assert.Equal(t, version, "latest")
-				assert.Equal(t, o.Org, "kubernetes-sig")
+				assert.Equal(t, o.Org, "kubernetes-sigs")
 				assert.Equal(t, o.Repo, "kustomize")
 				assert.Equal(t, o.Name, "kustomize")
 				return nil
@@ -41,10 +41,10 @@ func TestGetVersion(t *testing.T) {
 		},
 		{
 			name:    "semver version, specific app name",
-			appInfo: "kubernetes-sig/kustomize/kustomize@v1.0",
+			appInfo: "kubernetes-sigs/kustomize/kustomize@v1.0",
 			verify: func(o *Installer, version string, t *testing.T) error {
 				assert.Equal(t, version, "v1.0")
-				assert.Equal(t, o.Org, "kubernetes-sig")
+				assert.Equal(t, o.Org, "kubernetes-sigs")
 				assert.Equal(t, o.Repo, "kustomize")
 				assert.Equal(t, o.Name, "kustomize")
 				return nil
@@ -53,10 +53,10 @@ func TestGetVersion(t *testing.T) {
 		},
 		{
 			name:    "specific version with a slash, specific app name",
-			appInfo: "kubernetes-sig/kustomize/kustomize@kustomize/v1.0",
+			appInfo: "kubernetes-sigs/kustomize/kustomize@kustomize/v1.0",
 			verify: func(o *Installer, version string, t *testing.T) error {
 				assert.Equal(t, version, "kustomize/v1.0")
-				assert.Equal(t, o.Org, "kubernetes-sig")
+				assert.Equal(t, o.Org, "kubernetes-sigs")
 				assert.Equal(t, o.Repo, "kustomize")
 				assert.Equal(t, o.Name, "kustomize")
 				return nil
@@ -65,10 +65,10 @@ func TestGetVersion(t *testing.T) {
 		},
 		{
 			name:    "specific version with a underlined, specific app name",
-			appInfo: "kubernetes-sig/kustomize/kustomize@kustomize_v1.0",
+			appInfo: "kubernetes-sigs/kustomize/kustomize@kustomize_v1.0",
 			verify: func(o *Installer, version string, t *testing.T) error {
 				assert.Equal(t, version, "kustomize_v1.0")
-				assert.Equal(t, o.Org, "kubernetes-sig")
+				assert.Equal(t, o.Org, "kubernetes-sigs")
 				assert.Equal(t, o.Repo, "kustomize")
 				assert.Equal(t, o.Name, "kustomize")
 				return nil
@@ -93,7 +93,7 @@ func TestGetVersion(t *testing.T) {
 	}
 }
 
-func TestProviderURLParse(t *testing.T) {
+func TestProviderURLParseNoConfig(t *testing.T) {
 
 	tests := []struct {
 		name       string
@@ -103,10 +103,10 @@ func TestProviderURLParse(t *testing.T) {
 	}{
 		{
 			name:       "empty version, repo as default name",
-			packageURL: "kubernetes-sig/kustomize",
+			packageURL: "orgtest/repotest",
 			verify: func(o *Installer, packageURL string, t *testing.T) error {
 				expectURL := fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
-					"kubernetes-sig", "kustomize", "latest", "kustomize", o.OS, o.Arch)
+					"orgtest", "repotest", "latest", "repotest", o.OS, o.Arch)
 				assert.Equal(t, packageURL, expectURL)
 				return nil
 			},
@@ -114,10 +114,10 @@ func TestProviderURLParse(t *testing.T) {
 		},
 		{
 			name:       "empty version, specific app name",
-			packageURL: "kubernetes-sig/kustomize/hello",
+			packageURL: "orgtest/repotest/hello",
 			verify: func(o *Installer, packageURL string, t *testing.T) error {
 				expectURL := fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
-					"kubernetes-sig", "kustomize", "latest", "hello", o.OS, o.Arch)
+					"orgtest", "repotest", "latest", "hello", o.OS, o.Arch)
 				assert.Equal(t, packageURL, expectURL)
 				return nil
 			},
@@ -125,10 +125,10 @@ func TestProviderURLParse(t *testing.T) {
 		},
 		{
 			name:       "semver version, specific app name",
-			packageURL: "kubernetes-sig/kustomize/kustomize@v1.0",
+			packageURL: "orgtest/repotest/hello@v1.0",
 			verify: func(o *Installer, packageURL string, t *testing.T) error {
 				expectURL := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-					"kubernetes-sig", "kustomize", "v1.0", "kustomize", o.OS, o.Arch)
+					"orgtest", "repotest", "v1.0", "hello", o.OS, o.Arch)
 				assert.Equal(t, packageURL, expectURL)
 				return nil
 			},
@@ -136,10 +136,10 @@ func TestProviderURLParse(t *testing.T) {
 		},
 		{
 			name:       "specific version with a slash, specific app name",
-			packageURL: "kubernetes-sig/kustomize/kustomize@kustomize/v1.0",
+			packageURL: "orgtest/repotest/hello@hello/v1.0",
 			verify: func(o *Installer, packageURL string, t *testing.T) error {
 				expectURL := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-					"kubernetes-sig", "kustomize", "kustomize/v1.0", "kustomize", o.OS, o.Arch)
+					"orgtest", "repotest", "hello/v1.0", "hello", o.OS, o.Arch)
 				assert.Equal(t, packageURL, expectURL)
 				return nil
 			},
@@ -147,10 +147,10 @@ func TestProviderURLParse(t *testing.T) {
 		},
 		{
 			name:       "specific version with a underlined, specific app name",
-			packageURL: "kubernetes-sig/kustomize/kustomize@kustomize_v1.0",
+			packageURL: "orgtest/repotest/hello@hello_v1.0",
 			verify: func(o *Installer, packageURL string, t *testing.T) error {
 				expectURL := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-					"kubernetes-sig", "kustomize", "kustomize_v1.0", "kustomize", o.OS, o.Arch)
+					"orgtest", "repotest", "hello_v1.0", "hello", o.OS, o.Arch)
 				assert.Equal(t, packageURL, expectURL)
 				return nil
 			},
