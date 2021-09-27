@@ -193,7 +193,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					ghClient.Init()
 					if asset, err := ghClient.GetLatestAsset(acceptPreRelease); err == nil {
 						hdPkg.Version = url.QueryEscape(asset.TagName) // the version name might have some special string
-						hdPkg.VersionNum = common.SplitVersionNum(asset.TagName)
+						hdPkg.VersionNum = common.ParseVersionNum(asset.TagName)
 
 						version = hdPkg.Version
 					} else {
@@ -205,7 +205,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 							o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
 					}
 				} else {
-					hdPkg.VersionNum = common.SplitVersionNum(version)
+					hdPkg.VersionNum = common.ParseVersionNum(version)
 					if packageURL == "" {
 						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
 							o.Org, o.Repo, version, o.Name, o.OS, o.Arch)

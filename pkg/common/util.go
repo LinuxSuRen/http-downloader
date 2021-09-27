@@ -76,7 +76,7 @@ func Exist(name string) bool {
 	return err == nil
 }
 
-// SplitVersionNum split version from release or tag
-func SplitVersionNum(release string) string {
+// ParseVersionNum split version from release or tag
+func ParseVersionNum(release string) string {
 	return regexp.MustCompile(`^.*v`).ReplaceAllString(release, "")
 }
