@@ -16,7 +16,6 @@ import (
 	sysos "os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"text/template"
@@ -73,26 +72,32 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 	return
 }
 
-// ProviderURLParse parse the URL
-func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packageURL string, err error) {
-	packageURL = path
-	if o.Fetch {
-		// fetch the latest config
-		fmt.Println("start to fetch the config")
-		if err = FetchLatestRepo(o.Provider, ConfigBranch, sysos.Stdout); err != nil {
-			err = fmt.Errorf("unable to fetch the latest config, error: %v", err)
-			return
-		}
-	}
+// GetVersion parse install app info
+func (o *Installer) GetVersion(path string) (version string, err error) {
 
 	var (
-		org     string
-		repo    string
-		name    string
-		version string
+		org  string
+		repo string
+		name string
 	)
 
-	addr := strings.Split(packageURL, "/")
+	// 1. split app info and app version
+	var appName string
+	appInfo := strings.Split(path, "@")
+	switch len(appInfo) {
+	case 1:
+		appName = appInfo[0]
+		version = "latest"
+	case 2:
+		appName = appInfo[0]
+		version = appInfo[1]
+	default:
+		err = fmt.Errorf("only support format xxx or xxx@version")
+		return
+	}
+
+	// 2. split app info
+	addr := strings.Split(appName, "/")
 	if len(addr) >= 2 {
 		org = addr[0]
 		repo = addr[1]
@@ -113,7 +118,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 
 		fmt.Printf("target package is %s/%s\n", org, repo)
 	} else {
-		err = fmt.Errorf("only support format xx, xx/xx or xx/xx/xx")
+		err = fmt.Errorf("name only support format xx, xx/xx or xx/xx/xx")
 		return
 	}
 
@@ -125,26 +130,40 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 
 	o.Org = org
 	o.Repo = repo
-
-	// extract version from name
-	if strings.Contains(name, "@") {
-		nameWithVer := strings.Split(name, "@")
-		name = nameWithVer[0]
-		version = nameWithVer[1]
-
-		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-			org, repo, version, name, o.OS, o.Arch)
-	} else if name != "" {
-		version = "latest"
-		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
-			org, repo, version, name, o.OS, o.Arch)
-	}
 	o.Name = name
+
+	return
+}
+
+// ProviderURLParse parse the URL
+func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packageURL string, err error) {
+	packageURL = path
+	if o.Fetch {
+		// fetch the latest config
+		fmt.Println("start to fetch the config")
+		if err = FetchLatestRepo(o.Provider, ConfigBranch, sysos.Stdout); err != nil {
+			err = fmt.Errorf("unable to fetch the latest config, error: %v", err)
+			return
+		}
+	}
+
+	version, err := o.GetVersion(packageURL)
+	if err != nil {
+		return
+	}
+
+	if version == "latest" {
+		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
+			o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
+	} else {
+		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
+			o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
+	}
 
 	// try to parse from config
 	userHome, _ := homedir.Dir()
 	configDir := userHome + "/.config/hd-home"
-	matchedFile := configDir + "/config/" + org + "/" + repo + ".yml"
+	matchedFile := configDir + "/config/" + o.Org + "/" + o.Repo + ".yml"
 	if ok, _ := common.PathExists(matchedFile); ok {
 		var data []byte
 		if data, err = ioutil.ReadFile(matchedFile); err == nil {
@@ -168,13 +187,13 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 
 				if version == "latest" || version == "" {
 					ghClient := pkg.ReleaseClient{
-						Org:  org,
-						Repo: repo,
+						Org:  o.Org,
+						Repo: o.Repo,
 					}
 					ghClient.Init()
 					if asset, err := ghClient.GetLatestAsset(acceptPreRelease); err == nil {
 						hdPkg.Version = url.QueryEscape(asset.TagName) // the version name might have some special string
-						hdPkg.VersionNum = regexp.MustCompile(`^.*v`).ReplaceAllString(asset.TagName, "")
+						hdPkg.VersionNum = common.ParseVersionNum(asset.TagName)
 
 						version = hdPkg.Version
 					} else {
@@ -183,12 +202,13 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 
 					if packageURL == "" {
 						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-							org, repo, version, o.Name, o.OS, o.Arch)
+							o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
 					}
 				} else {
+					hdPkg.VersionNum = common.ParseVersionNum(version)
 					if packageURL == "" {
 						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-							org, repo, version, name, o.OS, o.Arch)
+							o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
 					}
 				}
 
@@ -208,7 +228,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					var buf bytes.Buffer
 					if err = tmp.Execute(&buf, hdPkg); err == nil {
 						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s",
-							org, repo, version, buf.String())
+							o.Org, o.Repo, version, buf.String())
 
 						o.Output = buf.String()
 					} else {

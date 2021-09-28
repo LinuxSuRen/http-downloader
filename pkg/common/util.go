@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 // GetOrDefault returns the value or a default value from a map
@@ -73,4 +74,9 @@ func CheckDirPermission(dir string, perm os.FileMode) error {
 func Exist(name string) bool {
 	_, err := os.Stat(name)
 	return err == nil
+}
+
+// ParseVersionNum split version from release or tag
+func ParseVersionNum(release string) string {
+	return regexp.MustCompile(`^.*v`).ReplaceAllString(release, "")
 }
