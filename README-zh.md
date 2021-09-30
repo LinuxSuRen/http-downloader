@@ -49,3 +49,15 @@ hd get --pre ks
 * 多线程
 * 断点续传 (TODO)
 * 对 GitHub release 文件下载（安装）友好
+
+## 使用多阶段构建
+你想要在 Docker 构建中下载工具吗？这个很容易的，请查看下面的例子：
+
+```dockerfile
+FROM ghcr.io/linuxsuren/hd:v0.0.40 as downloader
+RUN hd install kubesphere-sigs/ks@v0.0.50
+
+FROM alpine:3.10
+COPY --from=downloader /usr/local/bin/ks /usr/local/bin/ks
+CMD ["ks"]
+```
