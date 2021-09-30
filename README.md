@@ -54,6 +54,18 @@ When you first run it, please init via: `hd fetch`
 
 then you can search it by a keyword: `hd search jenkins`
 
+## Use multi-stage builds
+Do you want to download tools in the Docker builds? It's pretty easy. Please see the following example:
+
+```dockerfile
+FROM ghcr.io/linuxsuren/hd:v0.0.40 as downloader
+RUN hd install kubesphere-sigs/ks@v0.0.50
+
+FROM alpine:3.10
+COPY --from=downloader /usr/local/bin/ks /usr/local/bin/ks
+CMD ["ks"]
+```
+
 ## As a library
 You can import it from `github.com/linuxsuren/http-downloader/pkg/installer`, then put the following code to your CLI. 
 It can help you to download desired tools:
