@@ -58,7 +58,7 @@ then you can search it by a keyword: `hd search jenkins`
 Do you want to download tools in the Docker builds? It's pretty easy. Please see the following example:
 
 ```dockerfile
-FROM ghcr.io/linuxsuren/hd:v0.0.40 as downloader
+FROM ghcr.io/linuxsuren/hd:v0.0.42 as downloader
 RUN hd install kubesphere-sigs/ks@v0.0.50
 
 FROM alpine:3.10
