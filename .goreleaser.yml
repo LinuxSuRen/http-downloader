@@ -98,4 +98,4 @@ dockers:
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--label=org.opencontainers.image.source=https://github.com/LinuxSuRen/http-downloader"
-      - "--platform=linux/arm64"
+      - "--platform=linux/amd64,linux/arm64"
