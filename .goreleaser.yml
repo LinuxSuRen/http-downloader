@@ -83,3 +83,19 @@ nfpms:
       darwin: macOS
       linux: linux
       windows: windows
+dockers:
+  - goos: linux
+    goarch: amd64
+    image_templates:
+      - "surenpi/hd:latest"
+      - "surenpi/hd:{{.Tag}}"
+      - "ghcr.io/linuxsuren/hd:latest"
+      - "ghcr.io/linuxsuren/hd:{{.Tag}}"
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/LinuxSuRen/http-downloader"
+      - "--platform=linux/arm64"
