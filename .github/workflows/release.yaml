@@ -27,6 +27,10 @@ jobs:
           rm -rf upx-3.96-amd64_linux
           rm -rf xvf upx-3.96-amd64_linux.tar.xz
           upx -V
+      - name: Image Registry Login
+        run: |
+          docker login --username ${{ secrets.DOCKER_HUB_USER }} --password ${{secrets.DOCKER_HUB_TOKEN}}
+          docker login ghcr.io/linuxsuren --username linuxsuren --password ${{secrets.GH_PUBLISH_SECRETS}}
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2.7.0
         with:
