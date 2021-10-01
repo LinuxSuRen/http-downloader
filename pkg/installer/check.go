@@ -151,13 +151,16 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 	if err != nil {
 		return
 	}
-
+	packagingFormat := getPackagingFormat(o)
+	if packagingFormat == "" {
+		return
+	}
 	if version == "latest" {
-		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
-			o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
+		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.%s",
+			o.Org, o.Repo, version, o.Name, o.OS, o.Arch, packagingFormat)
 	} else {
-		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-			o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
+		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.%s",
+			o.Org, o.Repo, version, o.Name, o.OS, o.Arch, packagingFormat)
 	}
 
 	// try to parse from config
@@ -348,4 +351,14 @@ func chooseOneFromArray(options []string) (result string, err error) {
 	}
 	err = survey.AskOne(prompt, &result)
 	return
+}
+
+func getPackagingFormat(installer *Installer) string {
+	switch strings.ToLower(installer.OS) {
+	case "windows":
+		return installer.Package.FormatOverrides.Windows
+	case "linux":
+		return installer.Package.FormatOverrides.Linux
+	}
+	return ""
 }

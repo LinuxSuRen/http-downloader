@@ -1,9 +1,15 @@
 package installer
 
+type PackagingFormat struct {
+	Windows string `yaml:"windows"`
+	Linux   string `yaml:"linux"`
+}
+
 // HDConfig is the config of http-downloader
 type HDConfig struct {
 	Name             string            `yaml:"Name"`
 	Filename         string            `yaml:"filename"`
+	FormatOverrides  PackagingFormat   `yaml:"formatOverrides"`
 	Binary           string            `yaml:"binary"`
 	TargetBinary     string            `yaml:"targetBinary"`
 	AdditionBinaries []string          `yaml:"additionBinaries"`
