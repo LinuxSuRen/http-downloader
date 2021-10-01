@@ -1,5 +1,6 @@
 package installer
 
+// PackagingFormat is used for containing config depending on machine
 type PackagingFormat struct {
 	Windows string `yaml:"windows"`
 	Linux   string `yaml:"linux"`
