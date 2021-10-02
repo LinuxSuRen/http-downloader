@@ -97,8 +97,8 @@ func TestProviderURLParseNoConfig(t *testing.T) {
 			packageURL: "orgtest/repotest",
 			verify: func(o *Installer, packageURL string, t *testing.T) {
 				expectURL := fmt.Sprintf(
-					"https://github.com/orgtest/repotest/releases/latest/download/repotest-%s-%s.tar.gz",
-					o.OS, o.Arch)
+					"https://github.com/orgtest/repotest/releases/latest/download/repotest-%s-%s.%s",
+					o.OS, o.Arch, getPackagingFormat(o))
 				assert.Equal(t, packageURL, expectURL)
 			},
 			wantErr: false,
@@ -108,8 +108,8 @@ func TestProviderURLParseNoConfig(t *testing.T) {
 			packageURL: "orgtest/repotest/hello",
 			verify: func(o *Installer, packageURL string, t *testing.T) {
 				expectURL := fmt.Sprintf(
-					"https://github.com/orgtest/repotest/releases/latest/download/hello-%s-%s.tar.gz",
-					o.OS, o.Arch)
+					"https://github.com/orgtest/repotest/releases/latest/download/hello-%s-%s.%s",
+					o.OS, o.Arch, getPackagingFormat(o))
 				assert.Equal(t, packageURL, expectURL)
 			},
 			wantErr: false,
@@ -119,8 +119,8 @@ func TestProviderURLParseNoConfig(t *testing.T) {
 			packageURL: "orgtest/repotest/hello@v1.0",
 			verify: func(o *Installer, packageURL string, t *testing.T) {
 				expectURL := fmt.Sprintf(
-					"https://github.com/orgtest/repotest/releases/download/v1.0/hello-%s-%s.tar.gz",
-					o.OS, o.Arch)
+					"https://github.com/orgtest/repotest/releases/download/v1.0/hello-%s-%s.%s",
+					o.OS, o.Arch, getPackagingFormat(o))
 				assert.Equal(t, packageURL, expectURL)
 			},
 			wantErr: false,
@@ -130,8 +130,8 @@ func TestProviderURLParseNoConfig(t *testing.T) {
 			packageURL: "orgtest/repotest/hello@hello/v1.0",
 			verify: func(o *Installer, packageURL string, t *testing.T) {
 				expectURL := fmt.Sprintf(
-					"https://github.com/orgtest/repotest/releases/download/hello/v1.0/hello-%s-%s.tar.gz",
-					o.OS, o.Arch)
+					"https://github.com/orgtest/repotest/releases/download/hello/v1.0/hello-%s-%s.%s",
+					o.OS, o.Arch, getPackagingFormat(o))
 				assert.Equal(t, packageURL, expectURL)
 			},
 			wantErr: false,
@@ -141,8 +141,8 @@ func TestProviderURLParseNoConfig(t *testing.T) {
 			packageURL: "orgtest/repotest/hello@hello_v1.0",
 			verify: func(o *Installer, packageURL string, t *testing.T) {
 				expectURL := fmt.Sprintf(
-					"https://github.com/orgtest/repotest/releases/download/hello_v1.0/hello-%s-%s.tar.gz",
-					o.OS, o.Arch)
+					"https://github.com/orgtest/repotest/releases/download/hello_v1.0/hello-%s-%s.%s",
+					o.OS, o.Arch, getPackagingFormat(o))
 				assert.Equal(t, packageURL, expectURL)
 			},
 			wantErr: false,
@@ -152,6 +152,10 @@ func TestProviderURLParseNoConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := &Installer{
+				Package: &HDConfig{FormatOverrides: PackagingFormat{
+					Windows: "zip",
+					Linux:   "tar.gz",
+				}},
 				OS:   runtime.GOOS,
 				Arch: runtime.GOARCH,
 			}

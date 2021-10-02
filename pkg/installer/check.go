@@ -204,14 +204,14 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					}
 
 					if packageURL == "" {
-						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-							o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
+						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.%s",
+							o.Org, o.Repo, version, o.Name, o.OS, o.Arch, getPackagingFormat(o))
 					}
 				} else {
 					hdPkg.VersionNum = common.ParseVersionNum(version)
 					if packageURL == "" {
-						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-							o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
+						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.%s",
+							o.Org, o.Repo, version, o.Name, o.OS, o.Arch, getPackagingFormat(o))
 					}
 				}
 
@@ -354,11 +354,9 @@ func chooseOneFromArray(options []string) (result string, err error) {
 }
 
 func getPackagingFormat(installer *Installer) string {
-	switch strings.ToLower(installer.OS) {
-	case "windows":
+	platformType := strings.ToLower(installer.OS)
+	if platformType == "windows" {
 		return installer.Package.FormatOverrides.Windows
-	case "linux":
-		return installer.Package.FormatOverrides.Linux
 	}
-	return ""
+	return installer.Package.FormatOverrides.Linux
 }
