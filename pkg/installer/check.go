@@ -152,9 +152,6 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 		return
 	}
 	packagingFormat := getPackagingFormat(o)
-	if packagingFormat == "" {
-		return
-	}
 	if version == "latest" {
 		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.%s",
 			o.Org, o.Repo, version, o.Name, o.OS, o.Arch, packagingFormat)
