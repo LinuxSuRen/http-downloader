@@ -230,8 +230,8 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 
 					var buf bytes.Buffer
 					if err = tmp.Execute(&buf, hdPkg); err == nil {
-						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s",
-							o.Org, o.Repo, version, buf.String())
+						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s.%s",
+							o.Org, o.Repo, version, buf.String(), getPackagingFormat(o))
 
 						o.Output = buf.String()
 					} else {
@@ -356,7 +356,13 @@ func chooseOneFromArray(options []string) (result string, err error) {
 func getPackagingFormat(installer *Installer) string {
 	platformType := strings.ToLower(installer.OS)
 	if platformType == "windows" {
-		return installer.Package.FormatOverrides.Windows
+		if installer.Package != nil {
+			return installer.Package.FormatOverrides.Windows
+		}
+		return "zip"
 	}
-	return installer.Package.FormatOverrides.Linux
+	if installer.Package != nil {
+		return installer.Package.FormatOverrides.Linux
+	}
+	return "tar.gz"
 }
