@@ -151,13 +151,13 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 	if err != nil {
 		return
 	}
-
+	packagingFormat := getPackagingFormat(o)
 	if version == "latest" {
-		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.tar.gz",
-			o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
+		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/%s/download/%s-%s-%s.%s",
+			o.Org, o.Repo, version, o.Name, o.OS, o.Arch, packagingFormat)
 	} else {
-		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-			o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
+		packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.%s",
+			o.Org, o.Repo, version, o.Name, o.OS, o.Arch, packagingFormat)
 	}
 
 	// try to parse from config
@@ -201,14 +201,14 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					}
 
 					if packageURL == "" {
-						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-							o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
+						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.%s",
+							o.Org, o.Repo, version, o.Name, o.OS, o.Arch, packagingFormat)
 					}
 				} else {
 					hdPkg.VersionNum = common.ParseVersionNum(version)
 					if packageURL == "" {
-						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.tar.gz",
-							o.Org, o.Repo, version, o.Name, o.OS, o.Arch)
+						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.%s",
+							o.Org, o.Repo, version, o.Name, o.OS, o.Arch, packagingFormat)
 					}
 				}
 
@@ -229,7 +229,9 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					if err = tmp.Execute(&buf, hdPkg); err == nil {
 						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s",
 							o.Org, o.Repo, version, buf.String())
-
+						if !strings.HasSuffix(packageURL, "tar.gz") && !strings.HasSuffix(packageURL, "zip") {
+							packageURL = fmt.Sprintf("%s.%s", packageURL, packagingFormat)
+						}
 						o.Output = buf.String()
 					} else {
 						return
@@ -348,4 +350,18 @@ func chooseOneFromArray(options []string) (result string, err error) {
 	}
 	err = survey.AskOne(prompt, &result)
 	return
+}
+
+func getPackagingFormat(installer *Installer) string {
+	platformType := strings.ToLower(installer.OS)
+	if platformType == "windows" {
+		if installer.Package != nil {
+			return installer.Package.FormatOverrides.Windows
+		}
+		return "zip"
+	}
+	if installer.Package != nil {
+		return installer.Package.FormatOverrides.Linux
+	}
+	return "tar.gz"
 }
