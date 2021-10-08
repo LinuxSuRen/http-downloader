@@ -235,7 +235,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					if err = tmp.Execute(&buf, hdPkg); err == nil {
 						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s",
 							o.Org, o.Repo, version, buf.String())
-						if !hasPackagePrefix(packageURL) {
+						if !hasPackageSuffix(packageURL) {
 							packageURL = fmt.Sprintf("%s.%s", packageURL, packagingFormat)
 						}
 						o.Output = buf.String()
@@ -372,7 +372,7 @@ func getPackagingFormat(installer *Installer) string {
 	return "tar.gz"
 }
 
-func hasPackagePrefix(packageURL string) bool {
+func hasPackageSuffix(packageURL string) bool {
 	for i := 0; i < len(supportedPackages); i++ {
 		if strings.HasSuffix(packageURL, supportedPackages[i]) {
 			return true
