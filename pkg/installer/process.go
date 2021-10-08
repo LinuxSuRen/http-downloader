@@ -116,6 +116,7 @@ func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 }
 
 func (o *Installer) extractFiles(tarFile, targetName string) (err error) {
+	fmt.Println("The tarfile name is", tarFile)
 	if targetName == "" {
 		err = errors.New("target filename is empty")
 		return
