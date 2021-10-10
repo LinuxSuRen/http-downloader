@@ -75,7 +75,7 @@ func (c *GZip) ExtractFiles(sourceFile, targetName string) (err error) {
 	}
 
 	if err == nil && !found {
-		err = fmt.Errorf("cannot found item '%s' from '%s'", targetName, sourceFile)
+		err = fmt.Errorf("cannot find item '%s' from '%s'", targetName, sourceFile)
 	}
 	return
 }

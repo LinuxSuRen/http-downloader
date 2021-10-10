@@ -3,6 +3,7 @@ package compress
 import (
 	"archive/tar"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -40,6 +41,7 @@ func (x *Xz) ExtractFiles(sourceFile, targetName string) (err error) {
 	}
 
 	var header *tar.Header
+	var found bool
 	// Create a tar Reader
 	tarReader := tar.NewReader(r)
 	for {
@@ -57,6 +59,8 @@ func (x *Xz) ExtractFiles(sourceFile, targetName string) (err error) {
 			if err != nil {
 				log.Fatal(err)
 				break
+			} else {
+				found = true
 			}
 			_, err = io.Copy(w, tarReader)
 			if err != nil {
@@ -66,6 +70,8 @@ func (x *Xz) ExtractFiles(sourceFile, targetName string) (err error) {
 			w.Close()
 		}
 	}
-	f.Close()
+	if err == nil && !found {
+		err = fmt.Errorf("cannot find item '%s' from '%s'", targetName, sourceFile)
+	}
 	return
 }
