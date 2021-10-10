@@ -10,7 +10,6 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"strings"
 )
 
 // Install installs a package
@@ -115,7 +114,7 @@ func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 
 func (o *Installer) extractFiles(tarFile, targetName string) (err error) {
 	// TODO choose a correct compress instance
-	extension := strings.Join(strings.Split(tarFile, ".")[1:], "")
+	extension := path.Ext(tarFile)
 	if extension == "tar.xz" {
 		compressor := compress.NewXz()
 		err = compressor.ExtractFiles(tarFile, targetName)

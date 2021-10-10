@@ -18,6 +18,7 @@ func NewXz() *Xz {
 	return &Xz{}
 }
 
+// ExtractFiles extracts files from a target compress file
 func (x *Xz) ExtractFiles(sourceFile, targetName string) (err error) {
 	if targetName == "" {
 		err = errors.New("target filename is empty")
