@@ -67,7 +67,11 @@ func (x *Xz) ExtractFiles(sourceFile, targetName string) (err error) {
 				log.Fatal(err)
 				break
 			}
-			w.Close()
+			err = w.Close()
+			if err != nil {
+				log.Fatal(err)
+				break
+			}
 		}
 	}
 	if err == nil && !found {
