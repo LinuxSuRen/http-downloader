@@ -190,6 +190,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 				}
 				o.Package = &cfg
 				o.AdditionBinaries = cfg.AdditionBinaries
+				o.Tar = cfg.Tar != "false"
 
 				if version == "latest" || version == "" {
 					ghClient := pkg.ReleaseClient{
@@ -235,7 +236,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					if err = tmp.Execute(&buf, hdPkg); err == nil {
 						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s",
 							o.Org, o.Repo, version, buf.String())
-						if !hasPackageSuffix(packageURL) {
+						if o.Tar && !hasPackageSuffix(packageURL) {
 							packageURL = fmt.Sprintf("%s.%s", packageURL, packagingFormat)
 						}
 						o.Output = buf.String()
@@ -257,7 +258,6 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					return
 				}
 
-				o.Tar = cfg.Tar != "false"
 				if cfg.Binary != "" {
 					if cfg.Binary, err = renderTemplate(cfg.Binary, hdPkg); err != nil {
 						return
