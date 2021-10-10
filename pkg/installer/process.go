@@ -116,7 +116,7 @@ func (o *Installer) extractFiles(tarFile, targetName string) (err error) {
 	// Select the right decompressor based on file type
 	extension := path.Ext(tarFile)
 	var compressor compress.Compress
-	if extension == "tar.xz" {
+	if extension == "xz" {
 		compressor = compress.NewXz()
 	} else {
 		compressor = compress.NewGZip(o.AdditionBinaries)
