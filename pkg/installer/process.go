@@ -1,18 +1,15 @@
 package installer
 
 import (
-	"archive/tar"
-	"compress/gzip"
-	"errors"
 	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/common"
+	"github.com/linuxsuren/http-downloader/pkg/compress"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
-	"strings"
 )
 
 // Install installs a package
@@ -116,71 +113,8 @@ func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 }
 
 func (o *Installer) extractFiles(tarFile, targetName string) (err error) {
-	if targetName == "" {
-		err = errors.New("target filename is empty")
-		return
-	}
-
-	var f *os.File
-	var gzf *gzip.Reader
-	if f, err = os.Open(tarFile); err != nil {
-		return
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-
-	if gzf, err = gzip.NewReader(f); err != nil {
-		return
-	}
-
-	tarReader := tar.NewReader(gzf)
-	var header *tar.Header
-	var found bool
-	for {
-		if header, err = tarReader.Next(); err == io.EOF {
-			err = nil
-			break
-		} else if err != nil {
-			break
-		}
-		name := header.Name
-
-		switch header.Typeflag {
-		case tar.TypeReg:
-			if err = extraFile(name, targetName, tarFile, header, tarReader); err == nil {
-				found = true
-			} else {
-				break
-			}
-
-			for i := range o.AdditionBinaries {
-				addition := o.AdditionBinaries[i]
-				if err = extraFile(addition, addition, tarFile, header, tarReader); err != nil {
-					return
-				}
-			}
-		}
-	}
-
-	if err == nil && !found {
-		err = fmt.Errorf("cannot found item '%s' from '%s'", targetName, tarFile)
-	}
-	return
-}
-
-func extraFile(name, targetName, tarFile string, header *tar.Header, tarReader *tar.Reader) (err error) {
-	if name != targetName && !strings.HasSuffix(name, "/"+targetName) {
-		return
-	}
-	var targetFile *os.File
-	if targetFile, err = os.OpenFile(fmt.Sprintf("%s/%s", filepath.Dir(tarFile), targetName),
-		os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)); err != nil {
-		return
-	}
-	if _, err = io.Copy(targetFile, tarReader); err != nil {
-		return
-	}
-	_ = targetFile.Close()
+	// TODO choose a correct compress instance
+	compressor := compress.NewGZip(o.AdditionBinaries)
+	err = compressor.ExtractFiles(tarFile, targetName)
 	return
 }
