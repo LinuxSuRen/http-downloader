@@ -169,3 +169,70 @@ func TestProviderURLParseNoConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestValidPackageSuffix(t *testing.T) {
+	type args struct {
+		packageURL string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "empty version, repo as default name",
+			args: args{
+				"https://github.com/orgtest/repotest/releases/latest/download/repotest-%s-%s.%s",
+			},
+			want: true,
+		},
+		{
+			name: "empty version, repo as default name",
+			args: args{
+				"https://github.com/orgtest/repotest/releases/latest/download/hello-%s-%s.%s",
+			},
+			want: true,
+		},
+		{
+			name: "semver version, specific app name",
+			args: args{
+				"https://github.com/orgtest/repotest/releases/download/v1.0/hello-%s-%s.%s",
+			},
+			want: true,
+		},
+		{
+			name: "specific version with a slash, specific app name",
+			args: args{
+				"https://github.com/orgtest/repotest/releases/download/hello/v1.0/hello-%s-%s.%s",
+			},
+			want: true,
+		},
+		{
+			name: "url of download without an compress extension",
+			args: args{
+				"https://github.com/orgtest/repotest/releases/download/hello/v1.0/hello-%s-%s.%s.abcdef",
+			},
+			want: false,
+		},
+	}
+
+	is := &Installer{
+		Package: &HDConfig{FormatOverrides: PackagingFormat{
+			Windows: "zip",
+			Linux:   "tar.gz",
+		}},
+		OS:   runtime.GOOS,
+		Arch: runtime.GOARCH,
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			packageURL := fmt.Sprintf(
+				tt.args.packageURL,
+				is.OS, is.Arch, getPackagingFormat(is))
+			if got := hasPackageSuffix(packageURL); got != tt.want {
+				t.Errorf("hasPackageSuffix() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
