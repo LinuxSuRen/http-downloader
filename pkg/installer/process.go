@@ -115,12 +115,12 @@ func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 func (o *Installer) extractFiles(tarFile, targetName string) (err error) {
 	// Select the right decompressor based on file type
 	extension := path.Ext(tarFile)
+	var compressor compress.Compress
 	if extension == "tar.xz" {
-		compressor := compress.NewXz()
-		err = compressor.ExtractFiles(tarFile, targetName)
+		compressor = compress.NewXz()
 	} else {
-		compressor := compress.NewGZip(o.AdditionBinaries)
-		err = compressor.ExtractFiles(tarFile, targetName)
+		compressor = compress.NewGZip(o.AdditionBinaries)
 	}
+	err = compressor.ExtractFiles(tarFile, targetName)
 	return
 }
