@@ -22,6 +22,9 @@ func NewGZip(additionBinaries []string) *GZip {
 	return &GZip{additionBinaries: additionBinaries}
 }
 
+// make sure GZip implements the interface Compress
+var _ Compress = &GZip{}
+
 // ExtractFiles extracts files from a target compress file
 func (c *GZip) ExtractFiles(sourceFile, targetName string) (err error) {
 	if targetName == "" {
