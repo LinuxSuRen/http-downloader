@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// GZip implements a compress which based gzip
+// GZip implements a compress which based is based on gzip
 type GZip struct {
 	additionBinaries []string
 }
