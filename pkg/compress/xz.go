@@ -4,19 +4,20 @@ import (
 	"archive/tar"
 	"errors"
 	"fmt"
+	"github.com/xi2/xz"
 	"io"
 	"log"
 	"os"
-
-	"github.com/xi2/xz"
 )
 
 // Xz implements a compress which based is based on xz
-type Xz struct{}
+type Xz struct {
+	additionBinaries []string
+}
 
 // NewXz creates an instance of Xz
-func NewXz() *Xz {
-	return &Xz{}
+func NewXz(additionBinaries []string) *Xz {
+	return &Xz{additionBinaries: additionBinaries}
 }
 
 // ExtractFiles extracts files from a target compress file
@@ -53,24 +54,21 @@ func (x *Xz) ExtractFiles(sourceFile, targetName string) (err error) {
 			log.Fatal(err)
 			return
 		}
+		name := header.Name
+
 		switch header.Typeflag {
 		case tar.TypeReg:
-			w, err := os.Create(header.Name)
-			if err != nil {
-				log.Fatal(err)
-				break
-			} else {
+			if err = extraFile(name, targetName, sourceFile, header, tarReader); err == nil {
 				found = true
-			}
-			_, err = io.Copy(w, tarReader)
-			if err != nil {
-				log.Fatal(err)
+			} else {
 				break
 			}
-			err = w.Close()
-			if err != nil {
-				log.Fatal(err)
-				break
+
+			for i := range x.additionBinaries {
+				addition := x.additionBinaries[i]
+				if err = extraFile(addition, addition, sourceFile, header, tarReader); err != nil {
+					return
+				}
 			}
 		}
 	}
