@@ -7,11 +7,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 )
 
-// GZip implements a compress which based gzip
+// GZip implements a compress which based is based on gzip
 type GZip struct {
 	additionBinaries []string
 }
@@ -75,23 +73,7 @@ func (c *GZip) ExtractFiles(sourceFile, targetName string) (err error) {
 	}
 
 	if err == nil && !found {
-		err = fmt.Errorf("cannot found item '%s' from '%s'", targetName, sourceFile)
+		err = fmt.Errorf("cannot find item '%s' from '%s'", targetName, sourceFile)
 	}
-	return
-}
-
-func extraFile(name, targetName, tarFile string, header *tar.Header, tarReader *tar.Reader) (err error) {
-	if name != targetName && !strings.HasSuffix(name, "/"+targetName) {
-		return
-	}
-	var targetFile *os.File
-	if targetFile, err = os.OpenFile(fmt.Sprintf("%s/%s", filepath.Dir(tarFile), targetName),
-		os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)); err != nil {
-		return
-	}
-	if _, err = io.Copy(targetFile, tarReader); err != nil {
-		return
-	}
-	_ = targetFile.Close()
 	return
 }
