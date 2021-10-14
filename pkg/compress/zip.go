@@ -35,7 +35,7 @@ func (z *Zip) ExtractFiles(sourceFile, targetName string) (err error) {
 			continue
 		}
 
-		if strings.HasPrefix(f.Name, "/"+targetName) {
+		if strings.HasPrefix(f.Name, targetName) {
 			var targetFile *os.File
 			if targetFile, err = os.OpenFile(fmt.Sprintf("%s/%s", filepath.Dir(sourceFile), targetName),
 				os.O_CREATE|os.O_RDWR, f.Mode()); err != nil {
