@@ -277,7 +277,8 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 
 func getVersionOrDefault(version string, defaultVer string) (target string) {
 	target = defaultVer
-	if strings.HasPrefix(version, "http://") || strings.HasPrefix(version, "https://") {
+	// for the security reason, only support https
+	if strings.HasPrefix(version, "https://") {
 		if response, err := http.Get(version); err == nil {
 			if data, err := ioutil.ReadAll(response.Body); err == nil {
 				target = string(data)
