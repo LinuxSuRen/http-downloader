@@ -17,6 +17,7 @@ type HDConfig struct {
 	FromSource       bool              `yaml:"fromSource"`
 	URL              string            `yaml:"url"`
 	Tar              string            `yaml:"tar"`
+	LatestVersion    string            `yaml:"latestVersion"`
 	SupportOS        []string          `yaml:"supportOS"`
 	SupportArch      []string          `yaml:"supportArch"`
 	Replacements     map[string]string `yaml:"replacements"`

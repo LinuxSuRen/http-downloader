@@ -12,6 +12,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	sysos "os"
 	"path"
@@ -192,6 +193,10 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 				o.AdditionBinaries = cfg.AdditionBinaries
 				o.Tar = cfg.Tar != "false"
 
+				if cfg.LatestVersion != "" {
+					version = getVersionOrDefault(cfg.LatestVersion, version)
+				}
+
 				if version == "latest" || version == "" {
 					ghClient := pkg.ReleaseClient{
 						Org:  o.Org,
@@ -264,6 +269,18 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					}
 					o.Name = cfg.Binary
 				}
+			}
+		}
+	}
+	return
+}
+
+func getVersionOrDefault(version string, defaultVer string) (target string) {
+	target = defaultVer
+	if strings.HasPrefix(version, "http://") || strings.HasPrefix(version, "https://") {
+		if response, err := http.Get(version); err == nil {
+			if data, err := ioutil.ReadAll(response.Body); err == nil {
+				target = string(data)
 			}
 		}
 	}
