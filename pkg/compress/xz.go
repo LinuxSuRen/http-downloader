@@ -20,6 +20,9 @@ func NewXz(additionBinaries []string) *Xz {
 	return &Xz{additionBinaries: additionBinaries}
 }
 
+// make sure Xz implements the interface Compress
+var _ Compress = &Xz{}
+
 // ExtractFiles extracts files from a target compress file
 func (x *Xz) ExtractFiles(sourceFile, targetName string) (err error) {
 	if targetName == "" {

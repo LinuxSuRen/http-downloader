@@ -29,3 +29,16 @@ func extraFile(name, targetName, tarFile string, header *tar.Header, tarReader *
 	_ = targetFile.Close()
 	return
 }
+
+// GetCompressor gets the compressor base on file extension
+func GetCompressor(extension string, additionBinaries []string) Compress {
+	// Select the right decompressor based on file type
+	switch extension {
+	case ".xz":
+		return NewXz(additionBinaries)
+	case ".zip":
+		return NewZip(additionBinaries)
+	default:
+		return NewGZip(additionBinaries)
+	}
+}
