@@ -72,9 +72,18 @@ func SetProxy(proxy, proxyAuth string, tr *http.Transport) (err error) {
 }
 
 func (h *HTTPDownloader) fetchProxyFromEnv(scheme string) {
-	allProxy := os.Getenv("all_proxy")
-	httpProxy := os.Getenv("http_proxy")
-	httpsProxy := os.Getenv("https_proxy")
+	allProxy := os.Getenv("ALL_PROXY")
+	if allProxy == "" {
+		allProxy = os.Getenv("all_proxy")
+	}
+	httpProxy := os.Getenv("HTTP_PROXY")
+	if httpProxy == "" {
+		os.Getenv("http_proxy")
+	}
+	httpsProxy := os.Getenv("HTTPS_PROXY")
+	if httpsProxy == "" {
+		os.Getenv("https_proxy")
+	}
 
 	if allProxy != "" {
 		h.Proxy = allProxy
