@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/linuxsuren/http-downloader/pkg/common"
 )
 
 const (
@@ -72,28 +74,18 @@ func SetProxy(proxy, proxyAuth string, tr *http.Transport) (err error) {
 }
 
 func (h *HTTPDownloader) fetchProxyFromEnv(scheme string) {
-	allProxy := os.Getenv("ALL_PROXY")
-	if allProxy == "" {
-		allProxy = os.Getenv("all_proxy")
-	}
-	httpProxy := os.Getenv("HTTP_PROXY")
-	if httpProxy == "" {
-		os.Getenv("http_proxy")
-	}
-	httpsProxy := os.Getenv("HTTPS_PROXY")
-	if httpsProxy == "" {
-		os.Getenv("https_proxy")
-	}
-
+	allProxy := common.GetEnvironment("ALL_PROXY", "all_proxy")
 	if allProxy != "" {
 		h.Proxy = allProxy
 	} else {
 		switch scheme {
 		case "http":
+			httpProxy := common.GetEnvironment("HTTP_PROXY", "http_proxy")
 			if httpProxy != "" {
 				h.Proxy = httpProxy
 			}
 		case "https":
+			httpsProxy := common.GetEnvironment("HTTPS_PROXY", "https_proxy")
 			if httpsProxy != "" {
 				h.Proxy = httpsProxy
 			}
