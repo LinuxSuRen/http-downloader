@@ -242,10 +242,11 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					if err = tmp.Execute(&buf, hdPkg); err == nil {
 						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s",
 							o.Org, o.Repo, version, buf.String())
+						o.Output = buf.String()
 						if o.Tar && !hasPackageSuffix(packageURL) {
 							packageURL = fmt.Sprintf("%s.%s", packageURL, packagingFormat)
+							o.Output = fmt.Sprintf("%s.%s", o.Output, packagingFormat)
 						}
-						o.Output = buf.String()
 					} else {
 						return
 					}
