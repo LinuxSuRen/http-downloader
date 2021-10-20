@@ -192,6 +192,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 				o.Package = &cfg
 				o.AdditionBinaries = cfg.AdditionBinaries
 				o.Tar = cfg.Tar != "false"
+				packagingFormat = getPackagingFormat(o) // rewrite the packing format due to the package config might be read from git repository
 
 				if cfg.LatestVersion != "" {
 					version = getVersionOrDefault(cfg.LatestVersion, version)
