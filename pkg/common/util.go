@@ -80,3 +80,18 @@ func Exist(name string) bool {
 func ParseVersionNum(release string) string {
 	return regexp.MustCompile(`^.*v`).ReplaceAllString(release, "")
 }
+
+// GetEnvironment retrieves the value of the environment variable named by the key.
+// If the environment dosen't exist, we will lookup for alternative environment variables
+// unti we find an environment. Return empty environment value while no environment variables found.
+func GetEnvironment(key string, alternativeKeys ...string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	for _, alternativeKey := range alternativeKeys {
+		if value, exists := os.LookupEnv(alternativeKey); exists {
+			return value
+		}
+	}
+	return ""
+}
