@@ -42,6 +42,8 @@ func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 		"Indicate if install it via go install github.com/xxx/xxx")
 	flags.StringVarP(&opt.fromBranch, "from-branch", "", "master",
 		"Only works if the flag --from-source is true")
+	flags.BoolVarP(&opt.goget, "goget", "", false,
+		"Use command goget to download the binary, only works if the flag --from-source is true")
 	flags.StringVarP(&opt.ProxyGitHub, "proxy-github", "", "",
 		`The proxy address of github.com, the proxy address will be the prefix of the final address.
 Available proxy: gh.api.99988866.xyz
@@ -71,6 +73,7 @@ type installOption struct {
 	CleanPackage bool
 	fromSource   bool
 	fromBranch   string
+	goget        bool
 	force        bool
 
 	// inner fields
@@ -161,14 +164,35 @@ func (o *installOption) installFromSource() (err error) {
 		return
 	}
 
-	gopath := sysos.Getenv("GOPATH")
-	if gopath == "" {
-		err = fmt.Errorf("GOPATH is required")
+	if o.org == "" || o.repo == "" {
+		err = fmt.Errorf("org: '%s' or repo: '%s' is empty", o.org, o.repo)
 		return
 	}
 
-	if o.org == "" || o.repo == "" {
-		err = fmt.Errorf("org: '%s' or repo: '%s' is empty", o.org, o.repo)
+	var binaryPath string
+	if o.goget {
+		binaryPath, err = o.runGogetCommand(fmt.Sprintf("github.com/%s/%s", o.org, o.repo), o.repo)
+	} else {
+		binaryPath, err = o.buildGoSource()
+	}
+
+	if err == nil && binaryPath != "" {
+		is := &installer.Installer{}
+		targetName := o.name
+		if o.Package != nil && o.Package.TargetBinary != "" {
+			targetName = o.Package.TargetBinary
+		}
+		err = is.OverWriteBinary(binaryPath, fmt.Sprintf("/usr/local/bin/%s", targetName))
+	}
+	return
+}
+
+
+
+func (o *installOption) buildGoSource() (binaryPath string, err error) {
+	gopath := sysos.Getenv("GOPATH")
+	if gopath == "" {
+		err = fmt.Errorf("GOPATH is required")
 		return
 	}
 
@@ -177,15 +201,8 @@ func (o *installOption) installFromSource() (err error) {
 		return
 	}
 
-	sourcePath := path.Join(gopath, fmt.Sprintf("bin/%s", o.name))
-	if common.Exist(sourcePath) {
-		is := &installer.Installer{}
-		targetName := o.name
-		if o.Package != nil && o.Package.TargetBinary != "" {
-			targetName = o.Package.TargetBinary
-		}
-		err = is.OverWriteBinary(sourcePath, fmt.Sprintf("/usr/local/bin/%s", targetName))
-	} else {
+	binaryPath = path.Join(gopath, fmt.Sprintf("bin/%s", o.name))
+	if !common.Exist(binaryPath) {
 		err = fmt.Errorf("no found %s from GOPATH", o.name)
 	}
 	return
@@ -193,4 +210,25 @@ func (o *installOption) installFromSource() (err error) {
 
 func (o *installOption) buildGoInstallCmd() string {
 	return fmt.Sprintf("go install github.com/%s/%s@%s", o.org, o.repo, o.fromBranch)
+}
+
+func (o *installOption) runGogetCommand(repo, name string) (binaryPath string, err error) {
+	// make sure goget command exists
+	is := installer.Installer{
+		Provider: "github",
+	}
+	if err = is.CheckDepAndInstall(map[string]string{
+		"goget": "linuxsuren/goget",
+	}); err != nil {
+		err = fmt.Errorf("cannot download goget, error: %v", err)
+		return
+	}
+
+	// run goget command
+	tmpPath := sysos.TempDir()
+	binaryPath = path.Join(tmpPath, name)
+	if err = exec.RunCommandInDir("goget", tmpPath, repo); err != nil {
+		err = fmt.Errorf("faield to run go install command, error: %v", err)
+	}
+	return
 }

@@ -192,6 +192,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 				o.Package = &cfg
 				o.AdditionBinaries = cfg.AdditionBinaries
 				o.Tar = cfg.Tar != "false"
+				packagingFormat = getPackagingFormat(o) // rewrite the packing format due to the package config might be read from git repository
 
 				if cfg.LatestVersion != "" {
 					version = getVersionOrDefault(cfg.LatestVersion, version)
@@ -241,10 +242,11 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					if err = tmp.Execute(&buf, hdPkg); err == nil {
 						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s",
 							o.Org, o.Repo, version, buf.String())
+						o.Output = buf.String()
 						if o.Tar && !hasPackageSuffix(packageURL) {
 							packageURL = fmt.Sprintf("%s.%s", packageURL, packagingFormat)
+							o.Output = fmt.Sprintf("%s.%s", o.Output, packagingFormat)
 						}
-						o.Output = buf.String()
 					} else {
 						return
 					}
