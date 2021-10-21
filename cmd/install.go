@@ -187,8 +187,6 @@ func (o *installOption) installFromSource() (err error) {
 	return
 }
 
-
-
 func (o *installOption) buildGoSource() (binaryPath string, err error) {
 	gopath := sysos.Getenv("GOPATH")
 	if gopath == "" {

@@ -6,6 +6,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/common"
+	"github.com/linuxsuren/http-downloader/pkg/compress"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/net"
 	"github.com/linuxsuren/http-downloader/pkg/os"
@@ -26,12 +27,6 @@ const (
 	// ProviderGitHub represents https://github.com
 	ProviderGitHub = "github"
 )
-
-var supportedPackages = []string{
-	"tar.gz",
-	"zip",
-	"tar.xz",
-}
 
 // CheckDepAndInstall checks the desired tools, install the missing packages
 func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
@@ -271,6 +266,8 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					}
 					o.Name = cfg.Binary
 				}
+			} else {
+				err = fmt.Errorf("failed to parse YAML file: %s, error: %v", matchedFile, err)
 			}
 		}
 	}
@@ -393,10 +390,5 @@ func getPackagingFormat(installer *Installer) string {
 }
 
 func hasPackageSuffix(packageURL string) bool {
-	for i := 0; i < len(supportedPackages); i++ {
-		if strings.HasSuffix(packageURL, supportedPackages[i]) {
-			return true
-		}
-	}
-	return false
+	return compress.IsSupport(path.Ext(packageURL))
 }
