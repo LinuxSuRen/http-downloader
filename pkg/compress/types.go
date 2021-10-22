@@ -38,7 +38,15 @@ func GetCompressor(extension string, additionBinaries []string) Compress {
 		return NewXz(additionBinaries)
 	case ".zip":
 		return NewZip(additionBinaries)
-	default:
+	case ".gz", ".tar.gz":
 		return NewGZip(additionBinaries)
+	case ".bz2":
+		return NewBzip2(additionBinaries)
 	}
+	return nil
+}
+
+// IsSupport checks if the desired file extension
+func IsSupport(extension string) bool {
+	return GetCompressor(extension, nil) != nil
 }
