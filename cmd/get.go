@@ -6,6 +6,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 	"net/http"
 	"net/url"
@@ -29,17 +30,12 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 
 	// set flags
 	flags := cmd.Flags()
+	opt.addFlags(flags)
 	flags.StringVarP(&opt.Output, "output", "o", "", "Write output to <file> instead of stdout.")
-	flags.BoolVarP(&opt.Fetch, "fetch", "", true,
-		"If fetch the latest config from https://github.com/LinuxSuRen/hd-home")
 	flags.BoolVarP(&opt.AcceptPreRelease, "accept-preRelease", "", false,
 		"If you accept preRelease as the binary asset from GitHub")
 	flags.BoolVarP(&opt.AcceptPreRelease, "pre", "", false,
 		"Same with option --accept-preRelease")
-	flags.StringVarP(&opt.ProxyGitHub, "proxy-github", "", "",
-		`The proxy address of github.com, the proxy address will be the prefix of the final address.
-Available proxy: gh.api.99988866.xyz
-Thanks to https://github.com/hunshcn/gh-proxy`)
 
 	flags.IntVarP(&opt.Timeout, "time", "", 10,
 		`The default timeout in seconds with the HTTP request`)
@@ -47,11 +43,10 @@ Thanks to https://github.com/hunshcn/gh-proxy`)
 		`Max times to attempt to download, zero means there's no retry action'`)
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.Int64VarP(&opt.ContinueAt, "continue-at", "", -1, "ContinueAt")
-	flags.IntVarP(&opt.Thread, "thread", "t", 0,
+	flags.IntVarP(&opt.Thread, "thread", "t", viper.GetInt("thread"),
 		`Download file with multi-threads. It only works when its value is bigger than 1`)
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
-	flags.StringVarP(&opt.Provider, "provider", "", ProviderGitHub, "The file provider")
 	flags.StringVarP(&opt.OS, "os", "", runtime.GOOS, "The OS of target binary file")
 	flags.StringVarP(&opt.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
 	flags.BoolVarP(&opt.PrintSchema, "print-schema", "", false,
@@ -63,26 +58,25 @@ Thanks to https://github.com/hunshcn/gh-proxy`)
 
 	_ = cmd.RegisterFlagCompletionFunc("proxy-github", ArrayCompletion("gh.api.99988866.xyz",
 		"ghproxy.com", "mirror.ghproxy.com"))
-	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, "gitee"))
+	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, ProviderGitee))
 	return
 }
 
 type downloadOption struct {
-	URL              string
-	Output           string
-	ShowProgress     bool
-	Fetch            bool
+	searchOption
+
+	URL          string
+	Output       string
+	ShowProgress bool
 	Timeout          int
 	MaxAttempts      int
 	AcceptPreRelease bool
 	RoundTripper     http.RoundTripper
-	ProxyGitHub      string
 
 	ContinueAt int64
 
-	Provider string
-	Arch     string
-	OS       string
+	Arch string
+	OS   string
 
 	Thread            int
 	KeepPart          bool
@@ -101,6 +95,8 @@ type downloadOption struct {
 const (
 	// ProviderGitHub represents https://github.com
 	ProviderGitHub = "github"
+	// ProviderGitee represents https://gitee.com
+	ProviderGitee = "gitee"
 )
 
 func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) {

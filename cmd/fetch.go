@@ -18,23 +18,22 @@ func newFetchCmd(context.Context) (cmd *cobra.Command) {
 	}
 
 	flags := cmd.Flags()
-	flags.StringVarP(&opt.provider, "provider", "p", "github",
-		"The provider of hd-home repository")
+	opt.addFlags(flags)
 	flags.StringVarP(&opt.branch, "branch", "b", installer.ConfigBranch,
 		"The branch of git repository (not support currently)")
 	flags.BoolVarP(&opt.reset, "reset", "", false,
 		"If you want to reset the hd-config which means delete and clone it again")
 
-	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, "gitee"))
+	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, ProviderGitee))
 	return
 }
 
 func (o *fetchOption) preRunE(_ *cobra.Command, _ []string) (err error) {
-	switch o.provider {
-	case "github":
-		o.provider = installer.ConfigGitHub
-	case "gitee":
-		o.provider = "https://gitee.com/LinuxSuRen/hd-home"
+	switch o.Provider {
+	case ProviderGitHub:
+		o.Provider = installer.ConfigGitHub
+	case ProviderGitee:
+		o.Provider = "https://gitee.com/LinuxSuRen/hd-home"
 	case "":
 		err = fmt.Errorf("--provider cannot be empty")
 		return
@@ -56,11 +55,12 @@ func (o *fetchOption) preRunE(_ *cobra.Command, _ []string) (err error) {
 }
 
 func (o *fetchOption) runE(cmd *cobra.Command, _ []string) (err error) {
-	return installer.FetchLatestRepo(o.provider, o.branch, cmd.OutOrStdout())
+	return installer.FetchLatestRepo(o.Provider, o.branch, cmd.OutOrStdout())
 }
 
 type fetchOption struct {
-	provider string
-	branch   string
-	reset    bool
+	searchOption
+
+	branch string
+	reset  bool
 }

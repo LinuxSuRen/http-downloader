@@ -8,6 +8,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	sysos "os"
 	"path"
 	"runtime"
@@ -24,16 +25,15 @@ func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 	cmd = &cobra.Command{
 		Use:     "install",
 		Short:   "Install a package from https://github.com/LinuxSuRen/hd-home",
-		Example: "hd install jenkins-zh/jenkins-cli/jcli -t 6",
+		Example: "hd install goget",
 		Args:    cobra.MinimumNArgs(1),
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
 	}
 
 	flags := cmd.Flags()
+	opt.addFlags(flags)
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
-	flags.BoolVarP(&opt.Fetch, "fetch", "", true,
-		"If fetch the latest config from https://github.com/LinuxSuRen/hd-home")
 	flags.BoolVarP(&opt.AcceptPreRelease, "accept-preRelease", "", false,
 		"If you accept preRelease as the binary asset from GitHub")
 	flags.BoolVarP(&opt.AcceptPreRelease, "pre", "", false,
@@ -42,12 +42,8 @@ func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 		"Indicate if install it via go install github.com/xxx/xxx")
 	flags.StringVarP(&opt.fromBranch, "from-branch", "", "master",
 		"Only works if the flag --from-source is true")
-	flags.BoolVarP(&opt.goget, "goget", "", false,
+	flags.BoolVarP(&opt.goget, "goget", "", viper.GetBool("fetch"),
 		"Use command goget to download the binary, only works if the flag --from-source is true")
-	flags.StringVarP(&opt.ProxyGitHub, "proxy-github", "", "",
-		`The proxy address of github.com, the proxy address will be the prefix of the final address.
-Available proxy: gh.api.99988866.xyz
-Thanks to https://github.com/hunshcn/gh-proxy`)
 
 	flags.BoolVarP(&opt.Download, "download", "", true,
 		"If download the package")
@@ -55,15 +51,14 @@ Thanks to https://github.com/hunshcn/gh-proxy`)
 		"Indicate if force to download the package even it is exist")
 	flags.BoolVarP(&opt.CleanPackage, "clean-package", "", true,
 		"Clean the package if the installation is success")
-	flags.IntVarP(&opt.Thread, "thread", "t", 4,
+	flags.IntVarP(&opt.Thread, "thread", "t", viper.GetInt("thread"),
 		`Download file with multi-threads. It only works when its value is bigger than 1`)
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
-	flags.StringVarP(&opt.Provider, "provider", "", ProviderGitHub, "The file provider")
 	flags.StringVarP(&opt.OS, "os", "", runtime.GOOS, "The OS of target binary file")
 	flags.StringVarP(&opt.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
 
-	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, "gitee"))
+	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, ProviderGitee))
 	return
 }
 
