@@ -4,6 +4,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os"
 )
 
 func newSetupCommand() (cmd *cobra.Command) {
@@ -32,6 +33,6 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	err = viper.WriteConfig()
+	err = viper.SafeWriteConfigAs(os.ExpandEnv("$HOME/.config/hd.yaml"))
 	return
 }

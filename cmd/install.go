@@ -23,8 +23,10 @@ func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 		},
 	}
 	cmd = &cobra.Command{
-		Use:     "install",
-		Short:   "Install a package from https://github.com/LinuxSuRen/hd-home",
+		Use:   "install",
+		Short: "Install a package from https://github.com/LinuxSuRen/hd-home",
+		Long: `Install a package from https://github.com/LinuxSuRen/hd-home
+Cannot find your desired package? Please run command: hd fetch --reset, then try it again`,
 		Example: "hd install goget",
 		Args:    cobra.MinimumNArgs(1),
 		PreRunE: opt.preRunE,
