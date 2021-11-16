@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	extpkg "github.com/linuxsuren/cobra-extension/pkg"
 	extver "github.com/linuxsuren/cobra-extension/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os"
 	"runtime"
 )
 
@@ -21,7 +23,7 @@ func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 	}
 
 	cmd.AddCommand(
-		newGetCmd(cxt), newInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt), newTestCmd(),
+		newGetCmd(cxt), newInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt), newTestCmd(), newSetupCommand(),
 		extver.NewVersionCmd("linuxsuren", "http-downloader", "hd", nil),
 		extpkg.NewCompletionCmd(cmd))
 	return
@@ -36,6 +38,8 @@ func loadConfig() (err error) {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			// Config file not found; ignore error if desired
 			err = nil
+		} else {
+			err = fmt.Errorf("failed to load config: %s, error: %v", os.ExpandEnv("$HOME/.config/hd.yaml"), err)
 		}
 	}
 	viper.SetDefault("provider", ProviderGitHub)

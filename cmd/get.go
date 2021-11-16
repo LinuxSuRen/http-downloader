@@ -65,9 +65,9 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 type downloadOption struct {
 	searchOption
 
-	URL          string
-	Output       string
-	ShowProgress bool
+	URL              string
+	Output           string
+	ShowProgress     bool
 	Timeout          int
 	MaxAttempts      int
 	AcceptPreRelease bool
