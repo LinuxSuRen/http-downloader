@@ -13,4 +13,5 @@ func SetInstallerRegistry(registry core.InstallerRegistry) {
 	registry.Registry("kubectl", &kubectlInstallerInUbuntu{})
 	registry.Registry("bash-completion", &bashCompletionInstallerInUbuntu{})
 	registry.Registry("asciinema", &asciinemaInstallerInUbuntu{})
+	registry.Registry("ffmpge", &ffmpegInstallerInUbuntu{})
 }

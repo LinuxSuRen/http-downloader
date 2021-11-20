@@ -7,4 +7,5 @@ func SetInstallerRegistry(registry core.InstallerRegistry) {
 	registry.Registry("vim", &vimInstallerInMacOS{})
 	registry.Registry("bash-completion", &vimInstallerInMacOS{})
 	registry.Registry("asciinema", &asciinemaInstallerInMacOS{})
+	registry.Registry("ffmpge", &ffmpegInstallerInMacOS{})
 }
