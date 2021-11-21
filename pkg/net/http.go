@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -93,9 +92,9 @@ func (h *HTTPDownloader) fetchProxyFromEnv(scheme string) {
 	}
 }
 
-// DownloadFile download a file with the progress
-func (h *HTTPDownloader) DownloadFile() error {
-	filepath, downloadURL, showProgress := h.TargetFilePath, h.URL, h.ShowProgress
+// DownloadTo downloads a file to target writer
+func (h *HTTPDownloader) DownloadTo(writer io.Writer) error {
+	downloadURL, showProgress := h.URL, h.ShowProgress
 	// Get the data
 	req, err := http.NewRequest(http.MethodGet, downloadURL, nil)
 	if err != nil {
@@ -167,19 +166,7 @@ func (h *HTTPDownloader) DownloadFile() error {
 		}
 	}
 
-	if err := os.MkdirAll(path.Dir(filepath), os.FileMode(0755)); err != nil {
-		return err
-	}
-
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		_ = out.Close()
-		return err
-	}
-
-	h.progressIndicator.Writer = out
-
+	h.progressIndicator.Writer = writer
 	if showProgress {
 		h.progressIndicator.Init()
 	}
@@ -187,6 +174,18 @@ func (h *HTTPDownloader) DownloadFile() error {
 	// Write the body to file
 	_, err = io.Copy(h.progressIndicator, resp.Body)
 	return err
+}
+
+// DownloadFile download a file with the progress
+func (h *HTTPDownloader) DownloadFile() error {
+	filepath := h.TargetFilePath
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		_ = out.Close()
+		return err
+	}
+	return h.DownloadTo(out)
 }
 
 // DownloadFileWithMultipleThread downloads the files with multiple threads
