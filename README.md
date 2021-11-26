@@ -87,3 +87,7 @@ if err = is.CheckDepAndInstall(map[string]string{
 * multi-thread
 * continuously (TODO)
 * GitHub release asset friendly
+
+## Release
+
+This project can be released via [linuxsuren-versions](https://github.com/linuxsuren/linuxsuren-versions).
