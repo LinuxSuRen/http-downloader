@@ -7,10 +7,17 @@ builds:
     goarch:
       - amd64
       - arm64
+      - arm
+    goarm:
+      - 7
     goos:
       - windows
       - linux
       - darwin
+    ignore:
+      - goos: windows
+        goarch: arm
+        goarm: 7
     hooks:
       post:
         - upx "{{ .Path }}"
