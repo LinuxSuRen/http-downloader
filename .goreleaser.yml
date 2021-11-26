@@ -10,6 +10,7 @@ builds:
       - arm
     goarm:
       - 7
+      - 6
     goos:
       - windows
       - linux
@@ -17,7 +18,10 @@ builds:
     ignore:
       - goos: windows
         goarch: arm
-        goarm: 7
+      - goos: windows
+        goarch: arm64
+      - goos: darwin
+        goarch: arm
     hooks:
       post:
         - upx "{{ .Path }}"
@@ -29,7 +33,7 @@ builds:
       - -s
 dist: release
 archives:
-  - name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
+  - name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}{{ .Arm }}"
     replacements:
       darwin: darwin
       linux: linux
