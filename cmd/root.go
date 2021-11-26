@@ -33,7 +33,6 @@ func loadConfig() (err error) {
 	viper.SetConfigName("hd")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("$HOME/.config")
-	viper.AddConfigPath(".")
 	if err = viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			// Config file not found; ignore error if desired
