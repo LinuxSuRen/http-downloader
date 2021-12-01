@@ -12,6 +12,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v2"
+	"io/fs"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -391,4 +392,33 @@ func getPackagingFormat(installer *Installer) string {
 
 func hasPackageSuffix(packageURL string) bool {
 	return compress.IsSupport(path.Ext(packageURL))
+}
+
+// FindPackagesByCategory returns the HDConfigs by category
+func FindPackagesByCategory(category string) (result []HDConfig) {
+	configDir := sysos.ExpandEnv("$HOME/.config/hd-home/config/")
+	_ = filepath.Walk(configDir, func(basepath string, info fs.FileInfo, err error) error {
+		if !strings.HasSuffix(basepath, ".yml") {
+			return nil
+		}
+
+		if data, err := ioutil.ReadFile(basepath); err == nil {
+			hdCfg := &HDConfig{}
+			if err := yaml.Unmarshal(data, hdCfg); err == nil {
+				orgAndRepo := strings.TrimPrefix(basepath, configDir)
+
+				hdCfg.Org = strings.Split(orgAndRepo, "/")[0]
+				hdCfg.Repo = strings.TrimSuffix(strings.Split(orgAndRepo, "/")[1], ".yml")
+
+				for _, item := range hdCfg.Categories {
+					if item == category {
+						result = append(result, *hdCfg)
+						break
+					}
+				}
+			}
+		}
+		return nil
+	})
+	return
 }

@@ -66,6 +66,7 @@ type downloadOption struct {
 	searchOption
 
 	URL              string
+	Category         string
 	Output           string
 	ShowProgress     bool
 	Timeout          int
