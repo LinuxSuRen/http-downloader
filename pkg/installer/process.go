@@ -113,6 +113,11 @@ func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 }
 
 func (o *Installer) extractFiles(tarFile, targetName string) (err error) {
-	err = compress.GetCompressor(path.Ext(tarFile), o.AdditionBinaries).ExtractFiles(tarFile, targetName)
+	compressor := compress.GetCompressor(path.Ext(tarFile), o.AdditionBinaries)
+	if compressor == nil {
+		err = fmt.Errorf("no compressor support for %s", tarFile)
+	} else {
+		err = compressor.ExtractFiles(tarFile, targetName)
+	}
 	return
 }

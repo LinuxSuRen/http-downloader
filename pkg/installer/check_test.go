@@ -15,7 +15,7 @@ func TestGetVersion(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "empty version, repo as default name",
+			name:    "empty version, Repo as default name",
 			appInfo: "kubernetes-sigs/kustomize",
 			verify: func(o *Installer, version string, t *testing.T) {
 				assert.Equal(t, version, "latest")
@@ -93,7 +93,7 @@ func TestProviderURLParseNoConfig(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name:       "empty version, repo as default name",
+			name:       "empty version, Repo as default name",
 			packageURL: "orgtest/repotest",
 			verify: func(o *Installer, packageURL string, t *testing.T) {
 				expectURL := fmt.Sprintf(
@@ -180,14 +180,14 @@ func TestValidPackageSuffix(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "empty version, repo as default name",
+			name: "empty version, Repo as default name",
 			args: args{
 				"https://github.com/orgtest/repotest/releases/latest/download/repotest-%s-%s.%s",
 			},
 			want: true,
 		},
 		{
-			name: "empty version, repo as default name",
+			name: "empty version, Repo as default name",
 			args: args{
 				"https://github.com/orgtest/repotest/releases/latest/download/hello-%s-%s.%s",
 			},
@@ -235,4 +235,9 @@ func TestValidPackageSuffix(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestA(t *testing.T) {
+	a := FindPackagesByCategory("k8s")
+	fmt.Println(a)
 }

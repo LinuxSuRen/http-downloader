@@ -9,6 +9,7 @@ type PackagingFormat struct {
 // HDConfig is the config of http-downloader
 type HDConfig struct {
 	Name             string            `yaml:"Name"`
+	Categories       []string          `yaml:"categories"`
 	Filename         string            `yaml:"filename"`
 	FormatOverrides  PackagingFormat   `yaml:"formatOverrides"`
 	Binary           string            `yaml:"binary"`
@@ -26,6 +27,8 @@ type HDConfig struct {
 	PreInstalls      []CmdWithArgs     `yaml:"preInstalls"`
 	PostInstalls     []CmdWithArgs     `yaml:"postInstalls"`
 	TestInstalls     []CmdWithArgs     `yaml:"testInstalls"`
+
+	Org, Repo string
 }
 
 // CmdWithArgs is a command with arguments
