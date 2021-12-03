@@ -42,8 +42,14 @@ hd get --pre ks
 ## Install
 You can also install a package from GitHub:
 
-```
+```shell
 hd install jenkins-zh/jenkins-cli/jcli -t 6
+```
+
+or install by a category name:
+
+```shell
+hd install --category security
 ```
 
 ## Search

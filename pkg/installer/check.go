@@ -141,14 +141,6 @@ func (o *Installer) GetVersion(path string) (version string, err error) {
 // ProviderURLParse parse the URL
 func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packageURL string, err error) {
 	packageURL = path
-	if o.Fetch {
-		// fetch the latest config
-		fmt.Println("start to fetch the config")
-		if err = FetchLatestRepo(o.Provider, ConfigBranch, sysos.Stdout); err != nil {
-			err = fmt.Errorf("unable to fetch the latest config, error: %v", err)
-			return
-		}
-	}
 
 	version, err := o.GetVersion(packageURL)
 	if err != nil {
@@ -185,6 +177,8 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					AdditionBinaries: cfg.AdditionBinaries,
 					VersionNum:       strings.TrimPrefix(version, "v"),
 				}
+				cfg.Org = o.Org
+				cfg.Repo = o.Repo
 				o.Package = &cfg
 				o.AdditionBinaries = cfg.AdditionBinaries
 				o.Tar = cfg.Tar != "false"
@@ -392,6 +386,31 @@ func getPackagingFormat(installer *Installer) string {
 
 func hasPackageSuffix(packageURL string) bool {
 	return compress.IsSupport(path.Ext(packageURL))
+}
+
+// FindCategories returns the whole supported categories
+func FindCategories() (result []string) {
+	categories := make(map[string]string, 0)
+	configDir := sysos.ExpandEnv("$HOME/.config/hd-home/config/")
+	_ = filepath.Walk(configDir, func(basepath string, info fs.FileInfo, err error) error {
+		if !strings.HasSuffix(basepath, ".yml") {
+			return nil
+		}
+
+		if data, err := ioutil.ReadFile(basepath); err == nil {
+			hdCfg := &HDConfig{}
+			if err := yaml.Unmarshal(data, hdCfg); err == nil {
+				for _, category := range hdCfg.Categories {
+					categories[category] = ""
+				}
+			}
+		}
+		return nil
+	})
+	for key := range categories {
+		result = append(result, key)
+	}
+	return
 }
 
 // FindPackagesByCategory returns the HDConfigs by category
