@@ -29,16 +29,6 @@ func newFetchCmd(context.Context) (cmd *cobra.Command) {
 }
 
 func (o *fetchOption) preRunE(_ *cobra.Command, _ []string) (err error) {
-	switch o.Provider {
-	case ProviderGitHub:
-		o.Provider = installer.ConfigGitHub
-	case ProviderGitee:
-		o.Provider = "https://gitee.com/LinuxSuRen/hd-home"
-	case "":
-		err = fmt.Errorf("--provider cannot be empty")
-		return
-	}
-
 	if o.reset {
 		var configDir string
 		if configDir, err = installer.GetConfigDir(); err == nil {

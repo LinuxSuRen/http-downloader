@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/mitchellh/go-homedir"
 	"io"
@@ -37,6 +38,7 @@ func GetConfigDir() (configDir string, err error) {
 func FetchLatestRepo(provider string, branch string, progress io.Writer) (err error) {
 	repoAddr, ok := configRepos[provider]
 	if !ok {
+		fmt.Printf("not support '%s', use 'github' instead\n", provider)
 		repoAddr = ConfigGitHub
 	}
 
@@ -60,8 +62,28 @@ func FetchLatestRepo(provider string, branch string, progress io.Writer) (err er
 			var wd *git.Worktree
 
 			if wd, err = repo.Worktree(); err == nil {
-				if err = makeSureRemove(remoteName, repoAddr, repo); err != nil {
+				if err = makeSureRemote(remoteName, repoAddr, repo); err != nil {
 					err = fmt.Errorf("cannot add remote: %s, address: %s, error: %v", remoteName, repoAddr, err)
+					return
+				}
+
+				head, _ := repo.Head()
+
+				// avoid force push from remote
+				if err = wd.Reset(&git.ResetOptions{
+					Commit: head.Hash(),
+					Mode:   git.HardReset,
+				}); err != nil {
+					err = fmt.Errorf("unable to reset to '%s'", head.Hash().String())
+					return
+				}
+
+				if err = wd.Checkout(&git.CheckoutOptions{
+					Branch: plumbing.NewBranchReferenceName(branch),
+					Create: false,
+					Force:  true,
+				}); err != nil {
+					err = fmt.Errorf("unable to checkout git branch: %s, error: %v", branch, err)
 					return
 				}
 
@@ -96,7 +118,7 @@ func FetchLatestRepo(provider string, branch string, progress io.Writer) (err er
 	return
 }
 
-func makeSureRemove(name, repoAddr string, repo *git.Repository) (err error) {
+func makeSureRemote(name, repoAddr string, repo *git.Repository) (err error) {
 	if _, err = repo.Remote(name); err != nil {
 		_, err = repo.CreateRemote(&config.RemoteConfig{
 			Name: name,
