@@ -91,3 +91,5 @@ if err = is.CheckDepAndInstall(map[string]string{
 ## Release
 
 This project can be released via [linuxsuren-versions](https://github.com/linuxsuren/linuxsuren-versions).
+
+![Visitor Count](https://profile-counter.glitch.me/{http-downloader}/count.svg)
