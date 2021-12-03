@@ -102,20 +102,26 @@ func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 	o.nativePackage = os.HasPackage(o.tool)
 	if !o.nativePackage && o.Category == "" {
 		err = o.downloadOption.preRunE(cmd, args)
+
+		// try to find the real tool name
+		if o.downloadOption.Package.TargetBinary != "" {
+			o.tool = o.downloadOption.Package.TargetBinary
+		} else if o.downloadOption.Package.Binary != "" {
+			o.tool = o.downloadOption.Package.Binary
+		}
 	}
 	return
 }
 
 func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
-	if should, exist := o.shouldInstall(); !should {
-		if exist {
-			cmd.Printf("%s is already exist\n", o.tool)
-		}
-		return
-	}
-
 	if o.nativePackage {
 		// install a package
+		if should, exist := o.shouldInstall(); !should {
+			if exist {
+				cmd.Printf("%s is already exist, please use the flag --force if you install it again\n", o.tool)
+			}
+			return
+		}
 		err = os.Install(args[0])
 		return
 	}
@@ -128,6 +134,13 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 
 	// install a package from hd-home
 	if o.Download {
+		if should, exist := o.shouldInstall(); !should {
+			if exist {
+				cmd.Printf("%s is already exist, please use the flag --force if you install it again\n", o.tool)
+			}
+			return
+		}
+
 		if err = o.downloadOption.runE(cmd, args); err != nil {
 			return
 		}
@@ -186,6 +199,14 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 			if err = o.downloadOption.preRunE(cmd, []string{item}); err != nil {
 				return
 			}
+
+			// try to find the real tool name
+			if o.downloadOption.Package.TargetBinary != "" {
+				o.tool = o.downloadOption.Package.TargetBinary
+			} else if o.downloadOption.Package.Binary != "" {
+				o.tool = o.downloadOption.Package.Binary
+			}
+
 			if err = o.install(cmd, []string{item}); err != nil {
 				return
 			}
