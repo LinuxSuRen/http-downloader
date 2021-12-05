@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"net/http"
 	"net/url"
+	sysos "os"
 	"path"
 	"runtime"
 	"strings"
@@ -53,6 +54,8 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 		"Print the schema of HDConfig if the flag is true without other function")
 	flags.BoolVarP(&opt.PrintVersion, "print-version", "", false,
 		"Print the version list")
+	flags.BoolVarP(&opt.PrintCategories, "print-categories", "", false,
+		"Print the category list")
 	flags.IntVarP(&opt.PrintVersionCount, "print-version-count", "", 20,
 		"The number of the version list")
 
@@ -84,6 +87,7 @@ type downloadOption struct {
 	PrintSchema       bool
 	PrintVersion      bool
 	PrintVersionCount int
+	PrintCategories   bool
 
 	// inner fields
 	name    string
@@ -100,9 +104,32 @@ const (
 	ProviderGitee = "gitee"
 )
 
+func (o *downloadOption) fetch() (err error) {
+	if !o.Fetch {
+		return
+	}
+
+	// fetch the latest config
+	fmt.Println("start to fetch the config")
+	if err = installer.FetchLatestRepo(o.Provider, installer.ConfigBranch, sysos.Stdout); err != nil {
+		err = fmt.Errorf("unable to fetch the latest config, error: %v", err)
+		return
+	}
+	o.Fetch = false
+	return
+}
+
 func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 	// this might not be the best way to print schema
 	if o.PrintSchema {
+		return
+	}
+
+	if err = o.fetch(); err != nil {
+		return
+	}
+
+	if o.PrintCategories {
 		return
 	}
 
@@ -174,6 +201,11 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 				cmd.Println(item.TagName)
 			}
 		}
+		return
+	}
+
+	if o.PrintCategories {
+		cmd.Println(installer.FindCategories())
 		return
 	}
 

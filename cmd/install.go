@@ -35,7 +35,7 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 
 	flags := cmd.Flags()
 	opt.addFlags(flags)
-	flags.StringVarP(&opt.Category, "category", "", "",
+	flags.StringVarP(&opt.Category, "category", "c", "",
 		"The category of the potentials packages")
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.BoolVarP(&opt.AcceptPreRelease, "accept-preRelease", "", false,
@@ -100,14 +100,20 @@ func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 
 	// try to find if it's a native package
 	o.nativePackage = os.HasPackage(o.tool)
-	if !o.nativePackage && o.Category == "" {
-		err = o.downloadOption.preRunE(cmd, args)
+	if !o.nativePackage {
+		if o.Category == "" {
+			err = o.downloadOption.preRunE(cmd, args)
 
-		// try to find the real tool name
-		if o.downloadOption.Package.TargetBinary != "" {
-			o.tool = o.downloadOption.Package.TargetBinary
-		} else if o.downloadOption.Package.Binary != "" {
-			o.tool = o.downloadOption.Package.Binary
+			// try to find the real tool name
+			if o.downloadOption.Package.TargetBinary != "" {
+				o.tool = o.downloadOption.Package.TargetBinary
+			} else if o.downloadOption.Package.Binary != "" {
+				o.tool = o.downloadOption.Package.Binary
+			} else {
+				o.tool = o.downloadOption.Package.Repo
+			}
+		} else {
+			err = o.downloadOption.fetch()
 		}
 	}
 	return
@@ -195,7 +201,6 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 		}
 
 		for _, item := range choose {
-			o.tool = item
 			if err = o.downloadOption.preRunE(cmd, []string{item}); err != nil {
 				return
 			}
@@ -205,6 +210,8 @@ func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {
 				o.tool = o.downloadOption.Package.TargetBinary
 			} else if o.downloadOption.Package.Binary != "" {
 				o.tool = o.downloadOption.Package.Binary
+			} else {
+				o.tool = o.downloadOption.Package.Repo
 			}
 
 			if err = o.install(cmd, []string{item}); err != nil {

@@ -41,7 +41,7 @@ func (x *Bzip2) ExtractFiles(sourceFile, targetName string) (err error) {
 
 	var targetFile *os.File
 	if targetFile, err = os.OpenFile(fmt.Sprintf("%s/%s", filepath.Dir(sourceFile), targetName),
-		os.O_CREATE|os.O_RDWR, 0744); err != nil {
+		os.O_CREATE|os.O_RDWR, 0600); err != nil {
 		return
 	}
 	if _, err = io.Copy(targetFile, r); err != nil {
