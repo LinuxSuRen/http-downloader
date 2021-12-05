@@ -1,0 +1,12 @@
+# https://docs.codecov.com/docs/commit-status
+# it's hard to have a coverage for some code lines
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 0.1%
+    patch:
+      default:
+        target: auto
+        threshold: 0%
