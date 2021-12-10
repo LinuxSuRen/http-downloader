@@ -37,16 +37,16 @@ jobs:
 
           sudo ./release/http-downloader_linux_amd64/hd install ks
           ks version
-      - name: Upload Artifact for darwin
-        uses: actions/upload-artifact@v2
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
         with:
-          name: hd-darwin-amd64
-          path: release/hd-darwin-amd64.tar.gz
-      - name: Upload Artifact for linux
-        uses: actions/upload-artifact@v2
-        with:
-          name: hd-linux-amd64
-          path: release/hd-linux-amd64.tar.gz
+          image-ref: 'surenpi/hd:latest'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
   GoLint:
     name: Lint
     runs-on: ubuntu-20.04
