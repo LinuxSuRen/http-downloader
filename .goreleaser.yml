@@ -74,26 +74,6 @@ brews:
       bin.install name
 
       prefix.install_metafiles
-nfpms:
-  - file_name_template: "{{ .Binary }}-{{.Os}}-{{.Arch}}"
-    homepage: https://github.com/linuxsuren/http-downloader
-    description: HTTP download tool
-    maintainer: rick <rick@jenkins-zh.cn>
-    license: MIT
-    vendor: Jenkins
-    formats:
-      - deb
-      - rpm
-    recommends:
-      - bash-completion
-      - vim
-    bindir: /usr/bin
-    replacements:
-      amd64: 64bit
-      arm64: arm64
-      darwin: macOS
-      linux: linux
-      windows: windows
 dockers:
   - goos: linux
     goarch: amd64
