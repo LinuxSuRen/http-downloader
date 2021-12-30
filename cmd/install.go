@@ -104,13 +104,15 @@ func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 		if o.Category == "" {
 			err = o.downloadOption.preRunE(cmd, args)
 
-			// try to find the real tool name
-			if o.downloadOption.Package.TargetBinary != "" {
-				o.tool = o.downloadOption.Package.TargetBinary
-			} else if o.downloadOption.Package.Binary != "" {
-				o.tool = o.downloadOption.Package.Binary
-			} else {
-				o.tool = o.downloadOption.Package.Repo
+			if o.downloadOption.Package != nil {
+				// try to find the real tool name
+				if o.downloadOption.Package.TargetBinary != "" {
+					o.tool = o.downloadOption.Package.TargetBinary
+				} else if o.downloadOption.Package.Binary != "" {
+					o.tool = o.downloadOption.Package.Binary
+				} else {
+					o.tool = o.downloadOption.Package.Repo
+				}
 			}
 		} else {
 			err = o.downloadOption.fetch()

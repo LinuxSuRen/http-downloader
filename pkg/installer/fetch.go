@@ -35,7 +35,8 @@ func GetConfigDir() (configDir string, err error) {
 }
 
 // FetchLatestRepo fetches the hd-home as the config
-func FetchLatestRepo(provider string, branch string, progress io.Writer) (err error) {
+func FetchLatestRepo(provider string, branch string,
+	progress io.Writer) (err error) {
 	repoAddr, ok := configRepos[provider]
 	if !ok {
 		fmt.Printf("not support '%s', use 'github' instead\n", provider)
@@ -67,21 +68,31 @@ func FetchLatestRepo(provider string, branch string, progress io.Writer) (err er
 					return
 				}
 
-				head, _ := repo.Head()
-
-				// avoid force push from remote
-				if err = wd.Reset(&git.ResetOptions{
-					Commit: head.Hash(),
-					Mode:   git.HardReset,
-				}); err != nil {
-					err = fmt.Errorf("unable to reset to '%s'", head.Hash().String())
+				if err = repo.Fetch(&git.FetchOptions{
+					RemoteName: remoteName,
+					Progress:   progress,
+					Force:      true,
+				}); err != nil && err != git.NoErrAlreadyUpToDate {
+					err = fmt.Errorf("failed to fetch '%s', error: %v", remoteName, err)
 					return
 				}
 
+				head, _ := repo.Head()
+				if head != nil {
+					// avoid force push from remote
+					if err = wd.Reset(&git.ResetOptions{
+						Commit: head.Hash(),
+						Mode:   git.HardReset,
+					}); err != nil {
+						err = fmt.Errorf("unable to reset to '%s'", head.Hash().String())
+						return
+					}
+				}
+
 				if err = wd.Checkout(&git.CheckoutOptions{
-					Branch: plumbing.NewBranchReferenceName(branch),
+					Branch: plumbing.NewRemoteReferenceName(remoteName, branch),
 					Create: false,
-					Force:  true,
+					Keep:   true,
 				}); err != nil {
 					err = fmt.Errorf("unable to checkout git branch: %s, error: %v", branch, err)
 					return
@@ -101,6 +112,8 @@ func FetchLatestRepo(provider string, branch string, progress io.Writer) (err er
 			err = fmt.Errorf("failed to open git local repository, error: %v", err)
 		}
 	} else {
+		_, _ = fmt.Fprintf(progress, "no local config exist, try to clone it\n")
+
 		if _, err = git.PlainClone(configDir, false, &git.CloneOptions{
 			RemoteName: remoteName,
 			URL:        repoAddr,
