@@ -7,7 +7,7 @@ build-linux: fmt lint
 	CGO_ENABLE=0 GOOS=linux go build -ldflags "-w -s" -o bin/linux/hd
 	upx bin/linux/hd
 
-test: fmt lint
+test: fmt
 	go test ./... -coverprofile coverage.out
 
 run:
