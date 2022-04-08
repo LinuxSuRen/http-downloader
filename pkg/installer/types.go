@@ -8,7 +8,7 @@ type PackagingFormat struct {
 
 // HDConfig is the config of http-downloader
 type HDConfig struct {
-	Name             string            `yaml:"Name"`
+	Name             string            `yaml:"name"`
 	Categories       []string          `yaml:"categories"`
 	Filename         string            `yaml:"filename"`
 	FormatOverrides  PackagingFormat   `yaml:"formatOverrides"`

@@ -107,16 +107,18 @@ func (o *Installer) GetVersion(path string) (version string, err error) {
 	} else if len(addr) > 0 {
 		repo = addr[0]
 
-		if potentialOrgs := findByRepo(repo); len(potentialOrgs) == 0 {
+		if potentialOrgs := findOrgsByRepo(repo); len(potentialOrgs) == 0 {
 			err = fmt.Errorf("cannot found the package: %s", repo)
 			return
 		} else if len(potentialOrgs) == 1 {
-			org = potentialOrgs[0]
+			org, repo = getOrgAndRepo(potentialOrgs[0])
 		} else {
-			if org, err = chooseOneFromArray(potentialOrgs); err != nil {
+			var result string
+			if result, err = chooseOneFromArray(potentialOrgs); err != nil {
 				err = fmt.Errorf("failed to choose the potential organizations of your desired package")
 				return
 			}
+			org, repo = getOrgAndRepo(result)
 		}
 
 		fmt.Printf("target package is %s/%s\n", org, repo)
@@ -136,6 +138,10 @@ func (o *Installer) GetVersion(path string) (version string, err error) {
 	o.Name = name
 
 	return
+}
+
+func getOrgAndRepo(orgAndRepo string) (string, string) {
+	return strings.Split(orgAndRepo, "/")[0], strings.Split(orgAndRepo, "/")[1]
 }
 
 // ProviderURLParse parse the URL
@@ -348,15 +354,43 @@ func renderCmdWithArgs(cmd *CmdWithArgs, hdPkg *HDPackage) (err error) {
 	return
 }
 
-func findByRepo(repo string) (result []string) {
+func findOrgsByRepo(repo string) (result []string) {
 	userHome, _ := homedir.Dir()
 	configDir := userHome + "/.config/hd-home"
-	matchedFile := configDir + "/config/*/" + repo + ".yml"
 
-	if files, err := filepath.Glob(matchedFile); err == nil {
+	result = FindByKeyword(repo, configDir)
+	return
+}
+
+// FindByKeyword find org/repo by a keyword
+func FindByKeyword(keyword, configDir string) (result []string) {
+	if files, err := filepath.Glob(path.Join(configDir, "config/**/*.yml")); err == nil {
 		for _, metaFile := range files {
-			result = append(result, filepath.Base(filepath.Dir(metaFile)))
+			ext := path.Ext(metaFile)
+			fileName := path.Base(metaFile)
+			org := path.Base(path.Dir(metaFile))
+			repo := strings.TrimSuffix(fileName, ext)
+
+			if !strings.Contains(repo, keyword) && !hasKeyword(metaFile, keyword) {
+				continue
+			}
+
+			result = append(result, path.Join(org, repo))
 		}
+	}
+	return
+}
+
+func hasKeyword(metaFile, keyword string) (ok bool) {
+	data, err := ioutil.ReadFile(metaFile)
+	if err != nil {
+		return
+	}
+
+	config := &HDConfig{}
+	if err = yaml.Unmarshal(data, config); err == nil {
+		ok = strings.Contains(config.Name, keyword) || strings.Contains(config.Binary, keyword) ||
+			strings.Contains(config.TargetBinary, keyword)
 	}
 	return
 }

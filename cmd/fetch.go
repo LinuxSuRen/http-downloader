@@ -29,9 +29,10 @@ func newFetchCmd(context.Context) (cmd *cobra.Command) {
 }
 
 func (o *fetchOption) preRunE(_ *cobra.Command, _ []string) (err error) {
+	fetcher := &installer.DefaultFetcher{}
 	if o.reset {
 		var configDir string
-		if configDir, err = installer.GetConfigDir(); err == nil {
+		if configDir, err = fetcher.GetConfigDir(); err == nil {
 			if err = os.RemoveAll(configDir); err != nil {
 				err = fmt.Errorf("failed to remove directory: %s, error %v", configDir, err)
 				return
@@ -45,7 +46,8 @@ func (o *fetchOption) preRunE(_ *cobra.Command, _ []string) (err error) {
 }
 
 func (o *fetchOption) runE(cmd *cobra.Command, _ []string) (err error) {
-	return installer.FetchLatestRepo(o.Provider, o.branch, cmd.OutOrStdout())
+	fetcher := &installer.DefaultFetcher{}
+	return fetcher.FetchLatestRepo(o.Provider, o.branch, cmd.OutOrStdout())
 }
 
 type fetchOption struct {

@@ -23,7 +23,7 @@ func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 	}
 
 	cmd.AddCommand(
-		newGetCmd(cxt), newInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt), newTestCmd(), newSetupCommand(),
+		newGetCmd(cxt), newInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt), newSetupCommand(),
 		extver.NewVersionCmd("linuxsuren", "http-downloader", "hd", nil),
 		extpkg.NewCompletionCmd(cmd))
 	return

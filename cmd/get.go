@@ -111,7 +111,8 @@ func (o *downloadOption) fetch() (err error) {
 
 	// fetch the latest config
 	fmt.Println("start to fetch the config")
-	if err = installer.FetchLatestRepo(o.Provider, installer.ConfigBranch, sysos.Stdout); err != nil {
+	fetcher := &installer.DefaultFetcher{}
+	if err = fetcher.FetchLatestRepo(o.Provider, installer.ConfigBranch, sysos.Stdout); err != nil {
 		err = fmt.Errorf("unable to fetch the latest config, error: %v", err)
 		return
 	}
