@@ -45,12 +45,6 @@ func TestHasPackage(t *testing.T) {
 		},
 		want: true,
 	}, {
-		name: "kubectl",
-		args: args{
-			name: "kubectl",
-		},
-		want: true,
-	}, {
 		name: "bash-completion",
 		args: args{
 			name: "bash-completion",

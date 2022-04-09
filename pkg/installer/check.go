@@ -230,19 +230,11 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					}
 				}
 
-				// parse the version if it's an URL
-				if cfg.Version != "" && (strings.HasPrefix(cfg.Version, "http://") || strings.HasPrefix(cfg.Version, "https://")) {
-					var resp *http.Response
-					if resp, err = http.Get(cfg.Version); err != nil || resp.StatusCode != http.StatusOK {
-						err = fmt.Errorf("cannot get version from '%s', error is '%v', status code is '%d'", cfg.Version, err, resp.StatusCode)
-						return
-					}
-					var data []byte
-					if data, err = ioutil.ReadAll(resp.Body); err != nil {
-						err = fmt.Errorf("failed to get version from '%s', error is '%v'", cfg.Version, err)
-						return
-					}
-					hdPkg.Version = string(data)
+				var ver string
+				if ver, err = getDynamicVersion(cfg.Version); ver != "" {
+					hdPkg.Version = ver
+				} else if err != nil {
+					return
 				}
 
 				if cfg.URL != "" {
@@ -295,6 +287,24 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 				err = fmt.Errorf("failed to parse YAML file: %s, error: %v", matchedFile, err)
 			}
 		}
+	}
+	return
+}
+
+// parse the version if it's an URL
+func getDynamicVersion(version string) (realVersion string, err error) {
+	if version != "" && (strings.HasPrefix(version, "http://") || strings.HasPrefix(version, "https://")) {
+		var resp *http.Response
+		if resp, err = http.Get(version); err != nil || resp.StatusCode != http.StatusOK {
+			err = fmt.Errorf("cannot get version from '%s', error is '%v', status code is '%d'", version, err, resp.StatusCode)
+			return
+		}
+		var data []byte
+		if data, err = ioutil.ReadAll(resp.Body); err != nil {
+			err = fmt.Errorf("failed to get version from '%s', error is '%v'", version, err)
+			return
+		}
+		realVersion = string(data)
 	}
 	return
 }

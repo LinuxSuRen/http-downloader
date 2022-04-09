@@ -2,7 +2,9 @@ package installer
 
 import (
 	"fmt"
+	"github.com/h2non/gock"
 	"github.com/stretchr/testify/assert"
+	"net/http"
 	"os"
 	"path"
 	"runtime"
@@ -369,6 +371,46 @@ func Test_getHDConfig(t *testing.T) {
 				}
 			}
 			assert.Equalf(t, tt.wantConfig, getHDConfig(tt.args.configDir, tt.args.orgAndRepo()), "getHDConfig(%v, %v)", tt.args.configDir, tt.args.orgAndRepo)
+		})
+	}
+}
+
+func Test_getDynamicVersion(t *testing.T) {
+	const fakeVersionURL = "https://fake.com"
+	const expectVersion = "v1.1.1"
+
+	tests := []struct {
+		name          string
+		prepare       func()
+		expectVersion string
+		expectError   bool
+	}{{
+		name: "normal case",
+		prepare: func() {
+			gock.New(fakeVersionURL).Get("/").Reply(http.StatusOK).BodyString(expectVersion)
+		},
+		expectVersion: expectVersion,
+		expectError:   false,
+	}, {
+		name: "got statusCode which is not 200",
+		prepare: func() {
+			gock.New(fakeVersionURL).Get("/").Reply(http.StatusNotFound)
+		},
+		expectVersion: "",
+		expectError:   true,
+	}}
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			tt.prepare()
+			version, err := getDynamicVersion(fakeVersionURL)
+			assert.Equal(t, tt.expectVersion, version)
+			if tt.expectError {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
 		})
 	}
 }
