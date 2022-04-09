@@ -11,7 +11,7 @@
 通过命令：`brew install linuxsuren/linuxsuren/hd` 来安装
 
 或者，对于 Linux 用户可以直接通过命令下载：
-```
+```shell
 curl -L https://github.com/linuxsuren/http-downloader/releases/latest/download/hd-linux-amd64.tar.gz | tar xzv
 mv hd /usr/local/bin
 ```
@@ -20,26 +20,25 @@ mv hd /usr/local/bin
 
 # 用法
 
-```
+```shell
 hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-linux-amd64.tar.gz --thread 6
 ```
 
 或者，用一个更加简便的办法：
 
-```
+```shell
 hd get jenkins-zh/jenkins-cli/jcli -t 6
 ```
 
 获取，你也可以安装一个来自 GitHub 的软件包：
 
-```
+```shell
 hd install jenkins-zh/jenkins-cli/jcli -t 6
-```
 ```
 
 或者，你也可以从 GitHub 上下载预发布的二进制包：
 
-```
+```shell
 hd get --pre ks
 ```
 

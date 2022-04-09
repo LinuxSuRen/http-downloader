@@ -10,7 +10,6 @@ func SetInstallerRegistry(registry core.InstallerRegistry) {
 	registry.Registry("vim", &vimInstallerInUbuntu{})
 	registry.Registry("golang", &golangInstallerInUbuntu{})
 	registry.Registry("git", &gitInstallerInUbuntu{})
-	registry.Registry("kubectl", &kubectlInstallerInUbuntu{})
 	registry.Registry("bash-completion", &bashCompletionInstallerInUbuntu{})
 	registry.Registry("asciinema", &asciinemaInstallerInUbuntu{})
 	registry.Registry("ffmpge", &ffmpegInstallerInUbuntu{})
