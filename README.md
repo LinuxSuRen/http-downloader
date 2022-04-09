@@ -23,19 +23,19 @@ Want to go through the code? [GitPod](https://gitpod.io/#https://github.com/linu
 # Usage
 
 ## Download
-```
+```shell
 hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-linux-amd64.tar.gz --thread 6
 ```
 
 Or use a simple way instead of typing the whole URL:
 
-```
+```shell
 hd get jenkins-zh/jenkins-cli/jcli -t 6
 ```
 
 Or you might want to download a pre-released binary package from GitHub:
 
-```
+```shell
 hd get --pre ks
 ```
 
@@ -76,7 +76,7 @@ CMD ["ks"]
 You can import it from `github.com/linuxsuren/http-downloader/pkg/installer`, then put the following code to your CLI. 
 It can help you to download desired tools:
 
-```
+```go
 is := installer.Installer{
     Provider: "github",
 }

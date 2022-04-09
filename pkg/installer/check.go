@@ -230,6 +230,21 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					}
 				}
 
+				// parse the version if it's an URL
+				if cfg.Version != "" && (strings.HasPrefix(cfg.Version, "http://") || strings.HasPrefix(cfg.Version, "https://")) {
+					var resp *http.Response
+					if resp, err = http.Get(cfg.Version); err != nil || resp.StatusCode != http.StatusOK {
+						err = fmt.Errorf("cannot get version from '%s', error is '%v', status code is '%d'", cfg.Version, err, resp.StatusCode)
+						return
+					}
+					var data []byte
+					if data, err = ioutil.ReadAll(resp.Body); err != nil {
+						err = fmt.Errorf("failed to get version from '%s', error is '%v'", cfg.Version, err)
+						return
+					}
+					hdPkg.Version = string(data)
+				}
+
 				if cfg.URL != "" {
 					// it does not come from GitHub release
 					tmp, _ := template.New("hd").Parse(cfg.URL)
