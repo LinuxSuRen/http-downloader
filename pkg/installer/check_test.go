@@ -326,3 +326,49 @@ func Test_getOrgAndRepo(t *testing.T) {
 		})
 	}
 }
+
+func Test_getHDConfig(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "config")
+	assert.Nil(t, err)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	type args struct {
+		configDir  string
+		orgAndRepo func() string
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantConfig *HDConfig
+	}{{
+		name:       "not exist",
+		wantConfig: nil,
+	}, {
+		name: "valid file",
+		args: args{
+			configDir: tmpDir,
+			orgAndRepo: func() (orgAndRepo string) {
+				orgAndRepo = "org/repo"
+				configFile := path.Join(tmpDir, "config", orgAndRepo+".yml")
+				err := os.MkdirAll(path.Dir(configFile), 0755)
+				assert.Nil(t, err)
+				err = os.WriteFile(configFile, []byte("name: fake"), 0400)
+				assert.Nil(t, err)
+				return
+			},
+		},
+		wantConfig: &HDConfig{Name: "fake"},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.args.orgAndRepo == nil {
+				tt.args.orgAndRepo = func() string {
+					return ""
+				}
+			}
+			assert.Equalf(t, tt.wantConfig, getHDConfig(tt.args.configDir, tt.args.orgAndRepo()), "getHDConfig(%v, %v)", tt.args.configDir, tt.args.orgAndRepo)
+		})
+	}
+}

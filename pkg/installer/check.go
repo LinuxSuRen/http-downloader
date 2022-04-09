@@ -77,7 +77,6 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 
 // GetVersion parse install app info
 func (o *Installer) GetVersion(path string) (version string, err error) {
-
 	var (
 		org  string
 		repo string
@@ -131,12 +130,22 @@ func (o *Installer) GetVersion(path string) (version string, err error) {
 		name = addr[2]
 	} else {
 		name = repo
+
+		// try to get the real name of a tool
+		fetcher := &DefaultFetcher{}
+		var configDir string
+		if configDir, err = fetcher.GetConfigDir(); err != nil {
+			return
+		}
+		config := getHDConfig(configDir, fmt.Sprintf("%s/%s", org, repo))
+		if config != nil && config.Name != "" {
+			name = config.Name
+		}
 	}
 
 	o.Org = org
 	o.Repo = repo
 	o.Name = name
-
 	return
 }
 
@@ -392,6 +401,18 @@ func hasKeyword(metaFile, keyword string) (ok bool) {
 		ok = strings.Contains(config.Name, keyword) || strings.Contains(config.Binary, keyword) ||
 			strings.Contains(config.TargetBinary, keyword)
 	}
+	return
+}
+
+func getHDConfig(configDir, orgAndRepo string) (config *HDConfig) {
+	configFile := path.Join(configDir, "config", orgAndRepo+".yml")
+	data, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		return
+	}
+
+	config = &HDConfig{}
+	_ = yaml.Unmarshal(data, config)
 	return
 }
 
