@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"reflect"
 	"testing"
@@ -76,4 +78,13 @@ func Test_getOrDefault(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestArrayCompletion(t *testing.T) {
+	function := ArrayCompletion("a", "b")
+	assert.NotNil(t, function)
+
+	array, direct := function(nil, nil, "")
+	assert.Equal(t, []string{"a", "b"}, array)
+	assert.Equal(t, cobra.ShellCompDirectiveNoFileComp, direct)
 }

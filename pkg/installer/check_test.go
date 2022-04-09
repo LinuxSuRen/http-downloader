@@ -3,6 +3,8 @@ package installer
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"os"
+	"path"
 	"runtime"
 	"testing"
 )
@@ -231,7 +233,7 @@ func TestValidPackageSuffix(t *testing.T) {
 				tt.args.packageURL,
 				is.OS, is.Arch, getPackagingFormat(is))
 			if got := hasPackageSuffix(packageURL); got != tt.want {
-				t.Errorf("hasPackageSuffix() = %v, want %v", got, tt.want)
+				t.Errorf("hasPackageSuffix() = %v, wantOrg %v", got, tt.want)
 			}
 		})
 	}
@@ -240,4 +242,133 @@ func TestValidPackageSuffix(t *testing.T) {
 func TestA(t *testing.T) {
 	a := FindPackagesByCategory("k8s")
 	fmt.Println(a)
+}
+
+func Test_hasKeyword(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "config")
+	assert.Nil(t, err)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	type args struct {
+		metaFile func() string
+		keyword  string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{{
+		name: "has the same name",
+		args: args{
+			metaFile: func() (metaFile string) {
+				metaFile = path.Join(tmpDir, "repo.yml")
+				err = os.WriteFile(metaFile, []byte(`name: fake`), 0400)
+				assert.Nil(t, err)
+				return
+			},
+			keyword: "fake",
+		},
+		want: true,
+	}, {
+		name: "has the same binary",
+		args: args{
+			metaFile: func() (metaFile string) {
+				metaFile = path.Join(tmpDir, "repo-1.yml")
+				err = os.WriteFile(metaFile, []byte(`binary: fake`), 0400)
+				assert.Nil(t, err)
+				return
+			},
+			keyword: "fake",
+		},
+		want: true,
+	}, {
+		name: "has the same targetBinary",
+		args: args{
+			metaFile: func() (metaFile string) {
+				metaFile = path.Join(tmpDir, "repo-2.yml")
+				err = os.WriteFile(metaFile, []byte(`targetBinary: fake`), 0400)
+				assert.Nil(t, err)
+				return
+			},
+			keyword: "fake",
+		},
+		want: true,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, hasKeyword(tt.args.metaFile(), tt.args.keyword), "hasKeyword(%v, %v)", tt.args.metaFile, tt.args.keyword)
+		})
+	}
+}
+
+func Test_getOrgAndRepo(t *testing.T) {
+	type args struct {
+		orgAndRepo string
+	}
+	tests := []struct {
+		name     string
+		args     args
+		wantOrg  string
+		wantRepo string
+	}{{
+		name:     "normal case, org/repo",
+		args:     args{orgAndRepo: "org/repo"},
+		wantOrg:  "org",
+		wantRepo: "repo",
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := getOrgAndRepo(tt.args.orgAndRepo)
+			assert.Equalf(t, tt.wantOrg, got, "getOrgAndRepo(%v)", tt.args.orgAndRepo)
+			assert.Equalf(t, tt.wantRepo, got1, "getOrgAndRepo(%v)", tt.args.orgAndRepo)
+		})
+	}
+}
+
+func Test_getHDConfig(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "config")
+	assert.Nil(t, err)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	type args struct {
+		configDir  string
+		orgAndRepo func() string
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantConfig *HDConfig
+	}{{
+		name:       "not exist",
+		wantConfig: nil,
+	}, {
+		name: "valid file",
+		args: args{
+			configDir: tmpDir,
+			orgAndRepo: func() (orgAndRepo string) {
+				orgAndRepo = "org/repo"
+				configFile := path.Join(tmpDir, "config", orgAndRepo+".yml")
+				err := os.MkdirAll(path.Dir(configFile), 0755)
+				assert.Nil(t, err)
+				err = os.WriteFile(configFile, []byte("name: fake"), 0400)
+				assert.Nil(t, err)
+				return
+			},
+		},
+		wantConfig: &HDConfig{Name: "fake"},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.args.orgAndRepo == nil {
+				tt.args.orgAndRepo = func() string {
+					return ""
+				}
+			}
+			assert.Equalf(t, tt.wantConfig, getHDConfig(tt.args.configDir, tt.args.orgAndRepo()), "getHDConfig(%v, %v)", tt.args.configDir, tt.args.orgAndRepo)
+		})
+	}
 }

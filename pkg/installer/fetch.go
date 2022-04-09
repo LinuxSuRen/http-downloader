@@ -25,8 +25,19 @@ var configRepos = map[string]string{
 	"gitee":  "https://gitee.com/LinuxSuRen/hd-home",
 }
 
+// Fetcher is the interface of a fetcher which responses to fetch config files
+type Fetcher interface {
+	GetConfigDir() (configDir string, err error)
+	FetchLatestRepo(provider string, branch string,
+		progress io.Writer) (err error)
+}
+
+// DefaultFetcher is the default fetcher which fetches the config files from a git repository
+type DefaultFetcher struct {
+}
+
 // GetConfigDir returns the directory of the config
-func GetConfigDir() (configDir string, err error) {
+func (f *DefaultFetcher) GetConfigDir() (configDir string, err error) {
 	var userHome string
 	if userHome, err = homedir.Dir(); err == nil {
 		configDir = path.Join(userHome, "/.config/hd-home")
@@ -35,11 +46,13 @@ func GetConfigDir() (configDir string, err error) {
 }
 
 // FetchLatestRepo fetches the hd-home as the config
-func FetchLatestRepo(provider string, branch string,
+func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 	progress io.Writer) (err error) {
 	repoAddr, ok := configRepos[provider]
 	if !ok {
-		fmt.Printf("not support '%s', use 'github' instead\n", provider)
+		if provider != "" {
+			fmt.Printf("not support '%s', use 'github' instead\n", provider)
+		}
 		repoAddr = ConfigGitHub
 	}
 
@@ -53,7 +66,7 @@ func FetchLatestRepo(provider string, branch string,
 	}
 
 	var configDir string
-	if configDir, err = GetConfigDir(); err != nil {
+	if configDir, err = f.GetConfigDir(); err != nil {
 		return
 	}
 
@@ -126,7 +139,7 @@ func FetchLatestRepo(provider string, branch string,
 	if err != nil && strings.Contains(err.Error(), "exit status 128") {
 		// target directory was created accidentally, remove it then try again
 		_ = os.RemoveAll(configDir)
-		return FetchLatestRepo(repoAddr, branch, progress)
+		return f.FetchLatestRepo(repoAddr, branch, progress)
 	}
 	return
 }
@@ -138,5 +151,26 @@ func makeSureRemote(name, repoAddr string, repo *git.Repository) (err error) {
 			URLs: []string{repoAddr},
 		})
 	}
+	return
+}
+
+// FakeFetcher is a fake fetch. We expect to use it for unit test cases.
+type FakeFetcher struct {
+	ConfigDir          string
+	GetConfigDirErr    error
+	FetchLatestRepoErr error
+}
+
+// GetConfigDir is a fake method
+func (f *FakeFetcher) GetConfigDir() (configDir string, err error) {
+	configDir = f.ConfigDir
+	err = f.GetConfigDirErr
+	return
+}
+
+// FetchLatestRepo is fake method
+func (f *FakeFetcher) FetchLatestRepo(provider string, branch string,
+	progress io.Writer) (err error) {
+	err = f.FetchLatestRepoErr
 	return
 }

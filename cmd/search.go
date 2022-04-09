@@ -8,9 +8,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	sysos "os"
-	"path"
-	"path/filepath"
-	"strings"
 )
 
 func newSearchCmd(context.Context) (cmd *cobra.Command) {
@@ -43,34 +40,25 @@ Thanks to https://github.com/hunshcn/gh-proxy`)
 }
 
 func (s *searchOption) runE(_ *cobra.Command, args []string) (err error) {
-	err = search(args[0])
+	err = search(args[0], s.Fetch, &installer.DefaultFetcher{})
 	return
 }
 
-func search(keyword string) (err error) {
-	if err = installer.FetchLatestRepo("", "", sysos.Stdout); err != nil {
-		return
+func search(keyword string, fetch bool, fetcher installer.Fetcher) (err error) {
+	if fetch {
+		if err = fetcher.FetchLatestRepo("", "", sysos.Stdout); err != nil {
+			return
+		}
 	}
 
 	var configDir string
-	if configDir, err = installer.GetConfigDir(); err != nil {
+	if configDir, err = fetcher.GetConfigDir(); err != nil {
 		return
 	}
 
-	var files []string
-	if files, err = filepath.Glob(path.Join(configDir, "config/**/*.yml")); err == nil {
-		for _, metaFile := range files {
-			ext := path.Ext(metaFile)
-			fileName := path.Base(metaFile)
-			org := path.Base(path.Dir(metaFile))
-			repo := strings.TrimSuffix(fileName, ext)
-
-			if !strings.Contains(repo, keyword) {
-				continue
-			}
-
-			fmt.Println(path.Join(org, repo))
-		}
+	result := installer.FindByKeyword(keyword, configDir)
+	for _, item := range result {
+		fmt.Println(item)
 	}
 	return
 }
