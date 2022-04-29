@@ -36,7 +36,7 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	configDir := os.ExpandEnv("$HOME/.config")
-	if err = os.MkdirAll(configDir, 0755); err != nil {
+	if err = os.MkdirAll(configDir, 0750); err != nil {
 		err = fmt.Errorf("failed to create directory: %s, error: %v", configDir, err)
 		return
 	}

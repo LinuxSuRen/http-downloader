@@ -32,10 +32,10 @@ jobs:
           args: release --skip-publish --rm-dist
       - name: Test against the cmd
         run: |
-          sudo ./release/http-downloader_linux_amd64/hd install jenkins-zh/jenkins-cli/jcli
+          sudo ./release/http-downloader_linux_amd64_v1/hd install jenkins-zh/jenkins-cli/jcli
           jcli version
 
-          sudo ./release/http-downloader_linux_amd64/hd install ks
+          sudo ./release/http-downloader_linux_amd64_v1/hd install ks
           ks version
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.2.1
