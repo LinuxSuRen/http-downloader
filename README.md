@@ -18,6 +18,12 @@ curl -L https://github.com/linuxsuren/http-downloader/releases/latest/download/h
 mv hd /usr/bin/hd
 ```
 
+Or download it via proxy:
+```
+curl -L https://ghproxy.com/https://github.com/linuxsuren/http-downloader/releases/latest/download/hd-linux-amd64.tar.gz | tar xzv hd
+mv hd /usr/bin/hd
+```
+
 Want to go through the code? [GitPod](https://gitpod.io/#https://github.com/linuxsuren/http-downloader) definitely can help you.
 
 # Usage
