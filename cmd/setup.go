@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"
+	"path"
 )
 
 func newSetupCommand() (cmd *cobra.Command) {
@@ -33,6 +35,12 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	err = viper.SafeWriteConfigAs(os.ExpandEnv("$HOME/.config/hd.yaml"))
+	configDir := os.ExpandEnv("$HOME/.config")
+	if err = os.MkdirAll(configDir, 0755); err != nil {
+		err = fmt.Errorf("failed to create directory: %s, error: %v", configDir, err)
+		return
+	}
+
+	err = viper.SafeWriteConfigAs(path.Join(configDir, "hd.yaml"))
 	return
 }

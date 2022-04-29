@@ -8,9 +8,11 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/go-github/v29 v29.0.3
 	github.com/gosuri/uiprogress v0.0.1
-	github.com/linuxsuren/cobra-extension v0.0.12
+	github.com/h2non/gock v1.0.9
+	github.com/linuxsuren/cobra-extension v0.0.13
 	github.com/magiconair/properties v1.8.5
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32 // indirect
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.16.0
 	github.com/spf13/cobra v1.2.1
@@ -19,5 +21,4 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	gopkg.in/yaml.v2 v2.4.0
-		github.com/h2non/gock v1.0.9
 )
