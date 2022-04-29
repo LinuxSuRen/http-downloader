@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	cotesting "github.com/linuxsuren/cobra-extension/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -10,48 +11,43 @@ func Test_newInstallCmd(t *testing.T) {
 	cmd := newInstallCmd(context.Background())
 	assert.Equal(t, "install", cmd.Name())
 
-	flags := []struct {
-		name      string
-		shorthand string
-	}{{
-		name:      "category",
-		shorthand: "c",
+	test := cotesting.FlagsValidation{{
+		Name:      "category",
+		Shorthand: "c",
 	}, {
-		name: "show-progress",
+		Name: "show-progress",
 	}, {
-		name: "accept-preRelease",
+		Name: "accept-preRelease",
 	}, {
-		name: "pre",
+		Name: "pre",
 	}, {
-		name: "from-source",
+		Name: "from-source",
 	}, {
-		name: "from-branch",
+		Name: "from-branch",
 	}, {
-		name: "goget",
+		Name: "goget",
 	}, {
-		name: "download",
+		Name: "download",
 	}, {
-		name:      "force",
-		shorthand: "f",
+		Name:      "force",
+		Shorthand: "f",
 	}, {
-		name: "clean-package",
+		Name: "clean-package",
 	}, {
-		name:      "thread",
-		shorthand: "t",
+		Name:      "thread",
+		Shorthand: "t",
 	}, {
-		name: "keep-part",
+		Name: "keep-part",
 	}, {
-		name: "os",
+		Name: "os",
 	}, {
-		name: "arch",
+		Name: "arch",
+	}, {
+		Name: "proxy-github",
+	}, {
+		Name: "fetch",
+	}, {
+		Name: "provider",
 	}}
-	for i := range flags {
-		tt := flags[i]
-		t.Run(tt.name, func(t *testing.T) {
-			flag := cmd.Flag(tt.name)
-			assert.NotNil(t, flag)
-			assert.NotEmpty(t, flag.Usage)
-			assert.Equal(t, tt.shorthand, flag.Shorthand)
-		})
-	}
+	test.Valid(t, cmd.Flags())
 }
