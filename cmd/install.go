@@ -155,25 +155,31 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	process := &installer.Installer{
-		Source:           o.downloadOption.Output,
-		Name:             o.name,
-		Package:          o.Package,
-		Tar:              o.Tar,
-		Output:           o.Output,
-		CleanPackage:     o.CleanPackage,
-		AdditionBinaries: o.Package.AdditionBinaries,
+		Source:       o.downloadOption.Output,
+		Name:         o.name,
+		Package:      o.Package,
+		Tar:          o.Tar,
+		Output:       o.Output,
+		CleanPackage: o.CleanPackage,
 	}
-	// install requirements tools in the post phase
-	if len(o.Package.Requirements) > 0 {
-		if len(o.Package.PostInstalls) == 0 {
-			o.Package.PostInstalls = make([]installer.CmdWithArgs, 0)
-		}
-		for i := range o.Package.Requirements {
-			tool := o.Package.Requirements[i]
-			o.Package.PostInstalls = append(o.Package.PostInstalls, installer.CmdWithArgs{
-				Cmd:  "hd",
-				Args: []string{"install", tool},
-			})
+
+	// TODO consider how to handle if the package is missing
+	// maybe it's possible to provide a default strategy for it.
+	if o.Package != nil {
+		process.AdditionBinaries = o.Package.AdditionBinaries
+
+		// install requirements tools in the post phase
+		if len(o.Package.Requirements) > 0 {
+			if len(o.Package.PostInstalls) == 0 {
+				o.Package.PostInstalls = make([]installer.CmdWithArgs, 0)
+			}
+			for i := range o.Package.Requirements {
+				tool := o.Package.Requirements[i]
+				o.Package.PostInstalls = append(o.Package.PostInstalls, installer.CmdWithArgs{
+					Cmd:  "hd",
+					Args: []string{"install", tool},
+				})
+			}
 		}
 	}
 	err = process.Install()
