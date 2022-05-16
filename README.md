@@ -88,6 +88,13 @@ if err = is.CheckDepAndInstall(map[string]string{
 }
 ```
 
+## Install other services
+It supports to install other services, for example: `bitbucket`.
+
+```shell
+hd install bitbucket
+```
+
 # Features
 * go library for HTTP
 * multi-thread
