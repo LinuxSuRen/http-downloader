@@ -5,6 +5,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
 	"github.com/linuxsuren/http-downloader/pkg/os/brew"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
+	"github.com/linuxsuren/http-downloader/pkg/os/docker"
 	"github.com/linuxsuren/http-downloader/pkg/os/yum"
 )
 
@@ -22,6 +23,7 @@ func init() {
 	yum.SetInstallerRegistry(defaultInstallerRegistry)
 	apt.SetInstallerRegistry(defaultInstallerRegistry)
 	brew.SetInstallerRegistry(defaultInstallerRegistry)
+	docker.SetInstallerRegistry(defaultInstallerRegistry)
 }
 
 // Registry registries a DockerInstaller
