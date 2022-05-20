@@ -14,6 +14,7 @@ type HDConfig struct {
 	FormatOverrides  PackagingFormat   `yaml:"formatOverrides"`
 	Binary           string            `yaml:"binary"`
 	TargetBinary     string            `yaml:"targetBinary"`
+	TargetDirectory  string            `yaml:"targetDirectory"`
 	AdditionBinaries []string          `yaml:"additionBinaries"`
 	FromSource       bool              `yaml:"fromSource"`
 	URL              string            `yaml:"url"`
@@ -53,6 +54,7 @@ type Installer struct {
 	Package          *HDConfig
 	Tar              bool
 	Output           string
+	TargetDirectory  string
 	Source           string
 	Name             string
 	CleanPackage     bool
