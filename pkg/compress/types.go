@@ -38,7 +38,7 @@ func GetCompressor(extension string, additionBinaries []string) Compress {
 		return NewXz(additionBinaries)
 	case ".zip":
 		return NewZip(additionBinaries)
-	case ".gz", ".tar.gz":
+	case ".gz", ".tar.gz", ".tgz":
 		return NewGZip(additionBinaries)
 	case ".bz2":
 		return NewBzip2(additionBinaries)

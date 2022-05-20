@@ -134,13 +134,6 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	if o.Package.TargetDirectory == "" {
-		o.Package.TargetDirectory = "/usr/local/bin"
-	}
-	if err = sysos.MkdirAll(o.Package.TargetDirectory, 0750); err != nil {
-		return
-	}
-
 	// aka go get github.com/xxx/xxx
 	if o.fromSource {
 		err = o.installFromSource()
@@ -159,6 +152,13 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		if err = o.downloadOption.runE(cmd, args); err != nil {
 			return
 		}
+	}
+
+	if o.Package.TargetDirectory == "" {
+		o.Package.TargetDirectory = "/usr/local/bin"
+	}
+	if err = sysos.MkdirAll(o.Package.TargetDirectory, 0750); err != nil {
+		return
 	}
 
 	process := &installer.Installer{
