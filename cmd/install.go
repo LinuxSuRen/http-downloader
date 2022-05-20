@@ -134,6 +134,13 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
+	if o.Package.TargetDirectory == "" {
+		o.Package.TargetDirectory = "/usr/local/bin"
+	}
+	if err = sysos.MkdirAll(o.Package.TargetDirectory, 0750); err != nil {
+		return
+	}
+
 	// aka go get github.com/xxx/xxx
 	if o.fromSource {
 		err = o.installFromSource()
@@ -162,6 +169,7 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		Output:           o.Output,
 		CleanPackage:     o.CleanPackage,
 		AdditionBinaries: o.Package.AdditionBinaries,
+		TargetDirectory:  o.Package.TargetDirectory,
 	}
 	// install requirements tools in the post phase
 	if len(o.Package.Requirements) > 0 {
@@ -256,7 +264,7 @@ func (o *installOption) installFromSource() (err error) {
 		if o.Package != nil && o.Package.TargetBinary != "" {
 			targetName = o.Package.TargetBinary
 		}
-		err = is.OverWriteBinary(binaryPath, fmt.Sprintf("/usr/local/bin/%s", targetName))
+		err = is.OverWriteBinary(binaryPath, path.Join(o.Package.TargetDirectory, targetName))
 	}
 	return
 }

@@ -26,13 +26,13 @@ func (o *Installer) Install() (err error) {
 	if o.Tar {
 		if err = o.extractFiles(tarFile, o.Name); err == nil {
 			source = fmt.Sprintf("%s/%s", filepath.Dir(tarFile), o.Name)
-			target = fmt.Sprintf("/usr/local/bin/%s", targetBinary)
+			target = path.Join(o.TargetDirectory, targetBinary)
 		} else {
 			err = fmt.Errorf("cannot extract %s from tar file, error: %v", tarFile, err)
 		}
 	} else {
 		source = o.Source
-		target = fmt.Sprintf("/usr/local/bin/%s", targetBinary)
+		target = path.Join(o.TargetDirectory, targetBinary)
 	}
 
 	if err == nil {
@@ -51,7 +51,7 @@ func (o *Installer) Install() (err error) {
 
 			for i := range o.AdditionBinaries {
 				addition := o.AdditionBinaries[i]
-				if err = o.OverWriteBinary(addition, fmt.Sprintf("/usr/local/bin/%s", filepath.Base(addition))); err != nil {
+				if err = o.OverWriteBinary(addition, path.Join(o.TargetDirectory, filepath.Base(addition))); err != nil {
 					return
 				}
 			}
