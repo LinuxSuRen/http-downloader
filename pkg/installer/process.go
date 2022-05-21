@@ -2,14 +2,16 @@ package installer
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/common"
-	"github.com/linuxsuren/http-downloader/pkg/compress"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+
+	"github.com/linuxsuren/http-downloader/pkg/common"
+	"github.com/linuxsuren/http-downloader/pkg/compress"
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // Install installs a package
@@ -53,6 +55,28 @@ func (o *Installer) Install() (err error) {
 				addition := o.AdditionBinaries[i]
 				if err = o.OverWriteBinary(addition, path.Join(o.TargetDirectory, filepath.Base(addition))); err != nil {
 					return
+				}
+			}
+		}
+
+		if o.Package != nil {
+			for i := range o.Package.DefaultConfigFile {
+				configFile := o.Package.DefaultConfigFile[i]
+				configFilePath := configFile.Path
+				configDir := filepath.Dir(configFilePath)
+
+				if configFile.OS == runtime.GOOS {
+					if err = os.MkdirAll(configDir, 0755); err != nil {
+						err = fmt.Errorf("cannot create config dir: %s, error: %v", configDir, err)
+						return
+					}
+
+					if err = ioutil.WriteFile(configFilePath, []byte(configFile.Content), 0622); err != nil {
+						err = fmt.Errorf("cannot write config file: %s, error: %v", configFilePath, err)
+						return
+					}
+
+					fmt.Printf("config file [%s] is ready.\n", configFilePath)
 				}
 			}
 		}

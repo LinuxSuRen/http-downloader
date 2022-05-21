@@ -8,29 +8,37 @@ type PackagingFormat struct {
 
 // HDConfig is the config of http-downloader
 type HDConfig struct {
-	Name             string            `yaml:"name"`
-	Categories       []string          `yaml:"categories"`
-	Filename         string            `yaml:"filename"`
-	FormatOverrides  PackagingFormat   `yaml:"formatOverrides"`
-	Binary           string            `yaml:"binary"`
-	TargetBinary     string            `yaml:"targetBinary"`
-	TargetDirectory  string            `yaml:"targetDirectory"`
-	AdditionBinaries []string          `yaml:"additionBinaries"`
-	FromSource       bool              `yaml:"fromSource"`
-	URL              string            `yaml:"url"`
-	Tar              string            `yaml:"tar"`
-	LatestVersion    string            `yaml:"latestVersion"`
-	SupportOS        []string          `yaml:"supportOS"`
-	SupportArch      []string          `yaml:"supportArch"`
-	Replacements     map[string]string `yaml:"replacements"`
-	Requirements     []string          `yaml:"requirements"`
-	Installation     *CmdWithArgs      `yaml:"installation"`
-	PreInstalls      []CmdWithArgs     `yaml:"preInstalls"`
-	PostInstalls     []CmdWithArgs     `yaml:"postInstalls"`
-	TestInstalls     []CmdWithArgs     `yaml:"testInstalls"`
-	Version          string            `yaml:"version"`
+	Name              string            `yaml:"name"`
+	Categories        []string          `yaml:"categories"`
+	Filename          string            `yaml:"filename"`
+	FormatOverrides   PackagingFormat   `yaml:"formatOverrides"`
+	Binary            string            `yaml:"binary"`
+	TargetBinary      string            `yaml:"targetBinary"`
+	TargetDirectory   string            `yaml:"targetDirectory"`
+	AdditionBinaries  []string          `yaml:"additionBinaries"`
+	FromSource        bool              `yaml:"fromSource"`
+	URL               string            `yaml:"url"`
+	Tar               string            `yaml:"tar"`
+	LatestVersion     string            `yaml:"latestVersion"`
+	SupportOS         []string          `yaml:"supportOS"`
+	SupportArch       []string          `yaml:"supportArch"`
+	Replacements      map[string]string `yaml:"replacements"`
+	Requirements      []string          `yaml:"requirements"`
+	Installation      *CmdWithArgs      `yaml:"installation"`
+	DefaultConfigFile []ConfigFile      `yaml:"defaultConfigFiles"`
+	PreInstalls       []CmdWithArgs     `yaml:"preInstalls"`
+	PostInstalls      []CmdWithArgs     `yaml:"postInstalls"`
+	TestInstalls      []CmdWithArgs     `yaml:"testInstalls"`
+	Version           string            `yaml:"version"`
 
 	Org, Repo string
+}
+
+// ConfigFile represents a config file
+type ConfigFile struct {
+	OS      string `yaml:"os"`
+	Path    string `yaml:"path"`
+	Content string `yaml:"content"`
 }
 
 // CmdWithArgs is a command with arguments
