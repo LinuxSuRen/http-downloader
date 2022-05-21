@@ -9,7 +9,7 @@ require (
 	github.com/google/go-github/v29 v29.0.3
 	github.com/gosuri/uiprogress v0.0.1
 	github.com/h2non/gock v1.0.9
-	github.com/linuxsuren/cobra-extension v0.0.13
+	github.com/linuxsuren/cobra-extension v0.0.16
 	github.com/magiconair/properties v1.8.5
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32 // indirect
