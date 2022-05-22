@@ -124,7 +124,7 @@ func (i *genericPackage) IsService() bool {
 	return i.Service
 }
 func (i *genericPackage) WaitForStart() (bool, error) {
-	return false, nil
+	return true, nil
 }
 func (i *genericPackage) Start() error {
 	return nil
