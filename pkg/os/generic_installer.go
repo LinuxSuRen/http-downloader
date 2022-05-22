@@ -14,18 +14,23 @@ type genericPackages struct {
 	Packages []genericPackage `yaml:"packages"`
 }
 
+type preInstall struct {
+	HasIssuePrefix string      `yaml:"hasIssuePrefix"`
+	Cmd            CmdWithArgs `yaml:"cmd"`
+}
+
 type genericPackage struct {
-	Alias          string      `yaml:"alias"`
-	Name           string      `yaml:"name"`
-	OS             string      `yaml:"os"`
-	PackageManager string      `yaml:"packageManager"`
-	PreInstall     CmdWithArgs `yaml:"preInstall"`
-	Dependents     []string    `yaml:"dependents"`
-	InstallCmd     CmdWithArgs `yaml:"install"`
-	UninstallCmd   CmdWithArgs `yaml:"uninstall"`
-	Service        bool        `yaml:"isService"`
-	StartCmd       CmdWithArgs `yaml:"start"`
-	StopCmd        CmdWithArgs `yaml:"stop"`
+	Alias          string       `yaml:"alias"`
+	Name           string       `yaml:"name"`
+	OS             string       `yaml:"os"`
+	PackageManager string       `yaml:"packageManager"`
+	PreInstall     []preInstall `yaml:"preInstall"`
+	Dependents     []string     `yaml:"dependents"`
+	InstallCmd     CmdWithArgs  `yaml:"install"`
+	UninstallCmd   CmdWithArgs  `yaml:"uninstall"`
+	Service        bool         `yaml:"isService"`
+	StartCmd       CmdWithArgs  `yaml:"start"`
+	StopCmd        CmdWithArgs  `yaml:"stop"`
 
 	CommonInstaller core.Installer
 }
