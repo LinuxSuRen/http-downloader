@@ -2,12 +2,13 @@ package os
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
 	"github.com/linuxsuren/http-downloader/pkg/os/brew"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 	"github.com/linuxsuren/http-downloader/pkg/os/docker"
 	"github.com/linuxsuren/http-downloader/pkg/os/yum"
+	"github.com/mitchellh/go-homedir"
+	"path"
 	"path/filepath"
 )
 
@@ -27,10 +28,10 @@ func init() {
 	brew.SetInstallerRegistry(defaultInstallerRegistry)
 	docker.SetInstallerRegistry(defaultInstallerRegistry)
 
-	fetcher := &installer.DefaultFetcher{}
-	if configDir, err := fetcher.GetConfigDir(); err != nil {
-		fmt.Println(err)
-	} else {
+	var userHome string
+	var err error
+	if userHome, err = homedir.Dir(); err == nil {
+		configDir := path.Join(userHome, "/.config/hd-home")
 		if err = GenericInstallerRegistry(filepath.Join(configDir, "config/generic.yaml"), defaultInstallerRegistry); err != nil {
 			fmt.Println(err)
 		}
