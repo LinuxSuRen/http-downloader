@@ -2,11 +2,13 @@ package os
 
 import (
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
 	"github.com/linuxsuren/http-downloader/pkg/os/brew"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 	"github.com/linuxsuren/http-downloader/pkg/os/docker"
 	"github.com/linuxsuren/http-downloader/pkg/os/yum"
+	"path/filepath"
 )
 
 // DefaultInstallerRegistry is the default installer registry
@@ -24,6 +26,15 @@ func init() {
 	apt.SetInstallerRegistry(defaultInstallerRegistry)
 	brew.SetInstallerRegistry(defaultInstallerRegistry)
 	docker.SetInstallerRegistry(defaultInstallerRegistry)
+
+	fetcher := &installer.DefaultFetcher{}
+	if configDir, err := fetcher.GetConfigDir(); err != nil {
+		fmt.Println(err)
+	} else {
+		if err = GenericInstallerRegistry(filepath.Join(configDir, "config/generic.yaml"), defaultInstallerRegistry); err != nil {
+			fmt.Println(err)
+		}
+	}
 }
 
 // Registry registries a DockerInstaller
@@ -45,8 +56,8 @@ func GetInstallers(name string) (installers []core.Installer, ok bool) {
 // HasPackage finds if the target package installer exist
 func HasPackage(name string) bool {
 	if installers, ok := GetInstallers(name); ok {
-		for _, installer := range installers {
-			if installer.Available() {
+		for _, item := range installers {
+			if item.Available() {
 				return true
 			}
 		}
