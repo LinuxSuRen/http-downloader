@@ -7,6 +7,9 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 	"github.com/linuxsuren/http-downloader/pkg/os/docker"
 	"github.com/linuxsuren/http-downloader/pkg/os/yum"
+	"github.com/mitchellh/go-homedir"
+	"path"
+	"path/filepath"
 )
 
 // DefaultInstallerRegistry is the default installer registry
@@ -24,6 +27,15 @@ func init() {
 	apt.SetInstallerRegistry(defaultInstallerRegistry)
 	brew.SetInstallerRegistry(defaultInstallerRegistry)
 	docker.SetInstallerRegistry(defaultInstallerRegistry)
+
+	var userHome string
+	var err error
+	if userHome, err = homedir.Dir(); err == nil {
+		configDir := path.Join(userHome, "/.config/hd-home")
+		if err = GenericInstallerRegistry(filepath.Join(configDir, "config/generic.yaml"), defaultInstallerRegistry); err != nil {
+			fmt.Println(err)
+		}
+	}
 }
 
 // Registry registries a DockerInstaller
@@ -45,8 +57,8 @@ func GetInstallers(name string) (installers []core.Installer, ok bool) {
 // HasPackage finds if the target package installer exist
 func HasPackage(name string) bool {
 	if installers, ok := GetInstallers(name); ok {
-		for _, installer := range installers {
-			if installer.Available() {
+		for _, item := range installers {
+			if item.Available() {
 				return true
 			}
 		}
