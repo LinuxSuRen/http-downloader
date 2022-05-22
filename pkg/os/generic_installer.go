@@ -2,14 +2,15 @@ package os
 
 import (
 	"fmt"
+	"io/ioutil"
+	"runtime"
+	"strings"
+
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 	"github.com/linuxsuren/http-downloader/pkg/os/yum"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
-	"runtime"
-	"strings"
 )
 
 type genericPackages struct {
@@ -91,6 +92,7 @@ func (i *genericPackage) Install() (err error) {
 	for index := range i.PreInstall {
 		preInstall := i.PreInstall[index]
 
+		needInstall := false
 		if preInstall.IssuePrefix != "" && runtime.GOOS == "linux" {
 			var data []byte
 			if data, err = ioutil.ReadFile("/etc/issue"); err != nil {
@@ -98,9 +100,15 @@ func (i *genericPackage) Install() (err error) {
 			}
 
 			if strings.HasPrefix(string(data), preInstall.IssuePrefix) {
-				if err = exec.RunCommand(preInstall.Cmd.Cmd, preInstall.Cmd.Args...); err != nil {
-					return
-				}
+				needInstall = true
+			}
+		} else if preInstall.IssuePrefix == "" {
+			needInstall = true
+		}
+
+		if needInstall {
+			if err = exec.RunCommand(preInstall.Cmd.Cmd, preInstall.Cmd.Args...); err != nil {
+				return
 			}
 		}
 	}
