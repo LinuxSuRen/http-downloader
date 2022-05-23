@@ -14,8 +14,7 @@ Install it via: `brew install linuxsuren/linuxsuren/hd`
 
 Or download it directly (for Linux):
 ```
-curl -L https://github.com/linuxsuren/http-downloader/releases/latest/download/hd-linux-amd64.tar.gz | tar xzv hd
-mv hd /usr/bin/hd
+curl https://linuxsuren.github.io/tools/install.sh|sh
 ```
 
 Or download it via proxy:
@@ -36,7 +35,7 @@ hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-l
 Or use a simple way instead of typing the whole URL:
 
 ```shell
-hd get jenkins-zh/jenkins-cli/jcli -t 6
+hd get jcli
 ```
 
 Or you might want to download a pre-released binary package from GitHub:
@@ -49,7 +48,7 @@ hd get --pre ks
 You can also install a package from GitHub:
 
 ```shell
-hd install jenkins-zh/jenkins-cli/jcli -t 6
+hd install jcli -t 6
 ```
 
 or install by a category name:
