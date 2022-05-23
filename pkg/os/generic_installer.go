@@ -11,6 +11,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
 	"github.com/linuxsuren/http-downloader/pkg/os/brew"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
+	"github.com/linuxsuren/http-downloader/pkg/os/generic"
 	"github.com/linuxsuren/http-downloader/pkg/os/yum"
 	"gopkg.in/yaml.v3"
 )
@@ -81,6 +82,19 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 			genericPackage.CommonInstaller = &brew.CommonInstaller{Name: genericPackage.Name}
 		case "apk":
 			genericPackage.CommonInstaller = &apk.CommonInstaller{Name: genericPackage.Name}
+		default:
+			genericPackage.CommonInstaller = &generic.CommonInstaller{
+				Name: genericPackage.Name,
+				OS:   genericPackage.OS,
+				InstallCmd: generic.CmdWithArgs{
+					Cmd:  genericPackage.InstallCmd.Cmd,
+					Args: genericPackage.InstallCmd.Args,
+				},
+				UninstallCmd: generic.CmdWithArgs{
+					Cmd:  genericPackage.UninstallCmd.Cmd,
+					Args: genericPackage.UninstallCmd.Args,
+				},
+			}
 		}
 
 		registry.Registry(genericPackage.Name, &genericPackage)
