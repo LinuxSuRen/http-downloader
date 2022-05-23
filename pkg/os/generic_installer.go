@@ -2,6 +2,7 @@ package os
 
 import (
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/os/apk"
 	"io/ioutil"
 	"runtime"
 	"strings"
@@ -78,6 +79,8 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 			genericPackage.CommonInstaller = &yum.CommonInstaller{Name: genericPackage.Name}
 		case "brew":
 			genericPackage.CommonInstaller = &brew.CommonInstaller{Name: genericPackage.Name}
+		case "apk":
+			genericPackage.CommonInstaller = &apk.CommonInstaller{Name: genericPackage.Name}
 		}
 
 		registry.Registry(genericPackage.Name, &genericPackage)
