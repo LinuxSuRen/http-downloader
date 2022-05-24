@@ -3,6 +3,7 @@ package os
 import (
 	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/os/apk"
+	"github.com/linuxsuren/http-downloader/pkg/os/snap"
 	"io/ioutil"
 	"runtime"
 	"strings"
@@ -82,6 +83,11 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 			genericPackage.CommonInstaller = &brew.CommonInstaller{Name: genericPackage.Name}
 		case "apk":
 			genericPackage.CommonInstaller = &apk.CommonInstaller{Name: genericPackage.Name}
+		case snap.SnapName:
+			genericPackage.CommonInstaller = &snap.CommonInstaller{
+				Name: genericPackage.Name,
+				Args: genericPackage.InstallCmd.Args,
+			}
 		default:
 			genericPackage.CommonInstaller = &generic.CommonInstaller{
 				Name: genericPackage.Name,

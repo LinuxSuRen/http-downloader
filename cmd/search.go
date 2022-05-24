@@ -14,10 +14,11 @@ func newSearchCmd(context.Context) (cmd *cobra.Command) {
 	opt := &searchOption{}
 
 	cmd = &cobra.Command{
-		Use:   "search",
-		Short: "Search packages from the hd config repo",
-		Args:  cobra.MinimumNArgs(1),
-		RunE:  opt.runE,
+		Use:     "search",
+		Aliases: []string{"s", "find", "f"},
+		Short:   "Search packages from the hd config repo",
+		Args:    cobra.MinimumNArgs(1),
+		RunE:    opt.runE,
 	}
 	opt.addFlags(cmd.Flags())
 	return
