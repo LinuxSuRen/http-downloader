@@ -45,8 +45,9 @@ type genericPackage struct {
 
 // CmdWithArgs is a command with arguments
 type CmdWithArgs struct {
-	Cmd  string   `yaml:"cmd"`
-	Args []string `yaml:"args"`
+	Cmd        string   `yaml:"cmd"`
+	Args       []string `yaml:"args"`
+	SystemCall bool     `yaml:"systemCall"`
 }
 
 func parseGenericPackages(configFile string, genericPackages *genericPackages) (err error) {
@@ -93,12 +94,14 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 				Name: genericPackage.Name,
 				OS:   genericPackage.OS,
 				InstallCmd: generic.CmdWithArgs{
-					Cmd:  genericPackage.InstallCmd.Cmd,
-					Args: genericPackage.InstallCmd.Args,
+					Cmd:        genericPackage.InstallCmd.Cmd,
+					Args:       genericPackage.InstallCmd.Args,
+					SystemCall: genericPackage.InstallCmd.SystemCall,
 				},
 				UninstallCmd: generic.CmdWithArgs{
-					Cmd:  genericPackage.UninstallCmd.Cmd,
-					Args: genericPackage.UninstallCmd.Args,
+					Cmd:        genericPackage.UninstallCmd.Cmd,
+					Args:       genericPackage.UninstallCmd.Args,
+					SystemCall: genericPackage.UninstallCmd.SystemCall,
 				},
 			}
 		}
