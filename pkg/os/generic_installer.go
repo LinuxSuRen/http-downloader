@@ -3,6 +3,7 @@ package os
 import (
 	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/os/apk"
+	"github.com/linuxsuren/http-downloader/pkg/os/dnf"
 	"github.com/linuxsuren/http-downloader/pkg/os/snap"
 	"io/ioutil"
 	"runtime"
@@ -88,6 +89,10 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 			genericPackage.CommonInstaller = &snap.CommonInstaller{
 				Name: genericPackage.Name,
 				Args: genericPackage.InstallCmd.Args,
+			}
+		case dnf.DNFName:
+			genericPackage.CommonInstaller = &dnf.CommonInstaller{
+				Name: genericPackage.Name,
 			}
 		default:
 			genericPackage.CommonInstaller = &generic.CommonInstaller{
