@@ -1,36 +1,34 @@
-package apk
+package npm
 
 import (
 	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
-	"runtime"
 )
 
-// CommonInstaller is the installer of a common apk
+// NPMName is the name of npm
+const NPMName = "npm"
+
+// CommonInstaller is the installer of a common npm
 type CommonInstaller struct {
 	Name string
 }
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
-		_, err := exec.LookPath("apk")
-		ok = err == nil
-	}
+	_, err := exec.LookPath("npm")
+	ok = err == nil
 	return
 }
 
 // Install installs the target package
 func (d *CommonInstaller) Install() (err error) {
-	if err = exec.RunCommand("apk", "add", d.Name); err != nil {
-		return
-	}
+	err = exec.RunCommand("npm", "i", "-g", d.Name)
 	return
 }
 
 // Uninstall uninstalls the target package
 func (d *CommonInstaller) Uninstall() (err error) {
-	err = exec.RunCommand("apk", "del", d.Name)
+	err = exec.RunCommand("npm", "uninstall", "-g", d.Name)
 	return
 }
 

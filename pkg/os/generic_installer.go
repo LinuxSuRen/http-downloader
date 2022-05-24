@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg/os/apk"
 	"github.com/linuxsuren/http-downloader/pkg/os/dnf"
+	"github.com/linuxsuren/http-downloader/pkg/os/npm"
 	"github.com/linuxsuren/http-downloader/pkg/os/snap"
 	"io/ioutil"
 	"runtime"
@@ -92,6 +93,10 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 			}
 		case dnf.DNFName:
 			genericPackage.CommonInstaller = &dnf.CommonInstaller{
+				Name: genericPackage.Name,
+			}
+		case npm.NPMName:
+			genericPackage.CommonInstaller = &npm.CommonInstaller{
 				Name: genericPackage.Name,
 			}
 		default:
