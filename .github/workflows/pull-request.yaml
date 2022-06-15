@@ -38,7 +38,7 @@ jobs:
           sudo ./release/http-downloader_linux_amd64_v1/hd install ks
           ks version
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.2.1
+        uses: aquasecurity/trivy-action@0.4.0
         if: github.event_name == 'pull_request'
         with:
           scan-type: 'fs'
