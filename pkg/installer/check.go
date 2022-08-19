@@ -3,15 +3,6 @@ package installer
 import (
 	"bytes"
 	"fmt"
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/linuxsuren/http-downloader/pkg"
-	"github.com/linuxsuren/http-downloader/pkg/common"
-	"github.com/linuxsuren/http-downloader/pkg/compress"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
-	"github.com/linuxsuren/http-downloader/pkg/net"
-	"github.com/linuxsuren/http-downloader/pkg/os"
-	"github.com/mitchellh/go-homedir"
-	"gopkg.in/yaml.v2"
 	"io/fs"
 	"io/ioutil"
 	"net/http"
@@ -22,6 +13,16 @@ import (
 	"runtime"
 	"strings"
 	"text/template"
+
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/linuxsuren/http-downloader/pkg"
+	"github.com/linuxsuren/http-downloader/pkg/common"
+	"github.com/linuxsuren/http-downloader/pkg/compress"
+	"github.com/linuxsuren/http-downloader/pkg/exec"
+	"github.com/linuxsuren/http-downloader/pkg/net"
+	"github.com/linuxsuren/http-downloader/pkg/os"
+	"github.com/mitchellh/go-homedir"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -31,8 +32,12 @@ const (
 
 // CheckDepAndInstall checks the desired tools, install the missing packages
 func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
+	if o.Execer == nil {
+		o.Execer = &exec.DefaultExecer{}
+	}
+
 	for tool, formula := range tools {
-		if _, lookErr := exec.LookPath(tool); lookErr == nil {
+		if _, lookErr := o.Execer.LookPath(tool); lookErr == nil {
 			continue
 		}
 

@@ -7,7 +7,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"net/http"
 	"net/url"
 	sysos "os"
