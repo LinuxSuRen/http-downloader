@@ -66,7 +66,7 @@ func (o *Installer) Install() (err error) {
 				configDir := filepath.Dir(configFilePath)
 
 				if configFile.OS == runtime.GOOS {
-					if err = os.MkdirAll(configDir, 0755); err != nil {
+					if err = os.MkdirAll(configDir, 0750); err != nil {
 						err = fmt.Errorf("cannot create config dir: %s, error: %v", configDir, err)
 						return
 					}
