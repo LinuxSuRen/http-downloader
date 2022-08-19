@@ -3,17 +3,18 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg"
-	"github.com/linuxsuren/http-downloader/pkg/installer"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 	"net/http"
 	"net/url"
 	sysos "os"
 	"path"
 	"runtime"
 	"strings"
+
+	"github.com/linuxsuren/http-downloader/pkg"
+	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // newGetCmd return the get command
@@ -95,6 +96,7 @@ type downloadOption struct {
 	Package *installer.HDConfig
 	org     string
 	repo    string
+	fetcher installer.Fetcher
 }
 
 const (
@@ -111,8 +113,10 @@ func (o *downloadOption) fetch() (err error) {
 
 	// fetch the latest config
 	fmt.Println("start to fetch the config")
-	fetcher := &installer.DefaultFetcher{}
-	if err = fetcher.FetchLatestRepo(o.Provider, installer.ConfigBranch, sysos.Stdout); err != nil {
+	if o.fetcher == nil {
+		o.fetcher = &installer.DefaultFetcher{}
+	}
+	if err = o.fetcher.FetchLatestRepo(o.Provider, installer.ConfigBranch, sysos.Stdout); err != nil {
 		err = fmt.Errorf("unable to fetch the latest config, error: %v", err)
 		return
 	}
