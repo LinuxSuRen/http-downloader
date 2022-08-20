@@ -3,6 +3,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	sysos "os"
+	"path"
+	"runtime"
+	"strings"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
@@ -10,10 +15,6 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	sysos "os"
-	"path"
-	"runtime"
-	"strings"
 )
 
 // newInstallCmd returns the install command
@@ -22,6 +23,7 @@ func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 		downloadOption: downloadOption{
 			RoundTripper: getRoundTripper(ctx),
 		},
+		execer: &exec.DefaultExecer{},
 	}
 	cmd = &cobra.Command{
 		Use:     "install",
@@ -79,10 +81,11 @@ type installOption struct {
 	// inner fields
 	nativePackage bool
 	tool          string
+	execer        exec.Execer
 }
 
 func (o *installOption) shouldInstall() (should, exist bool) {
-	if _, lookErr := exec.LookPath(o.tool); lookErr == nil {
+	if _, lookErr := o.execer.LookPath(o.tool); lookErr == nil {
 		exist = true
 	}
 	should = o.force || !exist

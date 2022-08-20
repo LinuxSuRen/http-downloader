@@ -8,9 +8,25 @@ import (
 	"sync"
 )
 
+// Execer is an interface for OS-related operations
+type Execer interface {
+	LookPath(string) (string, error)
+}
+
+// DefaultExecer is a wrapper for the OS exec
+type DefaultExecer struct {
+}
+
 // LookPath is the wrapper of os/exec.LookPath
-func LookPath(file string) (string, error) {
+func (e DefaultExecer) LookPath(file string) (string, error) {
 	return exec.LookPath(file)
+}
+
+// LookPath is the wrapper of os/exec.LookPath
+//
+// Deprecated: Use DefaultExecer.LookPath instead
+func LookPath(file string) (string, error) {
+	return DefaultExecer{}.LookPath(file)
 }
 
 // RunCommandAndReturn runs a command, then returns the output

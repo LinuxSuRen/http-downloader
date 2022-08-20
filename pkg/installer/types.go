@@ -1,5 +1,7 @@
 package installer
 
+import "github.com/linuxsuren/http-downloader/pkg/exec"
+
 // PackagingFormat is used for containing config depending on machine
 type PackagingFormat struct {
 	Windows string `yaml:"windows"`
@@ -74,4 +76,6 @@ type Installer struct {
 
 	Org  string
 	Repo string
+
+	Execer exec.Execer
 }

@@ -3,12 +3,13 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"runtime"
+
 	extpkg "github.com/linuxsuren/cobra-extension/pkg"
 	extver "github.com/linuxsuren/cobra-extension/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
-	"runtime"
 )
 
 // NewRoot returns the root command
@@ -42,8 +43,13 @@ func loadConfig() (err error) {
 		}
 	}
 	viper.SetDefault("provider", ProviderGitHub)
-	viper.SetDefault("fetch", true)
-	viper.SetDefault("thread", runtime.NumCPU()/2)
+	viper.SetDefault("fetch", false)
 	viper.SetDefault("goget", false)
+
+	thread := runtime.NumCPU()
+	if thread > 4 {
+		thread = thread / 2
+	}
+	viper.SetDefault("thread", thread)
 	return
 }

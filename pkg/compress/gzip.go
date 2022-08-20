@@ -25,8 +25,8 @@ var _ Compress = &GZip{}
 
 // ExtractFiles extracts files from a target compress file
 func (c *GZip) ExtractFiles(sourceFile, targetName string) (err error) {
-	if targetName == "" {
-		err = errors.New("target filename is empty")
+	if sourceFile == "" || targetName == "" {
+		err = errors.New("source or target filename is empty")
 		return
 	}
 

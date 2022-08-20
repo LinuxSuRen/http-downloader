@@ -24,8 +24,8 @@ var _ Compress = &Bzip2{}
 
 // ExtractFiles extracts files from a target compress file
 func (x *Bzip2) ExtractFiles(sourceFile, targetName string) (err error) {
-	if targetName == "" {
-		err = errors.New("target filename is empty")
+	if sourceFile == "" || targetName == "" {
+		err = errors.New("source or target filename is empty")
 		return
 	}
 	var f *os.File

@@ -23,10 +23,10 @@ func extraFile(name, targetName, tarFile string, header *tar.Header, tarReader *
 		os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)); err != nil {
 		return
 	}
-	if _, err = io.Copy(targetFile, tarReader); err != nil {
-		return
-	}
-	_ = targetFile.Close()
+	defer func() {
+		_ = targetFile.Close()
+	}()
+	_, err = io.Copy(targetFile, tarReader)
 	return
 }
 

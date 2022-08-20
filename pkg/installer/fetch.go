@@ -2,15 +2,16 @@ package installer
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"path"
+	"strings"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/mitchellh/go-homedir"
-	"io"
-	"os"
-	"path"
-	"strings"
 )
 
 const (

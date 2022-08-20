@@ -2,13 +2,15 @@ package installer
 
 import (
 	"fmt"
-	"github.com/h2non/gock"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"os"
 	"path"
 	"runtime"
 	"testing"
+
+	"github.com/h2non/gock"
+	"github.com/linuxsuren/http-downloader/pkg/exec"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetVersion(t *testing.T) {
@@ -72,6 +74,11 @@ func TestGetVersion(t *testing.T) {
 				assert.Equal(t, o.Name, "kustomize")
 			},
 			wantErr: false,
+		},
+		{
+			name:    "invalid version",
+			appInfo: "xx@xx@xx",
+			wantErr: true,
 		},
 	}
 
@@ -150,6 +157,11 @@ func TestProviderURLParseNoConfig(t *testing.T) {
 				assert.Equal(t, packageURL, expectURL)
 			},
 			wantErr: false,
+		},
+		{
+			name:       "invalid version",
+			packageURL: "xx@xx@xx",
+			wantErr:    true,
 		},
 	}
 
@@ -413,4 +425,18 @@ func Test_getDynamicVersion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCheckDepAndInstall(t *testing.T) {
+	installer := &Installer{
+		Execer: &exec.FakeExecer{},
+	}
+
+	err := installer.CheckDepAndInstall(map[string]string{})
+	assert.Nil(t, err)
+
+	err = installer.CheckDepAndInstall(map[string]string{
+		"fake": "fake",
+	})
+	assert.Nil(t, err)
 }
