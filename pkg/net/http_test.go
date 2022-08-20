@@ -232,3 +232,28 @@ func TestSetProxy(t *testing.T) {
 		})
 	}
 }
+
+func TestDetectSize(t *testing.T) {
+	const targetURL = "https://foo.com/"
+	ctrl := gomock.NewController(t)
+	roundTripper := mhttp.NewMockRoundTripper(ctrl)
+
+	mockRequest, _ := http.NewRequest(http.MethodGet, targetURL, nil)
+	mockRequest.Header.Set("Range", "bytes=2-")
+	mockResponse := &http.Response{
+		StatusCode: http.StatusPartialContent,
+		Proto:      "HTTP/1.1",
+		Request:    mockRequest,
+		Header: map[string][]string{
+			"Content-Length": {"100"},
+		},
+		Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+	}
+	roundTripper.EXPECT().
+		RoundTrip(mockRequest).Return(mockResponse, nil)
+
+	total, rangeSupport, err := net.DetectSizeWithRoundTripper(targetURL, os.TempDir(), false, roundTripper)
+	assert.Nil(t, err)
+	assert.Equal(t, int64(102), total)
+	assert.True(t, rangeSupport)
+}

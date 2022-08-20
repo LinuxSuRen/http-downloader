@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/xi2/xz"
 	"io"
-	"log"
 	"os"
 )
 
@@ -25,8 +24,8 @@ var _ Compress = &Xz{}
 
 // ExtractFiles extracts files from a target compress file
 func (x *Xz) ExtractFiles(sourceFile, targetName string) (err error) {
-	if targetName == "" {
-		err = errors.New("target filename is empty")
+	if sourceFile == "" || targetName == "" {
+		err = errors.New("source or target filename is empty")
 		return
 	}
 	var f *os.File
@@ -40,7 +39,6 @@ func (x *Xz) ExtractFiles(sourceFile, targetName string) (err error) {
 	// Create a xz Reader
 	r, err := xz.NewReader(f, 0)
 	if err != nil {
-		log.Fatal(err)
 		return
 	}
 
@@ -54,7 +52,6 @@ func (x *Xz) ExtractFiles(sourceFile, targetName string) (err error) {
 			break
 		}
 		if err != nil {
-			log.Fatal(err)
 			return
 		}
 		name := header.Name

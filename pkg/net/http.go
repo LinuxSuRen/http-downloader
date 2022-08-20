@@ -295,11 +295,19 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 }
 
 // DetectSize returns the size of target resource
-func DetectSize(targetURL, output string, showProgress bool) (total int64, rangeSupport bool, err error) {
+//
+// Deprecated, use DetectSizeWithRoundTripper instead
+func DetectSize(targetURL, output string, showProgress bool) (int64, bool, error) {
+	return DetectSizeWithRoundTripper(targetURL, output, showProgress, nil)
+}
+
+// DetectSizeWithRoundTripper returns the size of target resource
+func DetectSizeWithRoundTripper(targetURL, output string, showProgress bool, roundTripper http.RoundTripper) (total int64, rangeSupport bool, err error) {
 	downloader := HTTPDownloader{
 		TargetFilePath: output,
 		URL:            targetURL,
 		ShowProgress:   showProgress,
+		RoundTripper:   roundTripper,
 	}
 
 	var detectOffset int64

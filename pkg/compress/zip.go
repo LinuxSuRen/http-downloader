@@ -2,6 +2,7 @@ package compress
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,8 +25,15 @@ var _ Compress = &Zip{}
 
 // ExtractFiles extracts files from a target compress file
 func (z *Zip) ExtractFiles(sourceFile, targetName string) (err error) {
+	if sourceFile == "" || targetName == "" {
+		err = errors.New("source or target filename is empty")
+		return
+	}
+
 	var archive *zip.ReadCloser
-	archive, err = zip.OpenReader(sourceFile)
+	if archive, err = zip.OpenReader(sourceFile); err != nil {
+		return
+	}
 	defer func() {
 		_ = archive.Close()
 	}()
