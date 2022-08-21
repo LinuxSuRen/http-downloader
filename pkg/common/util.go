@@ -72,8 +72,8 @@ func CheckDirPermission(dir string, perm os.FileMode) error {
 
 // Exist returns true if a file or directory exists.
 func Exist(name string) bool {
-	_, err := os.Stat(name)
-	return err == nil
+	ok, _ := PathExists(name)
+	return ok
 }
 
 // ParseVersionNum split version from release or tag
