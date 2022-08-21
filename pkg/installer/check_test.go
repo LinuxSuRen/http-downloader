@@ -440,3 +440,70 @@ func TestCheckDepAndInstall(t *testing.T) {
 	})
 	assert.Nil(t, err)
 }
+
+func TestIsSupport(t *testing.T) {
+	type args struct {
+		cfg HDConfig
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{{
+		name: "support case",
+		args: args{
+			cfg: HDConfig{
+				SupportOS:   []string{runtime.GOOS},
+				SupportArch: []string{runtime.GOARCH},
+			},
+		},
+		want: true,
+	}, {
+		name: "not os and arch setting",
+		want: true,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, IsSupport(tt.args.cfg), "IsSupport(%v)", tt.args.cfg)
+		})
+	}
+}
+
+func Test_getVersionOrDefault(t *testing.T) {
+	type args struct {
+		version    string
+		defaultVer string
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantTarget string
+		prepare    func(string)
+	}{{
+		name: "version is not a HTTP",
+		args: args{
+			version:    "v1.2.3",
+			defaultVer: "1.2.3",
+		},
+		wantTarget: "1.2.3",
+	}, {
+		name: "version is a HTTP address",
+		args: args{
+			version:    "https://foo.com/",
+			defaultVer: "",
+		},
+		wantTarget: "v1.2.3",
+		prepare: func(address string) {
+			gock.New(address).Get("/").Reply(http.StatusOK).BodyString("v1.2.3")
+		},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			if tt.prepare != nil {
+				tt.prepare(tt.args.version)
+			}
+			assert.Equalf(t, tt.wantTarget, getVersionOrDefault(tt.args.version, tt.args.defaultVer), "getVersionOrDefault(%v, %v)", tt.args.version, tt.args.defaultVer)
+		})
+	}
+}
