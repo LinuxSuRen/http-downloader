@@ -51,6 +51,8 @@ func Test_newInstallCmd(t *testing.T) {
 		Name: "fetch",
 	}, {
 		Name: "provider",
+	}, {
+		Name: "no-proxy",
 	}}
 	test.Valid(t, cmd.Flags())
 }

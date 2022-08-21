@@ -82,8 +82,8 @@ func ParseVersionNum(release string) string {
 }
 
 // GetEnvironment retrieves the value of the environment variable named by the key.
-// If the environment dosen't exist, we will lookup for alternative environment variables
-// unti we find an environment. Return empty environment value while no environment variables found.
+// If the environment doesn't exist, we will lookup for alternative environment variables
+// until we find an environment. Return empty environment value while no environment variables found.
 func GetEnvironment(key string, alternativeKeys ...string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value

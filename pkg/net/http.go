@@ -34,6 +34,7 @@ type HTTPDownloader struct {
 	UserName string
 	Password string
 
+	NoProxy   bool
 	Proxy     string
 	ProxyAuth string
 
@@ -116,14 +117,17 @@ func (h *HTTPDownloader) DownloadFile() error {
 		trp := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: h.InsecureSkipVerify},
 		}
-		h.fetchProxyFromEnv(req.URL.Scheme)
-		if err = SetProxy(h.Proxy, h.ProxyAuth, trp); err != nil {
-			return err
-		}
 
-		if h.Proxy != "" {
-			basicAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(h.ProxyAuth))
-			req.Header.Add("Proxy-Authorization", basicAuth)
+		if !h.NoProxy {
+			h.fetchProxyFromEnv(req.URL.Scheme)
+			if err = SetProxy(h.Proxy, h.ProxyAuth, trp); err != nil {
+				return err
+			}
+
+			if h.Proxy != "" {
+				basicAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(h.ProxyAuth))
+				req.Header.Add("Proxy-Authorization", basicAuth)
+			}
 		}
 		tr = trp
 	}
@@ -194,12 +198,44 @@ func DownloadFileWithMultipleThread(targetURL, targetFilePath string, thread int
 	return DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath, thread, false, showProgress)
 }
 
-// DownloadFileWithMultipleThreadKeepParts downloads the files with multiple threads
-func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, thread int, keepParts, showProgress bool) (err error) {
+// MultiThreadDownloader is a download with multi-thread
+type MultiThreadDownloader struct {
+	noProxy                 bool
+	keepParts, showProgress bool
+
+	roundTripper http.RoundTripper
+}
+
+// WithoutProxy indicates not use HTTP proxy
+func (d *MultiThreadDownloader) WithoutProxy(noProxy bool) *MultiThreadDownloader {
+	d.noProxy = noProxy
+	return d
+}
+
+// WithShowProgress indicate if show the download progress
+func (d *MultiThreadDownloader) WithShowProgress(showProgress bool) *MultiThreadDownloader {
+	d.showProgress = showProgress
+	return d
+}
+
+// WithKeepParts indicates if keeping the part files
+func (d *MultiThreadDownloader) WithKeepParts(keepParts bool) *MultiThreadDownloader {
+	d.keepParts = keepParts
+	return d
+}
+
+// WithRoundTripper sets RoundTripper
+func (d *MultiThreadDownloader) WithRoundTripper(roundTripper http.RoundTripper) *MultiThreadDownloader {
+	d.roundTripper = roundTripper
+	return d
+}
+
+// Download starts to download the target URL
+func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, thread int) (err error) {
 	// get the total size of the target file
 	var total int64
 	var rangeSupport bool
-	if total, rangeSupport, err = DetectSize(targetURL, targetFilePath, true); err != nil {
+	if total, rangeSupport, err = DetectSizeWithRoundTripper(targetURL, targetFilePath, true, d.noProxy, d.roundTripper); err != nil {
 		return
 	}
 
@@ -222,8 +258,10 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 				start := unit * int64(index)
 
 				downloader := &ContinueDownloader{}
+				downloader.WithoutProxy(d.noProxy).
+					WithRoundTripper(d.roundTripper)
 				if downloadErr := downloader.DownloadWithContinue(targetURL, fmt.Sprintf("%s-%d", targetFilePath, index),
-					int64(index), start, end, showProgress); downloadErr != nil {
+					int64(index), start, end, d.showProgress); downloadErr != nil {
 					fmt.Println(downloadErr)
 				}
 			}(i, &wg)
@@ -245,7 +283,7 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 					if _, err = f.Write(data); err != nil {
 						err = fmt.Errorf("failed to write file: '%s'", partFile)
 						break
-					} else if !keepParts {
+					} else if !d.keepParts {
 						_ = os.RemoveAll(partFile)
 					}
 				} else {
@@ -257,14 +295,38 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 	} else {
 		fmt.Println("cannot download it using multiple threads, failed to one")
 		downloader := &ContinueDownloader{}
+		downloader.WithoutProxy(d.noProxy)
+		downloader.WithRoundTripper(d.roundTripper)
 		err = downloader.DownloadWithContinue(targetURL, targetFilePath, -1, 0, 0, true)
 	}
 	return
 }
 
+// DownloadFileWithMultipleThreadKeepParts downloads the files with multiple threads
+func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, thread int, keepParts, showProgress bool) (err error) {
+	downloader := &MultiThreadDownloader{}
+	downloader.WithKeepParts(keepParts).WithShowProgress(showProgress)
+	return downloader.Download(targetURL, targetFilePath, thread)
+}
+
 // ContinueDownloader is a downloader which support continuously download
 type ContinueDownloader struct {
 	downloader *HTTPDownloader
+
+	roundTripper http.RoundTripper
+	noProxy      bool
+}
+
+// WithRoundTripper set WithRoundTripper
+func (c *ContinueDownloader) WithRoundTripper(roundTripper http.RoundTripper) *ContinueDownloader {
+	c.roundTripper = roundTripper
+	return c
+}
+
+// WithoutProxy indicate no HTTP proxy use
+func (c *ContinueDownloader) WithoutProxy(noProxy bool) *ContinueDownloader {
+	c.noProxy = noProxy
+	return c
 }
 
 // DownloadWithContinue downloads the files continuously
@@ -273,6 +335,8 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 		TargetFilePath: output,
 		URL:            targetURL,
 		ShowProgress:   showProgress,
+		NoProxy:        c.noProxy,
+		RoundTripper:   c.roundTripper,
 	}
 	if index >= 0 {
 		c.downloader.Title = fmt.Sprintf("Downloading part %d", index)
@@ -298,16 +362,17 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 //
 // Deprecated, use DetectSizeWithRoundTripper instead
 func DetectSize(targetURL, output string, showProgress bool) (int64, bool, error) {
-	return DetectSizeWithRoundTripper(targetURL, output, showProgress, nil)
+	return DetectSizeWithRoundTripper(targetURL, output, showProgress, false, nil)
 }
 
 // DetectSizeWithRoundTripper returns the size of target resource
-func DetectSizeWithRoundTripper(targetURL, output string, showProgress bool, roundTripper http.RoundTripper) (total int64, rangeSupport bool, err error) {
+func DetectSizeWithRoundTripper(targetURL, output string, showProgress bool, noProxy bool, roundTripper http.RoundTripper) (total int64, rangeSupport bool, err error) {
 	downloader := HTTPDownloader{
 		TargetFilePath: output,
 		URL:            targetURL,
 		ShowProgress:   showProgress,
 		RoundTripper:   roundTripper,
+		NoProxy:        noProxy,
 	}
 
 	var detectOffset int64
