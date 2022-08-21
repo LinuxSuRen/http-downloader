@@ -12,6 +12,7 @@ import (
 
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/linuxsuren/http-downloader/pkg/net"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -43,6 +44,7 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 		`The default timeout in seconds with the HTTP request`)
 	flags.IntVarP(&opt.MaxAttempts, "max-attempts", "", 10,
 		`Max times to attempt to download, zero means there's no retry action'`)
+	flags.BoolVarP(&opt.NoProxy, "no-proxy", "", false, "Indicate no HTTP proxy taken")
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.Int64VarP(&opt.ContinueAt, "continue-at", "", -1, "ContinueAt")
 	flags.IntVarP(&opt.Thread, "thread", "t", viper.GetInt("thread"),
@@ -74,6 +76,7 @@ type downloadOption struct {
 	Output           string
 	ShowProgress     bool
 	Timeout          int
+	NoProxy          bool
 	MaxAttempts      int
 	AcceptPreRelease bool
 	RoundTripper     http.RoundTripper
@@ -216,9 +219,17 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 
 	cmd.Printf("start to download from %s\n", o.URL)
 	if o.Thread <= 1 {
-		err = pkg.DownloadWithContinue(o.URL, o.Output, o.ContinueAt, -1, 0, o.ShowProgress)
+		downloader := &net.ContinueDownloader{}
+		downloader.WithoutProxy(o.NoProxy).
+			WithRoundTripper(o.RoundTripper)
+		err = downloader.DownloadWithContinue(o.URL, o.Output, o.ContinueAt, -1, 0, o.ShowProgress)
 	} else {
-		err = pkg.DownloadFileWithMultipleThreadKeepParts(o.URL, o.Output, o.Thread, o.KeepPart, o.ShowProgress)
+		downloader := &net.MultiThreadDownloader{}
+		downloader.WithKeepParts(o.KeepPart).
+			WithShowProgress(o.ShowProgress).
+			WithoutProxy(o.NoProxy).
+			WithRoundTripper(o.RoundTripper)
+		err = downloader.Download(o.URL, o.Output, o.Thread)
 	}
 	return
 }

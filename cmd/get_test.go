@@ -1,10 +1,19 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path"
 	"testing"
+	"time"
 
+	"github.com/golang/mock/gomock"
+	"github.com/linuxsuren/http-downloader/mock/mhttp"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -26,6 +35,8 @@ func Test_newGetCmd(t *testing.T) {
 		name: "time",
 	}, {
 		name: "max-attempts",
+	}, {
+		name: "no-proxy",
 	}, {
 		name: "show-progress",
 	}, {
@@ -97,12 +108,127 @@ func TestPreRunE(t *testing.T) {
 }
 
 func TestRunE(t *testing.T) {
-	fakeCmd := &cobra.Command{}
+	tests := []struct {
+		name    string
+		opt     *downloadOption
+		args    []string
+		prepare func(t *testing.T, do *downloadOption)
+		wantErr bool
+	}{{
+		name: "print shcema only",
+		opt: &downloadOption{
+			fetcher:     &installer.FakeFetcher{},
+			PrintSchema: true,
+		},
+		wantErr: false,
+	}, {
+		name: "download from an URL with one thread",
+		opt: &downloadOption{
+			fetcher: &installer.FakeFetcher{},
+			NoProxy: true,
+		},
+		prepare: func(t *testing.T, do *downloadOption) {
+			do.Output = path.Join(os.TempDir(), fmt.Sprintf("fake-%d", time.Now().Nanosecond()))
+			do.URL = "https://foo.com"
 
-	opt := &downloadOption{}
-	opt.fetcher = &installer.FakeFetcher{}
+			ctrl := gomock.NewController(t)
+			roundTripper := mhttp.NewMockRoundTripper(ctrl)
 
-	// print schema
-	opt.PrintSchema = true
-	assert.Nil(t, opt.runE(fakeCmd, nil))
+			mockRequest, _ := http.NewRequest(http.MethodGet, do.URL, nil)
+			mockResponse := &http.Response{
+				StatusCode: http.StatusPartialContent,
+				Proto:      "HTTP/1.1",
+				Request:    mockRequest,
+				Header: map[string][]string{
+					"Content-Length": {"100"},
+				},
+				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+			}
+			roundTripper.EXPECT().
+				RoundTrip(mockRequest).Return(mockResponse, nil)
+			do.RoundTripper = roundTripper
+		},
+		wantErr: false,
+	}, {
+		name: "download from an URL with multi-threads",
+		opt: &downloadOption{
+			fetcher: &installer.FakeFetcher{},
+			NoProxy: true,
+			Thread:  2,
+		},
+		prepare: func(t *testing.T, do *downloadOption) {
+			do.Output = path.Join(os.TempDir(), fmt.Sprintf("fake-%d", time.Now().Nanosecond()))
+			do.URL = "https://foo.com"
+
+			ctrl := gomock.NewController(t)
+			roundTripper := mhttp.NewMockRoundTripper(ctrl)
+
+			// for size detecting
+			mockRequest, _ := http.NewRequest(http.MethodGet, do.URL, nil)
+			mockRequest.Header.Set("Range", "bytes=2-")
+			mockResponse := &http.Response{
+				StatusCode: http.StatusPartialContent,
+				Proto:      "HTTP/1.1",
+				Request:    mockRequest,
+				Header: map[string][]string{
+					"Content-Length": {"100"},
+				},
+				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+			}
+			roundTripper.EXPECT().
+				RoundTrip(mockRequest).Return(mockResponse, nil)
+
+			// for group-1
+			mockRequest1, _ := http.NewRequest(http.MethodGet, do.URL, nil)
+			mockRequest1.Header.Set("Range", "bytes=0-50")
+			mockResponse1 := &http.Response{
+				StatusCode: http.StatusPartialContent,
+				Proto:      "HTTP/1.1",
+				Request:    mockRequest1,
+				Header: map[string][]string{
+					"Content-Length": {"100"},
+				},
+				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+			}
+			roundTripper.EXPECT().
+				RoundTrip(mockRequest1).Return(mockResponse1, nil)
+
+			// for group-2
+			mockRequest2, _ := http.NewRequest(http.MethodGet, do.URL, nil)
+			mockRequest2.Header.Set("Range", "bytes=51-101")
+			mockResponse2 := &http.Response{
+				StatusCode: http.StatusPartialContent,
+				Proto:      "HTTP/1.1",
+				Request:    mockRequest2,
+				Header: map[string][]string{
+					"Content-Length": {"100"},
+				},
+				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+			}
+			roundTripper.EXPECT().
+				RoundTrip(mockRequest2).Return(mockResponse2, nil)
+			do.RoundTripper = roundTripper
+		},
+		wantErr: false,
+	}}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeCmd := &cobra.Command{}
+			fakeCmd.SetOut(new(bytes.Buffer))
+			if tt.prepare != nil {
+				tt.prepare(t, tt.opt)
+			}
+			if tt.opt.Output != "" {
+				defer func() {
+					_ = os.RemoveAll(tt.opt.Output)
+				}()
+			}
+			err := tt.opt.runE(fakeCmd, tt.args)
+			if tt.wantErr {
+				assert.NotNil(t, err, "should error in [%d][%s]", i, tt.name)
+			} else {
+				assert.Nil(t, err, "should not error in [%d][%s]", i, tt.name)
+			}
+		})
+	}
 }
