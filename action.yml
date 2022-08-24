@@ -1,0 +1,19 @@
+name: 'Downloader tool'
+description: 'Downloader tool'
+inputs:
+  version:
+    description: 'The version of hd'
+    required: false
+    default: 'v0.0.68'
+  tool:
+    description: 'The desired tool name'
+    required: true
+runs:
+  using: 'docker'
+  image: 'docker://ghcr.io/linuxsuren/hd:v0.0.68'
+  args:
+    - hd
+    - get
+    - ${{ inputs.tool }}
+    - --fetch=true
+    - --output=/github/home/${{ inputs.tool }}
