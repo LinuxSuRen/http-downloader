@@ -49,6 +49,7 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 		"Indicate if install it via go install github.com/xxx/xxx")
 	flags.StringVarP(&opt.fromBranch, "from-branch", "", "master",
 		"Only works if the flag --from-source is true")
+	flags.StringVarP(&opt.target, "target", "", "/usr/local/bin", "The target installation directory")
 	flags.BoolVarP(&opt.goget, "goget", "", viper.GetBool("fetch"),
 		"Use command goget to download the binary, only works if the flag --from-source is true")
 
@@ -76,6 +77,7 @@ type installOption struct {
 	CleanPackage bool
 	fromSource   bool
 	fromBranch   string
+	target       string
 	goget        bool
 	force        bool
 
@@ -159,6 +161,9 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
+	if o.target != "" {
+		o.Package.TargetDirectory = o.target
+	}
 	if o.Package.TargetDirectory == "" {
 		o.Package.TargetDirectory = "/usr/local/bin"
 	}

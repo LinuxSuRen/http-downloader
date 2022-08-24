@@ -4,16 +4,16 @@ inputs:
   version:
     description: 'The version of hd'
     required: false
-    default: 'v0.0.68'
+    default: 'v0.0.69'
   tool:
     description: 'The desired tool name'
     required: true
 runs:
   using: 'docker'
-  image: 'docker://ghcr.io/linuxsuren/hd:v0.0.68'
+  image: 'docker://ghcr.io/linuxsuren/hd:v0.0.69'
   args:
     - hd
-    - get
+    - install
     - ${{ inputs.tool }}
     - --fetch=true
-    - --output=/github/home/${{ inputs.tool }}
+    - --target=/github/home/
