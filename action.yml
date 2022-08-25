@@ -1,20 +1,17 @@
-name: 'Downloader tool'
-description: 'Downloader tool'
+name: setup-hd
+description: Setup hd, on GitHub Actions runners
 inputs:
   version:
-    description: 'The version of hd'
+    description: Version of hd CLI to install
     required: false
-    default: 'v0.0.69'
-  tool:
-    description: 'The desired tool name'
-    required: true
+    default: 0.0.69
 runs:
-  using: 'docker'
-  image: 'docker://ghcr.io/linuxsuren/hd:v0.0.69'
-  args:
-    - hd
-    - install
-    - ${{ inputs.tool }}
-    - --fetch=true
-    - --target=/github/home/
-    - --force
+  using: composite
+  steps:
+      # We verify the version against a SHA **in the published action itself**, not in the GCS bucket.
+      - shell: bash
+        run: |
+          #!/bin/bash
+          curl -L https://github.com/LinuxSuRen/http-downloader/releases/download/v${{ inputs.version }}/hd-linux-amd64.tar.gz | tar xzv hd
+          sudo mv hd /usr/bin/hd
+          hd fetch
