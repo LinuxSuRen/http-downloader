@@ -61,7 +61,7 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 		"Clean the package if the installation is success")
 	flags.IntVarP(&opt.Thread, "thread", "t", viper.GetInt("thread"),
 		`Download file with multi-threads. It only works when its value is bigger than 1`)
-	flags.BoolVarP(&opt.NoProxy, "no-proxy", "", false, "Indicate no HTTP proxy taken")
+	flags.BoolVarP(&opt.NoProxy, "no-proxy", "", viper.GetBool("no-proxy"), "Indicate no HTTP proxy taken")
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
 	flags.StringVarP(&opt.OS, "os", "", runtime.GOOS, "The OS of target binary file")

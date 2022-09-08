@@ -45,6 +45,7 @@ func loadConfig() (err error) {
 	viper.SetDefault("provider", ProviderGitHub)
 	viper.SetDefault("fetch", false)
 	viper.SetDefault("goget", false)
+	viper.SetDefault("no-proxy", false)
 
 	thread := runtime.NumCPU()
 	if thread > 4 {
