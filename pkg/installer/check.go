@@ -184,7 +184,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 		if data, err = ioutil.ReadFile(matchedFile); err == nil {
 			cfg := HDConfig{}
 			if !IsSupport(cfg) {
-				err = fmt.Errorf("not support this platform, os: %s, arch: %s", runtime.GOOS, runtime.GOARCH)
+				err = fmt.Errorf("not support this platform, os: %s, arch: %s", o.OS, o.Arch)
 				return
 			}
 
@@ -192,8 +192,8 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 				hdPkg := &HDPackage{
 					Name:             o.Name,
 					Version:          version,
-					OS:               common.GetReplacement(runtime.GOOS, cfg.Replacements),
-					Arch:             common.GetReplacement(runtime.GOARCH, cfg.Replacements),
+					OS:               common.GetReplacement(o.OS, cfg.Replacements),
+					Arch:             common.GetReplacement(o.Arch, cfg.Replacements),
 					AdditionBinaries: cfg.AdditionBinaries,
 					VersionNum:       strings.TrimPrefix(version, "v"),
 				}
