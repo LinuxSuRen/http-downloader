@@ -2,10 +2,12 @@ package generic
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"os"
 	"runtime"
+	"strings"
 	"syscall"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // CommonInstaller is the installer of a common bash
@@ -14,6 +16,9 @@ type CommonInstaller struct {
 	OS           string
 	InstallCmd   CmdWithArgs
 	UninstallCmd CmdWithArgs
+
+	// inner fields
+	proxyMap map[string]string
 }
 
 // CmdWithArgs is a command and with args
@@ -25,20 +30,51 @@ type CmdWithArgs struct {
 
 // Run runs the current command
 func (c CmdWithArgs) Run() (err error) {
-	fmt.Println(c.SystemCall)
+	execer := exec.DefaultExecer{}
+
 	if c.SystemCall {
 		var targetBinary string
-		if targetBinary, err = exec.LookPath(c.Cmd); err != nil {
+		if targetBinary, err = execer.LookPath(c.Cmd); err != nil {
 			err = fmt.Errorf("cannot find %s", c.Cmd)
 		} else {
 			sysCallArgs := []string{c.Cmd}
 			sysCallArgs = append(sysCallArgs, c.Args...)
+			fmt.Println(c.Cmd, strings.Join(sysCallArgs, " "))
 			err = syscall.Exec(targetBinary, sysCallArgs, os.Environ())
 		}
 	} else {
+		fmt.Println(c.Cmd, strings.Join(c.Args, " "))
 		err = exec.RunCommand(c.Cmd, c.Args...)
 	}
 	return
+}
+
+// SetURLReplace set the URL replace map
+func (d *CommonInstaller) SetURLReplace(data map[string]string) {
+	d.proxyMap = data
+}
+
+func (d *CommonInstaller) sliceReplace(args []string) []string {
+	for i, arg := range args {
+		if result := d.urlReplace(arg); result != arg {
+			args[i] = result
+		}
+	}
+	return args
+}
+
+func (d *CommonInstaller) urlReplace(old string) string {
+	if d.proxyMap == nil {
+		return old
+	}
+
+	for k, v := range d.proxyMap {
+		if !strings.Contains(old, k) {
+			continue
+		}
+		old = strings.ReplaceAll(old, k, v)
+	}
+	return old
 }
 
 // Available check if support current platform
@@ -49,12 +85,14 @@ func (d *CommonInstaller) Available() (ok bool) {
 
 // Install installs the target package
 func (d *CommonInstaller) Install() (err error) {
+	d.InstallCmd.Args = d.sliceReplace(d.InstallCmd.Args)
 	err = d.InstallCmd.Run()
 	return
 }
 
 // Uninstall uninstalls the target package
 func (d *CommonInstaller) Uninstall() (err error) {
+	d.InstallCmd.Args = d.sliceReplace(d.InstallCmd.Args)
 	err = d.UninstallCmd.Run()
 	return
 }

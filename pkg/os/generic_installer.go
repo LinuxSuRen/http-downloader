@@ -2,13 +2,14 @@ package os
 
 import (
 	"fmt"
+	"io/ioutil"
+	"runtime"
+	"strings"
+
 	"github.com/linuxsuren/http-downloader/pkg/os/apk"
 	"github.com/linuxsuren/http-downloader/pkg/os/dnf"
 	"github.com/linuxsuren/http-downloader/pkg/os/npm"
 	"github.com/linuxsuren/http-downloader/pkg/os/snap"
-	"io/ioutil"
-	"runtime"
-	"strings"
 
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
@@ -43,6 +44,9 @@ type genericPackage struct {
 	StopCmd        CmdWithArgs  `yaml:"stop"`
 
 	CommonInstaller core.Installer
+
+	// inner fields
+	proxyMap map[string]string
 }
 
 // CmdWithArgs is a command with arguments
@@ -146,6 +150,8 @@ func (i *genericPackage) Install() (err error) {
 		}
 
 		if needInstall {
+			preInstall.Cmd.Args = i.sliceReplace(preInstall.Cmd.Args)
+
 			if err = exec.RunCommand(preInstall.Cmd.Cmd, preInstall.Cmd.Args...); err != nil {
 				return
 			}
@@ -153,6 +159,9 @@ func (i *genericPackage) Install() (err error) {
 	}
 
 	if i.CommonInstaller != nil {
+		if proxyAble, ok := i.CommonInstaller.(core.ProxyAble); ok {
+			proxyAble.SetURLReplace(i.proxyMap)
+		}
 		err = i.CommonInstaller.Install()
 	} else {
 		err = fmt.Errorf("not support yet")
@@ -178,4 +187,30 @@ func (i *genericPackage) Start() error {
 }
 func (i *genericPackage) Stop() error {
 	return nil
+}
+
+// SetURLReplace set the URL replace map
+func (d *genericPackage) SetURLReplace(data map[string]string) {
+	d.proxyMap = data
+}
+func (d *genericPackage) sliceReplace(args []string) []string {
+	for i, arg := range args {
+		if result := d.urlReplace(arg); result != arg {
+			args[i] = result
+		}
+	}
+	return args
+}
+func (d *genericPackage) urlReplace(old string) string {
+	if d.proxyMap == nil {
+		return old
+	}
+
+	for k, v := range d.proxyMap {
+		if !strings.Contains(old, k) {
+			continue
+		}
+		old = strings.ReplaceAll(old, k, v)
+	}
+	return old
 }

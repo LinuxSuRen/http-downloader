@@ -2,13 +2,14 @@ package os
 
 import (
 	"fmt"
+	"path"
+	"path/filepath"
+
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 	"github.com/linuxsuren/http-downloader/pkg/os/docker"
 	"github.com/linuxsuren/http-downloader/pkg/os/yum"
 	"github.com/mitchellh/go-homedir"
-	"path"
-	"path/filepath"
 )
 
 // DefaultInstallerRegistry is the default installer registry
@@ -64,12 +65,20 @@ func HasPackage(name string) bool {
 	return false
 }
 
-// Install installs a package with name
-func Install(name string) (err error) {
+func Install(name string) error {
+	return InstallWithProxy(name, nil)
+}
+
+// InstallWithProxy installs a package with name
+func InstallWithProxy(name string, proxy map[string]string) (err error) {
 	var installer core.Installer
 	if installers, ok := GetInstallers(name); ok {
 		for _, installer = range installers {
 			if installer.Available() {
+				if proxyAble, ok := installer.(core.ProxyAble); ok {
+					proxyAble.SetURLReplace(proxy)
+				}
+
 				err = installer.Install()
 				break
 			}
