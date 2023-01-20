@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"internal/goarch"
 	"net/http"
 	"net/url"
 	sysos "os"
@@ -128,22 +127,11 @@ func (o *downloadOption) fetch() (err error) {
 	return
 }
 
-func (o *downloadOption) archFix() {
-	if o.Arch != "arm" {
-		return
-	}
-
-	if goarch.IsArm64 == 1 {
-		o.Arch = "arm64"
-	}
-}
-
 func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 	// this might not be the best way to print schema
 	if o.PrintSchema {
 		return
 	}
-	o.archFix()
 
 	if err = o.fetch(); err != nil {
 		return
