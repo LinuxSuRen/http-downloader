@@ -23,3 +23,8 @@ type AdvanceInstaller interface {
 type InstallerRegistry interface {
 	Registry(string, Installer)
 }
+
+// ProxyAble define the proxy support feature
+type ProxyAble interface {
+	SetURLReplace(map[string]string)
+}

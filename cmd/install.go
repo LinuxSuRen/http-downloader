@@ -137,7 +137,15 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 			}
 			return
 		}
-		err = os.Install(args[0])
+
+		var proxy map[string]string
+		if o.ProxyGitHub != "" {
+			proxy = map[string]string{
+				"raw.githubusercontent.com": fmt.Sprintf("%s/https://raw.githubusercontent.com", o.ProxyGitHub),
+				"github.com":                fmt.Sprintf("%s/https://github.com", o.ProxyGitHub),
+			}
+		}
+		err = os.InstallWithProxy(args[0], proxy)
 		return
 	}
 
