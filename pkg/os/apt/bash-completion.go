@@ -2,19 +2,20 @@ package apt
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"runtime"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // bashCompletionInstallerInUbuntu is the installer of bashCompletion in CentOS
 type bashCompletionInstallerInUbuntu struct {
-	count int
+	Execer exec.Execer
 }
 
 // Available check if support current platform
 func (d *bashCompletionInstallerInUbuntu) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
-		_, err := exec.LookPath("apt-get")
+		_, err := d.Execer.LookPath("apt-get")
 		ok = err == nil
 	}
 	return

@@ -3,13 +3,14 @@ package net_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/linuxsuren/http-downloader/mock/mhttp"
-	"github.com/linuxsuren/http-downloader/pkg/net"
-	"github.com/stretchr/testify/assert"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"testing"
+
+	"github.com/linuxsuren/http-downloader/mock/mhttp"
+	"github.com/linuxsuren/http-downloader/pkg/net"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -65,7 +66,7 @@ var _ = Describe("http test", func() {
 				Proto:      "HTTP/1.1",
 				Header:     http.Header{},
 				Request:    request,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(responseBody)),
+				Body:       io.NopCloser(bytes.NewBufferString(responseBody)),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(request).Return(response, nil)
@@ -75,10 +76,9 @@ var _ = Describe("http test", func() {
 			_, err = os.Stat(targetFilePath)
 			Expect(err).To(BeNil())
 
-			content, readErr := ioutil.ReadFile(targetFilePath)
+			content, readErr := os.ReadFile(targetFilePath)
 			Expect(readErr).To(BeNil())
 			Expect(string(content)).To(Equal(responseBody))
-			return
 		})
 
 		It("with BasicAuth", func() {
@@ -96,7 +96,7 @@ var _ = Describe("http test", func() {
 				Proto:      "HTTP/1.1",
 				Header:     http.Header{},
 				Request:    request,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(responseBody)),
+				Body:       io.NopCloser(bytes.NewBufferString(responseBody)),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(request).Return(response, nil)
@@ -106,10 +106,9 @@ var _ = Describe("http test", func() {
 			_, err = os.Stat(targetFilePath)
 			Expect(err).To(BeNil())
 
-			content, readErr := ioutil.ReadFile(targetFilePath)
+			content, readErr := os.ReadFile(targetFilePath)
 			Expect(readErr).To(BeNil())
 			Expect(string(content)).To(Equal(responseBody))
-			return
 		})
 
 		It("with error request", func() {
@@ -146,7 +145,7 @@ var _ = Describe("http test", func() {
 				StatusCode: 400,
 				Proto:      "HTTP/1.1",
 				Request:    request,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(responseBody)),
+				Body:       io.NopCloser(bytes.NewBufferString(responseBody)),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(request).Return(response, nil)
@@ -169,7 +168,7 @@ var _ = Describe("http test", func() {
 				StatusCode: 200,
 				Proto:      "HTTP/1.1",
 				Request:    request,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(responseBody)),
+				Body:       io.NopCloser(bytes.NewBufferString(responseBody)),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(request).Return(response, nil)
@@ -247,7 +246,7 @@ func TestDetectSize(t *testing.T) {
 		Header: map[string][]string{
 			"Content-Length": {"100"},
 		},
-		Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+		Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 	}
 	roundTripper.EXPECT().
 		RoundTrip(mockRequest).Return(mockResponse, nil)
@@ -282,7 +281,7 @@ func TestMultiThreadDownloader(t *testing.T) {
 				Header: map[string][]string{
 					"Content-Length": {"100"},
 				},
-				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(mockRequest).Return(mockResponse, nil)
@@ -297,7 +296,7 @@ func TestMultiThreadDownloader(t *testing.T) {
 				Header: map[string][]string{
 					"Content-Length": {"100"},
 				},
-				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(mockRequest1).Return(mockResponse1, nil)
@@ -312,7 +311,7 @@ func TestMultiThreadDownloader(t *testing.T) {
 				Header: map[string][]string{
 					"Content-Length": {"100"},
 				},
-				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(mockRequest2).Return(mockResponse2, nil)
@@ -339,7 +338,7 @@ func TestMultiThreadDownloader(t *testing.T) {
 				Header: map[string][]string{
 					"Content-Length": {"100"},
 				},
-				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(mockRequest4).Return(mockResponse4, nil)
@@ -353,7 +352,7 @@ func TestMultiThreadDownloader(t *testing.T) {
 				Header: map[string][]string{
 					"Content-Length": {"100"},
 				},
-				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(mockRequest3).Return(mockResponse3, nil)
@@ -379,7 +378,7 @@ func TestMultiThreadDownloader(t *testing.T) {
 				Header: map[string][]string{
 					"Content-Length": {"not-a-number"},
 				},
-				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(mockRequest4).Return(mockResponse4, nil)

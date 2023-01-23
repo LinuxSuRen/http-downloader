@@ -2,7 +2,7 @@ package os
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"runtime"
 	"strings"
 
@@ -58,7 +58,7 @@ type CmdWithArgs struct {
 
 func parseGenericPackages(configFile string, genericPackages *genericPackages) (err error) {
 	var data []byte
-	if data, err = ioutil.ReadFile(configFile); err != nil {
+	if data, err = os.ReadFile(configFile); err != nil {
 		err = fmt.Errorf("cannot read config file [%s], error: %v", configFile, err)
 		return
 	}
@@ -76,6 +76,7 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 	if err = parseGenericPackages(configFile, genericPackages); err != nil {
 		return
 	}
+	defaultExecer := exec.DefaultExecer{}
 
 	// registry all the packages
 	for i := range genericPackages.Packages {
@@ -83,25 +84,40 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 
 		switch genericPackage.PackageManager {
 		case "apt-get":
-			genericPackage.CommonInstaller = &apt.CommonInstaller{Name: genericPackage.Name}
+			genericPackage.CommonInstaller = &apt.CommonInstaller{
+				Name:   genericPackage.Name,
+				Execer: defaultExecer,
+			}
 		case "yum":
-			genericPackage.CommonInstaller = &yum.CommonInstaller{Name: genericPackage.Name}
+			genericPackage.CommonInstaller = &yum.CommonInstaller{
+				Name:   genericPackage.Name,
+				Execer: defaultExecer,
+			}
 		case "brew":
-			genericPackage.CommonInstaller = &brew.CommonInstaller{Name: genericPackage.Name}
+			genericPackage.CommonInstaller = &brew.CommonInstaller{
+				Name:   genericPackage.Name,
+				Execer: defaultExecer,
+			}
 		case "apk":
-			genericPackage.CommonInstaller = &apk.CommonInstaller{Name: genericPackage.Name}
+			genericPackage.CommonInstaller = &apk.CommonInstaller{
+				Name:   genericPackage.Name,
+				Execer: defaultExecer,
+			}
 		case snap.SnapName:
 			genericPackage.CommonInstaller = &snap.CommonInstaller{
-				Name: genericPackage.Name,
-				Args: genericPackage.InstallCmd.Args,
+				Name:   genericPackage.Name,
+				Args:   genericPackage.InstallCmd.Args,
+				Execer: defaultExecer,
 			}
 		case dnf.DNFName:
 			genericPackage.CommonInstaller = &dnf.CommonInstaller{
-				Name: genericPackage.Name,
+				Name:   genericPackage.Name,
+				Execer: defaultExecer,
 			}
 		case npm.NPMName:
 			genericPackage.CommonInstaller = &npm.CommonInstaller{
-				Name: genericPackage.Name,
+				Name:   genericPackage.Name,
+				Execer: defaultExecer,
 			}
 		default:
 			genericPackage.CommonInstaller = &generic.CommonInstaller{
@@ -117,6 +133,7 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 					Args:       genericPackage.UninstallCmd.Args,
 					SystemCall: genericPackage.UninstallCmd.SystemCall,
 				},
+				Execer: defaultExecer,
 			}
 		}
 
@@ -138,7 +155,7 @@ func (i *genericPackage) Install() (err error) {
 		needInstall := false
 		if preInstall.IssuePrefix != "" && runtime.GOOS == "linux" {
 			var data []byte
-			if data, err = ioutil.ReadFile("/etc/issue"); err != nil {
+			if data, err = os.ReadFile("/etc/issue"); err != nil {
 				return
 			}
 
@@ -190,23 +207,23 @@ func (i *genericPackage) Stop() error {
 }
 
 // SetURLReplace set the URL replace map
-func (d *genericPackage) SetURLReplace(data map[string]string) {
-	d.proxyMap = data
+func (i *genericPackage) SetURLReplace(data map[string]string) {
+	i.proxyMap = data
 }
-func (d *genericPackage) sliceReplace(args []string) []string {
-	for i, arg := range args {
-		if result := d.urlReplace(arg); result != arg {
-			args[i] = result
+func (i *genericPackage) sliceReplace(args []string) []string {
+	for index, arg := range args {
+		if result := i.urlReplace(arg); result != arg {
+			args[index] = result
 		}
 	}
 	return args
 }
-func (d *genericPackage) urlReplace(old string) string {
-	if d.proxyMap == nil {
+func (i *genericPackage) urlReplace(old string) string {
+	if i.proxyMap == nil {
 		return old
 	}
 
-	for k, v := range d.proxyMap {
+	for k, v := range i.proxyMap {
 		if !strings.Contains(old, k) {
 			continue
 		}

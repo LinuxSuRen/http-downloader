@@ -9,7 +9,9 @@ build-linux: fmt lint
 
 test: fmt lint
 	go test ./... -coverprofile coverage.out
-
+pre-commit: fmt lint test build
+cp-pre-commit:
+	cp .github/pre-commit .git/hooks/pre-commit
 run:
 	go run main.go
 

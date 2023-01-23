@@ -2,6 +2,7 @@ package npm
 
 import (
 	"fmt"
+
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -10,12 +11,13 @@ const NPMName = "npm"
 
 // CommonInstaller is the installer of a common npm
 type CommonInstaller struct {
-	Name string
+	Name   string
+	Execer exec.Execer
 }
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	_, err := exec.LookPath("npm")
+	_, err := d.Execer.LookPath("npm")
 	ok = err == nil
 	return
 }

@@ -3,13 +3,14 @@ package net
 import (
 	"bytes"
 	"fmt"
-	"github.com/golang/mock/gomock"
-	"github.com/linuxsuren/http-downloader/mock/mhttp"
-	"github.com/stretchr/testify/assert"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"testing"
+
+	"github.com/golang/mock/gomock"
+	"github.com/linuxsuren/http-downloader/mock/mhttp"
+	"github.com/stretchr/testify/assert"
 )
 
 const fakeURL = "http://fake"
@@ -30,7 +31,7 @@ func TestRetry(t *testing.T) {
 		StatusCode: http.StatusOK,
 		Proto:      "HTTP/1.1",
 		Request:    mockRequest,
-		Body:       ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+		Body:       io.NopCloser(bytes.NewBufferString("responseBody")),
 	}
 	roundTripper.EXPECT().
 		RoundTrip(mockRequest).Return(mockResponse, nil)

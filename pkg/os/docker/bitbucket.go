@@ -6,12 +6,12 @@ import (
 
 // bitbucket is the installer of bitbucket in CentOS
 type bitbucket struct {
-	count int
+	Execer exec.Execer
 }
 
 // Available check if support current platform
 func (d *bitbucket) Available() (ok bool) {
-	_, err := exec.LookPath("docker")
+	_, err := d.Execer.LookPath("docker")
 	ok = err == nil
 	return
 }

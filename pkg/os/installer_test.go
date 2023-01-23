@@ -1,10 +1,11 @@
 package os
 
 import (
-	"github.com/linuxsuren/http-downloader/pkg/os/fake"
-	"github.com/stretchr/testify/assert"
 	"runtime"
 	"testing"
+
+	"github.com/linuxsuren/http-downloader/pkg/os/fake"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHasPackage(t *testing.T) {
@@ -93,7 +94,7 @@ func TestWithFakeInstaller(t *testing.T) {
 	defaultInstallerRegistry.Registry("fake", fake.NewFakeInstaller(true, false))
 	err = Uninstall("fake")
 	assert.Nil(t, err)
-	err = Install("fake")
+	err = InstallWithProxy("fake", nil)
 	assert.Nil(t, err)
 
 	defaultInstallerRegistry.Registry("fake-with-err", fake.NewFakeInstaller(true, true))
