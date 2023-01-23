@@ -2,19 +2,21 @@ package brew
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"runtime"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // CommonInstaller is the installer of a common brew
 type CommonInstaller struct {
-	Name string
+	Name   string
+	Execer exec.Execer
 }
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
 	if runtime.GOOS == "darwin" {
-		_, err := exec.LookPath("brew")
+		_, err := d.Execer.LookPath("brew")
 		ok = err == nil
 	}
 	return

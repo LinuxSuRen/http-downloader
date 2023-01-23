@@ -2,19 +2,20 @@ package yum
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"runtime"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // vimInstallerInCentOS is the installer of vim in CentOS
 type vimInstallerInCentOS struct {
-	count int
+	Execer exec.Execer
 }
 
 // Available check if support current platform
 func (d *vimInstallerInCentOS) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
-		_, err := exec.LookPath("yum")
+		_, err := d.Execer.LookPath("yum")
 		ok = err == nil
 	}
 	return

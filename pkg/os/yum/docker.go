@@ -2,21 +2,23 @@ package yum
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // dockerInstallerInCentOS is the installer of Docker in CentOS
 type dockerInstallerInCentOS struct {
-	count int
+	Execer exec.Execer
+	count  int
 }
 
 // Available check if support current platform
 func (d *dockerInstallerInCentOS) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
-		_, err := exec.LookPath("yum")
+		_, err := d.Execer.LookPath("yum")
 		ok = err == nil
 	}
 	return

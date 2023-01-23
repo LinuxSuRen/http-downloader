@@ -2,22 +2,24 @@ package apt
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
-	"io/ioutil"
+	"os"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // dockerInstallerInUbuntu is the installer of Docker in Ubuntu
 type dockerInstallerInUbuntu struct {
-	count int
+	Execer exec.Execer
+	count  int
 }
 
 // Available check if support current platform
 func (d *dockerInstallerInUbuntu) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
-		_, err := exec.LookPath("apt-get")
+		_, err := d.Execer.LookPath("apt-get")
 		ok = err == nil
 	}
 	return
@@ -60,7 +62,7 @@ func (d *dockerInstallerInUbuntu) Install() (err error) {
 	if release, err = exec.RunCommandAndReturn("lsb_release", "", "-cs"); err == nil {
 		item := fmt.Sprintf("deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu %s stable",
 			strings.TrimSpace(release))
-		if err = ioutil.WriteFile("/etc/apt/sources.list.d/docker.list", []byte(item), 622); err != nil {
+		if err = os.WriteFile("/etc/apt/sources.list.d/docker.list", []byte(item), 0622); err != nil {
 			err = fmt.Errorf("failed to write docker.list, error: %v", err)
 			return
 		}

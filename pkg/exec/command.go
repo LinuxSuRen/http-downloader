@@ -22,13 +22,6 @@ func (e DefaultExecer) LookPath(file string) (string, error) {
 	return exec.LookPath(file)
 }
 
-// LookPath is the wrapper of os/exec.LookPath
-//
-// Deprecated: Use DefaultExecer.LookPath instead
-func LookPath(file string) (string, error) {
-	return DefaultExecer{}.LookPath(file)
-}
-
 // RunCommandAndReturn runs a command, then returns the output
 func RunCommandAndReturn(name, dir string, args ...string) (result string, err error) {
 	stdout := &bytes.Buffer{}
@@ -104,7 +97,7 @@ func RunCommandWithSudo(name string, args ...string) (err error) {
 
 func copyAndCapture(w io.Writer, r io.Reader) ([]byte, error) {
 	var out []byte
-	buf := make([]byte, 1024, 1024)
+	buf := make([]byte, 1024)
 	for {
 		n, err := r.Read(buf[:])
 		if n > 0 {

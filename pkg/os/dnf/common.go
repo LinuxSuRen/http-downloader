@@ -2,8 +2,9 @@ package dnf
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"runtime"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // DNFName is the tool name
@@ -11,13 +12,14 @@ const DNFName = "dnf"
 
 // CommonInstaller is the installer of a common dnf
 type CommonInstaller struct {
-	Name string
+	Name   string
+	Execer exec.Execer
 }
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
-		_, err := exec.LookPath("dnf")
+		_, err := d.Execer.LookPath("dnf")
 		ok = err == nil
 	}
 	return

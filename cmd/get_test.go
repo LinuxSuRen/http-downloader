@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -142,7 +142,7 @@ func TestRunE(t *testing.T) {
 				Header: map[string][]string{
 					"Content-Length": {"100"},
 				},
-				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(mockRequest).Return(mockResponse, nil)
@@ -173,7 +173,7 @@ func TestRunE(t *testing.T) {
 				Header: map[string][]string{
 					"Content-Length": {"100"},
 				},
-				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(mockRequest).Return(mockResponse, nil)
@@ -188,7 +188,7 @@ func TestRunE(t *testing.T) {
 				Header: map[string][]string{
 					"Content-Length": {"100"},
 				},
-				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(mockRequest1).Return(mockResponse1, nil)
@@ -203,7 +203,7 @@ func TestRunE(t *testing.T) {
 				Header: map[string][]string{
 					"Content-Length": {"100"},
 				},
-				Body: ioutil.NopCloser(bytes.NewBufferString("responseBody")),
+				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 			}
 			roundTripper.EXPECT().
 				RoundTrip(mockRequest2).Return(mockResponse2, nil)

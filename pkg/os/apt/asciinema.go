@@ -2,19 +2,20 @@ package apt
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"runtime"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // asciinemaInstallerInUbuntu is the installer of asciinema in CentOS
 type asciinemaInstallerInUbuntu struct {
-	count int
+	Execer exec.Execer
 }
 
 // Available check if support current platform
 func (d *asciinemaInstallerInUbuntu) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
-		_, err := exec.LookPath("apt-get")
+		_, err := d.Execer.LookPath("apt-get")
 		ok = err == nil
 	}
 	return

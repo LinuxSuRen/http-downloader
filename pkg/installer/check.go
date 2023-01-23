@@ -3,8 +3,8 @@ package installer
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/fs"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	sysos "os"
@@ -45,7 +45,7 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 
 		// check if it's a native package
 		if os.HasPackage(tool) {
-			if err = os.Install(tool); err != nil {
+			if err = os.InstallWithProxy(tool, nil); err != nil {
 				return
 			}
 			continue
@@ -181,7 +181,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 	matchedFile := configDir + "/config/" + o.Org + "/" + o.Repo + ".yml"
 	if ok, _ := common.PathExists(matchedFile); ok {
 		var data []byte
-		if data, err = ioutil.ReadFile(matchedFile); err == nil {
+		if data, err = sysos.ReadFile(matchedFile); err == nil {
 			cfg := HDConfig{}
 			if !IsSupport(cfg) {
 				err = fmt.Errorf("not support this platform, os: %s, arch: %s", o.OS, o.Arch)
@@ -305,7 +305,7 @@ func getDynamicVersion(version string) (realVersion string, err error) {
 			return
 		}
 		var data []byte
-		if data, err = ioutil.ReadAll(resp.Body); err != nil {
+		if data, err = io.ReadAll(resp.Body); err != nil {
 			err = fmt.Errorf("failed to get version from '%s', error is '%v'", version, err)
 			return
 		}
@@ -319,7 +319,7 @@ func getVersionOrDefault(version string, defaultVer string) (target string) {
 	// for the security reason, only support https
 	if strings.HasPrefix(version, "https://") {
 		if response, err := http.Get(version); err == nil {
-			if data, err := ioutil.ReadAll(response.Body); err == nil {
+			if data, err := io.ReadAll(response.Body); err == nil {
 				target = string(data)
 			}
 		}
@@ -421,7 +421,7 @@ func FindByKeyword(keyword, configDir string) (result []string) {
 }
 
 func hasKeyword(metaFile, keyword string) (ok bool) {
-	data, err := ioutil.ReadFile(metaFile)
+	data, err := sysos.ReadFile(metaFile)
 	if err != nil {
 		return
 	}
@@ -436,7 +436,7 @@ func hasKeyword(metaFile, keyword string) (ok bool) {
 
 func getHDConfig(configDir, orgAndRepo string) (config *HDConfig) {
 	configFile := path.Join(configDir, "config", orgAndRepo+".yml")
-	data, err := ioutil.ReadFile(configFile)
+	data, err := sysos.ReadFile(configFile)
 	if err != nil {
 		return
 	}
@@ -482,7 +482,7 @@ func FindCategories() (result []string) {
 			return nil
 		}
 
-		if data, err := ioutil.ReadFile(basepath); err == nil {
+		if data, err := sysos.ReadFile(basepath); err == nil {
 			hdCfg := &HDConfig{}
 			if err := yaml.Unmarshal(data, hdCfg); err == nil {
 				for _, category := range hdCfg.Categories {
@@ -506,7 +506,7 @@ func FindPackagesByCategory(category string) (result []HDConfig) {
 			return nil
 		}
 
-		if data, err := ioutil.ReadFile(basepath); err == nil {
+		if data, err := sysos.ReadFile(basepath); err == nil {
 			hdCfg := &HDConfig{}
 			if err := yaml.Unmarshal(data, hdCfg); err == nil {
 				orgAndRepo := strings.TrimPrefix(basepath, configDir)

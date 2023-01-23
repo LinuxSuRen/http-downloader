@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -279,7 +278,7 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 
 			for i := 0; i < thread; i++ {
 				partFile := fmt.Sprintf("%s-%d", targetFilePath, i)
-				if data, ferr := ioutil.ReadFile(partFile); ferr == nil {
+				if data, ferr := os.ReadFile(partFile); ferr == nil {
 					if _, err = f.Write(data); err != nil {
 						err = fmt.Errorf("failed to write file: '%s'", partFile)
 						break

@@ -4,9 +4,10 @@ import (
 	// Enable go embed
 	_ "embed"
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
-	"io/ioutil"
+	"os"
 	"runtime"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 //go:embed resource/go-repo.repo
@@ -14,13 +15,13 @@ var goRepo string
 
 // golangInstallerInCentOS is the installer of golang in CentOS
 type golangInstallerInCentOS struct {
-	count int
+	Execer exec.Execer
 }
 
 // Available check if support current platform
 func (d *golangInstallerInCentOS) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
-		_, err := exec.LookPath("yum")
+		_, err := d.Execer.LookPath("yum")
 		ok = err == nil
 	}
 	return
@@ -32,7 +33,7 @@ func (d *golangInstallerInCentOS) Install() (err error) {
 		return
 	}
 
-	if err = ioutil.WriteFile("/etc/yum.repos.d/go-repo.repo", []byte(goRepo), 0644); err != nil {
+	if err = os.WriteFile("/etc/yum.repos.d/go-repo.repo", []byte(goRepo), 0644); err != nil {
 		err = fmt.Errorf("failed to save go-repo.repo, error: %v", err)
 		return
 	}

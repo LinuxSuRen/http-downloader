@@ -3,7 +3,6 @@ package installer
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -71,7 +70,7 @@ func (o *Installer) Install() (err error) {
 						return
 					}
 
-					if err = ioutil.WriteFile(configFilePath, []byte(configFile.Content), 0622); err != nil {
+					if err = os.WriteFile(configFilePath, []byte(configFile.Content), 0622); err != nil {
 						err = fmt.Errorf("cannot write config file: %s, error: %v", configFilePath, err)
 						return
 					}

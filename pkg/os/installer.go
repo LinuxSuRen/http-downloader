@@ -5,6 +5,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 	"github.com/linuxsuren/http-downloader/pkg/os/docker"
@@ -20,11 +21,12 @@ type DefaultInstallerRegistry struct {
 var defaultInstallerRegistry *DefaultInstallerRegistry
 
 func init() {
+	defaultExecer := exec.DefaultExecer{}
 	defaultInstallerRegistry = &DefaultInstallerRegistry{
 		installerMap: map[string][]core.Installer{},
 	}
-	yum.SetInstallerRegistry(defaultInstallerRegistry)
-	apt.SetInstallerRegistry(defaultInstallerRegistry)
+	yum.SetInstallerRegistry(defaultInstallerRegistry, defaultExecer)
+	apt.SetInstallerRegistry(defaultInstallerRegistry, defaultExecer)
 	docker.SetInstallerRegistry(defaultInstallerRegistry)
 
 	var userHome string
@@ -63,10 +65,6 @@ func HasPackage(name string) bool {
 		}
 	}
 	return false
-}
-
-func Install(name string) error {
-	return InstallWithProxy(name, nil)
 }
 
 // InstallWithProxy installs a package with name

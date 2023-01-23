@@ -2,19 +2,21 @@ package apt
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"runtime"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // CommonInstaller is the installer of Conntrack in CentOS
 type CommonInstaller struct {
-	Name string
+	Name   string
+	Execer exec.Execer
 }
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
-		_, err := exec.LookPath("apt-get")
+		_, err := d.Execer.LookPath("apt-get")
 		ok = err == nil
 	}
 	return

@@ -2,19 +2,20 @@ package apt
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"runtime"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // gitInstallerInUbuntu is the installer of git in CentOS
 type gitInstallerInUbuntu struct {
-	count int
+	Execer exec.Execer
 }
 
 // Available check if support current platform
 func (d *gitInstallerInUbuntu) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
-		_, err := exec.LookPath("apt-get")
+		_, err := d.Execer.LookPath("apt-get")
 		ok = err == nil
 	}
 	return

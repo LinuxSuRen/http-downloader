@@ -2,8 +2,9 @@ package snap
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"runtime"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // SnapName is the name of the snap
@@ -11,14 +12,15 @@ const SnapName = "snap"
 
 // CommonInstaller is the installer of a common snap
 type CommonInstaller struct {
-	Name string
-	Args []string `yaml:"args"`
+	Name   string
+	Args   []string `yaml:"args"`
+	Execer exec.Execer
 }
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
 	if runtime.GOOS == "linux" {
-		_, err := exec.LookPath(SnapName)
+		_, err := d.Execer.LookPath(SnapName)
 		ok = err == nil
 	}
 	return

@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
-	"path"
 )
 
 func newSetupCommand() (cmd *cobra.Command) {
@@ -26,6 +27,7 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 	selector := &survey.Select{
 		Message: "Select proxy-github",
 		Options: []string{"gh.api.99988866.xyz", "ghproxy.com", "mirror.ghproxy.com", ""},
+		Default: viper.Get("proxy-github"),
 	}
 
 	var choose string
@@ -41,6 +43,6 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	err = viper.SafeWriteConfigAs(path.Join(configDir, "hd.yaml"))
+	err = viper.WriteConfigAs(path.Join(configDir, "hd.yaml"))
 	return
 }

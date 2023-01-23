@@ -16,6 +16,7 @@ type CommonInstaller struct {
 	OS           string
 	InstallCmd   CmdWithArgs
 	UninstallCmd CmdWithArgs
+	Execer       exec.Execer
 
 	// inner fields
 	proxyMap map[string]string
@@ -26,15 +27,14 @@ type CmdWithArgs struct {
 	Cmd        string   `yaml:"cmd"`
 	Args       []string `yaml:"args"`
 	SystemCall bool     `yaml:"systemCall"`
+	Execer     exec.Execer
 }
 
 // Run runs the current command
 func (c CmdWithArgs) Run() (err error) {
-	execer := exec.DefaultExecer{}
-
 	if c.SystemCall {
 		var targetBinary string
-		if targetBinary, err = execer.LookPath(c.Cmd); err != nil {
+		if targetBinary, err = c.Execer.LookPath(c.Cmd); err != nil {
 			err = fmt.Errorf("cannot find %s", c.Cmd)
 		} else {
 			sysCallArgs := []string{c.Cmd}
@@ -86,13 +86,15 @@ func (d *CommonInstaller) Available() (ok bool) {
 // Install installs the target package
 func (d *CommonInstaller) Install() (err error) {
 	d.InstallCmd.Args = d.sliceReplace(d.InstallCmd.Args)
+	d.InstallCmd.Execer = d.Execer
 	err = d.InstallCmd.Run()
 	return
 }
 
 // Uninstall uninstalls the target package
 func (d *CommonInstaller) Uninstall() (err error) {
-	d.InstallCmd.Args = d.sliceReplace(d.InstallCmd.Args)
+	d.UninstallCmd.Args = d.sliceReplace(d.UninstallCmd.Args)
+	d.UninstallCmd.Execer = d.Execer
 	err = d.UninstallCmd.Run()
 	return
 }
