@@ -288,6 +288,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					}
 					o.Name = cfg.Binary
 				}
+				o.Package.Version = hdPkg.Version
 			} else {
 				err = fmt.Errorf("failed to parse YAML file: %s, error: %v", matchedFile, err)
 			}

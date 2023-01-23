@@ -94,12 +94,13 @@ type downloadOption struct {
 	PrintCategories   bool
 
 	// inner fields
-	name    string
-	Tar     bool
-	Package *installer.HDConfig
-	org     string
-	repo    string
-	fetcher installer.Fetcher
+	name          string
+	Tar           bool
+	Package       *installer.HDConfig
+	org           string
+	repo          string
+	fetcher       installer.Fetcher
+	ExpectVersion string // should be like >v1.1.0
 }
 
 const (
@@ -147,6 +148,7 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 	}
 
 	targetURL := args[0]
+	o.Package = &installer.HDConfig{}
 	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
 		ins := &installer.Installer{
 			Provider: o.Provider,

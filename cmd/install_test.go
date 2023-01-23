@@ -3,11 +3,13 @@ package cmd
 import (
 	"context"
 	"errors"
+	"testing"
+
 	cotesting "github.com/linuxsuren/cobra-extension/pkg/testing"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
+	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func Test_newInstallCmd(t *testing.T) {
@@ -106,12 +108,31 @@ func TestInstallPreRunE(t *testing.T) {
 
 func TestShouldInstall(t *testing.T) {
 	opt := &installOption{
-		execer: &exec.FakeExecer{},
-		tool:   "fake",
+		execer: &exec.FakeExecer{
+			ExpectOutput: "v1.2.3",
+		},
+		tool: "fake",
 	}
 	should, exist := opt.shouldInstall()
 	assert.False(t, should)
 	assert.True(t, exist)
+
+	{
+		optGreater := &installOption{
+			execer: &exec.FakeExecer{
+				ExpectOutput: "v1.2.3",
+			},
+			downloadOption: downloadOption{
+				Package: &installer.HDConfig{
+					Version: "v1.2.4",
+				},
+			},
+			tool: "fake",
+		}
+		should, exist := optGreater.shouldInstall()
+		assert.True(t, should)
+		assert.True(t, exist)
+	}
 
 	// force to install
 	opt.force = true

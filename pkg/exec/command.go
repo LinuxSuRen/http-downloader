@@ -11,6 +11,7 @@ import (
 // Execer is an interface for OS-related operations
 type Execer interface {
 	LookPath(string) (string, error)
+	Command(name string, arg ...string) ([]byte, error)
 }
 
 // DefaultExecer is a wrapper for the OS exec
@@ -20,6 +21,11 @@ type DefaultExecer struct {
 // LookPath is the wrapper of os/exec.LookPath
 func (e DefaultExecer) LookPath(file string) (string, error) {
 	return exec.LookPath(file)
+}
+
+// Command is the wrapper  of os/exec.Command
+func (e DefaultExecer) Command(name string, arg ...string) ([]byte, error) {
+	return exec.Command(name, arg...).CombinedOutput()
 }
 
 // RunCommandAndReturn runs a command, then returns the output

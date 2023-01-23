@@ -13,6 +13,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/os"
+	"github.com/linuxsuren/http-downloader/pkg/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -88,10 +89,15 @@ type installOption struct {
 }
 
 func (o *installOption) shouldInstall() (should, exist bool) {
-	if _, lookErr := o.execer.LookPath(o.tool); lookErr == nil {
+	var greater bool
+	if name, lookErr := o.execer.LookPath(o.tool); lookErr == nil {
 		exist = true
+		if data, err := o.execer.Command(name, "version"); err == nil &&
+			(o.downloadOption.Package != nil && o.downloadOption.Package.Version != "") {
+			greater = version.GreatThan(o.downloadOption.Package.Version, string(data))
+		}
 	}
-	should = o.force || !exist
+	should = o.force || !exist || greater
 	return
 }
 
@@ -160,8 +166,8 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		if should, exist := o.shouldInstall(); !should {
 			if exist {
 				cmd.Printf("%s is already exist, please use the flag --force if you install it again\n", o.tool)
+				return
 			}
-			return
 		}
 
 		if err = o.downloadOption.runE(cmd, args); err != nil {
