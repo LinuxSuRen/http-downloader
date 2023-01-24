@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"sync"
 )
 
@@ -12,6 +13,10 @@ import (
 type Execer interface {
 	LookPath(string) (string, error)
 	Command(name string, arg ...string) ([]byte, error)
+	RunCommand(name string, arg ...string) (err error)
+	RunCommandWithIO(name, dir string, stdout, stderr io.Writer, args ...string) (err error)
+	OS() string
+	Arch() string
 }
 
 // DefaultExecer is a wrapper for the OS exec
@@ -28,29 +33,13 @@ func (e DefaultExecer) Command(name string, arg ...string) ([]byte, error) {
 	return exec.Command(name, arg...).CombinedOutput()
 }
 
-// RunCommandAndReturn runs a command, then returns the output
-func RunCommandAndReturn(name, dir string, args ...string) (result string, err error) {
-	stdout := &bytes.Buffer{}
-	if err = RunCommandWithBuffer(name, dir, stdout, nil, args...); err == nil {
-		result = stdout.String()
-	}
-	return
-}
-
-// RunCommandWithBuffer runs a command with buffer
-// stdout and stderr could be nil
-func RunCommandWithBuffer(name, dir string, stdout, stderr *bytes.Buffer, args ...string) error {
-	if stdout == nil {
-		stdout = &bytes.Buffer{}
-	}
-	if stderr != nil {
-		stderr = &bytes.Buffer{}
-	}
-	return RunCommandWithIO(name, dir, stdout, stderr, args...)
+// RunCommand runs a command
+func (e DefaultExecer) RunCommand(name string, arg ...string) error {
+	return e.RunCommandWithIO(name, "", os.Stdout, os.Stderr, arg...)
 }
 
 // RunCommandWithIO runs a command with given IO
-func RunCommandWithIO(name, dir string, stdout, stderr io.Writer, args ...string) (err error) {
+func (e DefaultExecer) RunCommandWithIO(name, dir string, stdout, stderr io.Writer, args ...string) (err error) {
 	command := exec.Command(name, args...)
 	if dir != "" {
 		command.Dir = dir
@@ -81,6 +70,44 @@ func RunCommandWithIO(name, dir string, stdout, stderr io.Writer, args ...string
 
 	err = command.Wait()
 	return
+}
+
+// OS returns the os name
+func (e DefaultExecer) OS() string {
+	return runtime.GOOS
+}
+
+// Arch returns the os arch
+func (e DefaultExecer) Arch() string {
+	return runtime.GOARCH
+}
+
+// RunCommandAndReturn runs a command, then returns the output
+func RunCommandAndReturn(name, dir string, args ...string) (result string, err error) {
+	stdout := &bytes.Buffer{}
+	if err = RunCommandWithBuffer(name, dir, stdout, nil, args...); err == nil {
+		result = stdout.String()
+	}
+	return
+}
+
+// RunCommandWithBuffer runs a command with buffer
+// stdout and stderr could be nil
+func RunCommandWithBuffer(name, dir string, stdout, stderr *bytes.Buffer, args ...string) error {
+	if stdout == nil {
+		stdout = &bytes.Buffer{}
+	}
+	if stderr != nil {
+		stderr = &bytes.Buffer{}
+	}
+	return RunCommandWithIO(name, dir, stdout, stderr, args...)
+}
+
+// RunCommandWithIO runs a command with given IO
+// Deprecated, use DefaultExecer.RunCommandWithIO instead
+func RunCommandWithIO(name, dir string, stdout, stderr io.Writer, args ...string) error {
+	execer := DefaultExecer{}
+	return execer.RunCommandWithIO(name, dir, stdout, stderr, args...)
 }
 
 // RunCommandInDir runs a command

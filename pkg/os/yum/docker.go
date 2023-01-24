@@ -2,7 +2,6 @@ package yum
 
 import (
 	"fmt"
-	"runtime"
 	"strings"
 	"time"
 
@@ -17,7 +16,7 @@ type dockerInstallerInCentOS struct {
 
 // Available check if support current platform
 func (d *dockerInstallerInCentOS) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath("yum")
 		ok = err == nil
 	}
@@ -26,15 +25,15 @@ func (d *dockerInstallerInCentOS) Available() (ok bool) {
 
 // Install installs the Docker
 func (d *dockerInstallerInCentOS) Install() (err error) {
-	if err = exec.RunCommand("yum", "install", "-y",
+	if err = d.Execer.RunCommand("yum", "install", "-y",
 		"yum-utils"); err != nil {
 		return
 	}
-	if err = exec.RunCommand("yum-config-manager", "--add-repo",
+	if err = d.Execer.RunCommand("yum-config-manager", "--add-repo",
 		"https://download.docker.com/linux/centos/docker-ce.repo"); err != nil {
 		return
 	}
-	if err = exec.RunCommand("yum", "install", "-y",
+	if err = d.Execer.RunCommand("yum", "install", "-y",
 		"docker-ce",
 		"docker-ce-cli",
 		"containerd.io"); err != nil {
@@ -45,7 +44,7 @@ func (d *dockerInstallerInCentOS) Install() (err error) {
 
 // Uninstall uninstalls the Docker
 func (d *dockerInstallerInCentOS) Uninstall() (err error) {
-	err = exec.RunCommand("yum", "remove", "-y",
+	err = d.Execer.RunCommand("yum", "remove", "-y",
 		"docker",
 		"docker-client",
 		"docker-client-latest",
@@ -85,10 +84,10 @@ func (d *dockerInstallerInCentOS) WaitForStart() (ok bool, err error) {
 
 // Start starts the Docker service
 func (d *dockerInstallerInCentOS) Start() error {
-	return exec.RunCommand("systemctl", "start", "docker")
+	return d.Execer.RunCommand("systemctl", "start", "docker")
 }
 
 // Stop stops the Docker service
 func (d *dockerInstallerInCentOS) Stop() error {
-	return exec.RunCommand("systemctl", "stop", "docker")
+	return d.Execer.RunCommand("systemctl", "stop", "docker")
 }

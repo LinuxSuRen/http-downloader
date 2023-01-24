@@ -3,7 +3,6 @@ package apt
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -18,7 +17,7 @@ type dockerInstallerInUbuntu struct {
 
 // Available check if support current platform
 func (d *dockerInstallerInUbuntu) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath("apt-get")
 		ok = err == nil
 	}
@@ -27,10 +26,10 @@ func (d *dockerInstallerInUbuntu) Available() (ok bool) {
 
 // Install installs the Docker
 func (d *dockerInstallerInUbuntu) Install() (err error) {
-	if err = exec.RunCommand("apt-get", "update", "-y"); err != nil {
+	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err != nil {
 		return
 	}
-	if err = exec.RunCommand("apt-get", "install", "-y",
+	if err = d.Execer.RunCommand("apt-get", "install", "-y",
 		"apt-transport-https",
 		"ca-certificates",
 		"curl",
@@ -38,16 +37,16 @@ func (d *dockerInstallerInUbuntu) Install() (err error) {
 		"lsb-release"); err != nil {
 		return
 	}
-	if err = exec.RunCommand("rm", "-rf", "/usr/share/keyrings/docker-archive-keyring.gpg"); err != nil {
+	if err = d.Execer.RunCommand("rm", "-rf", "/usr/share/keyrings/docker-archive-keyring.gpg"); err != nil {
 		return
 	}
 	const dockerGPG = "docker.gpg"
 	defer func() {
-		_ = exec.RunCommand("rm", "-rf", dockerGPG)
+		_ = d.Execer.RunCommand("rm", "-rf", dockerGPG)
 	}()
-	if err = exec.RunCommand("curl", "-fsSL",
+	if err = d.Execer.RunCommand("curl", "-fsSL",
 		"https://download.docker.com/linux/ubuntu/gpg", "-o", dockerGPG); err == nil {
-		if err = exec.RunCommand("gpg",
+		if err = d.Execer.RunCommand("gpg",
 			"--dearmor",
 			"-o",
 			"/usr/share/keyrings/docker-archive-keyring.gpg", dockerGPG); err != nil {
@@ -70,10 +69,10 @@ func (d *dockerInstallerInUbuntu) Install() (err error) {
 		err = fmt.Errorf("failed to run command lsb_release -cs, error: %v", err)
 		return
 	}
-	if err = exec.RunCommand("apt-get", "update", "-y"); err != nil {
+	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err != nil {
 		return
 	}
-	if err = exec.RunCommand("apt-get", "install", "-y",
+	if err = d.Execer.RunCommand("apt-get", "install", "-y",
 		"docker-ce", "docker-ce-cli", "containerd.io"); err != nil {
 		return
 	}
@@ -128,5 +127,5 @@ func (d *dockerInstallerInUbuntu) Start() error {
 
 // Stop stops the Docker service
 func (d *dockerInstallerInUbuntu) Stop() error {
-	return exec.RunCommand("systemctl", "start", "docker")
+	return d.Execer.RunCommand("systemctl", "start", "docker")
 }

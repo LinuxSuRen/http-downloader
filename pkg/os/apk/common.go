@@ -2,8 +2,6 @@ package apk
 
 import (
 	"fmt"
-	"runtime"
-
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -15,7 +13,7 @@ type CommonInstaller struct {
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath("apk")
 		ok = err == nil
 	}
@@ -24,15 +22,13 @@ func (d *CommonInstaller) Available() (ok bool) {
 
 // Install installs the target package
 func (d *CommonInstaller) Install() (err error) {
-	if err = exec.RunCommand("apk", "add", d.Name); err != nil {
-		return
-	}
+	err = d.Execer.RunCommand("apk", "add", d.Name)
 	return
 }
 
 // Uninstall uninstalls the target package
 func (d *CommonInstaller) Uninstall() (err error) {
-	err = exec.RunCommand("apk", "del", d.Name)
+	err = d.Execer.RunCommand("apk", "del", d.Name)
 	return
 }
 

@@ -2,8 +2,6 @@ package brew
 
 import (
 	"fmt"
-	"runtime"
-
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -15,7 +13,7 @@ type CommonInstaller struct {
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if runtime.GOOS == "darwin" {
+	if d.Execer.OS() == "darwin" {
 		_, err := d.Execer.LookPath("brew")
 		ok = err == nil
 	}
@@ -24,7 +22,7 @@ func (d *CommonInstaller) Available() (ok bool) {
 
 // Install installs the target package
 func (d *CommonInstaller) Install() (err error) {
-	if err = exec.RunCommand("brew", "install", d.Name); err != nil {
+	if err = d.Execer.RunCommand("brew", "install", d.Name); err != nil {
 		return
 	}
 	return
@@ -32,7 +30,7 @@ func (d *CommonInstaller) Install() (err error) {
 
 // Uninstall uninstalls the Conntrack
 func (d *CommonInstaller) Uninstall() (err error) {
-	err = exec.RunCommand("brew", "remove", d.Name)
+	err = d.Execer.RunCommand("brew", "remove", d.Name)
 	return
 }
 

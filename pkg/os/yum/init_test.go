@@ -11,7 +11,9 @@ import (
 
 func TestCommonCase(t *testing.T) {
 	registry := &core.FakeRegistry{}
-	SetInstallerRegistry(registry, exec.FakeExecer{})
+	SetInstallerRegistry(registry, exec.FakeExecer{
+		ExpectOS: "linux",
+	})
 
 	registry.Walk(func(s string, i core.Installer) {
 		t.Run(s, func(t *testing.T) {

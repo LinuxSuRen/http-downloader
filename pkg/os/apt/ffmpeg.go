@@ -2,8 +2,6 @@ package apt
 
 import (
 	"fmt"
-	"runtime"
-
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -14,7 +12,7 @@ type ffmpegInstallerInUbuntu struct {
 
 // Available check if support current platform
 func (d *ffmpegInstallerInUbuntu) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath("apt-get")
 		ok = err == nil
 	}

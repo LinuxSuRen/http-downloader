@@ -2,8 +2,6 @@ package dnf
 
 import (
 	"fmt"
-	"runtime"
-
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -18,7 +16,7 @@ type CommonInstaller struct {
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath("dnf")
 		ok = err == nil
 	}
@@ -27,7 +25,7 @@ func (d *CommonInstaller) Available() (ok bool) {
 
 // Install installs the target package
 func (d *CommonInstaller) Install() (err error) {
-	if err = exec.RunCommand("dnf", "install", d.Name, "-y"); err != nil {
+	if err = d.Execer.RunCommand("dnf", "install", d.Name, "-y"); err != nil {
 		return
 	}
 	return
@@ -35,7 +33,7 @@ func (d *CommonInstaller) Install() (err error) {
 
 // Uninstall uninstalls the target
 func (d *CommonInstaller) Uninstall() (err error) {
-	err = exec.RunCommand("dnf", "remove", d.Name, "-y")
+	err = d.Execer.RunCommand("dnf", "remove", d.Name, "-y")
 	return
 }
 

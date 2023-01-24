@@ -175,6 +175,9 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
+	if o.Package == nil {
+		o.Package = &installer.HDConfig{}
+	}
 	if o.target != "" {
 		o.Package.TargetDirectory = o.target
 	}

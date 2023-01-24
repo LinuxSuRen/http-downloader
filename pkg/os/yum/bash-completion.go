@@ -2,8 +2,6 @@ package yum
 
 import (
 	"fmt"
-	"runtime"
-
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -14,7 +12,7 @@ type bashCompletionInstallerInCentOS struct {
 
 // Available check if support current platform
 func (d *bashCompletionInstallerInCentOS) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath("yum")
 		ok = err == nil
 	}
@@ -23,7 +21,7 @@ func (d *bashCompletionInstallerInCentOS) Available() (ok bool) {
 
 // Install installs the bashCompletion
 func (d *bashCompletionInstallerInCentOS) Install() (err error) {
-	if err = exec.RunCommand("yum", "install", "-y", "bash-completion"); err != nil {
+	if err = d.Execer.RunCommand("yum", "install", "-y", "bash-completion"); err != nil {
 		return
 	}
 	return
@@ -31,7 +29,7 @@ func (d *bashCompletionInstallerInCentOS) Install() (err error) {
 
 // Uninstall uninstalls the bashCompletion
 func (d *bashCompletionInstallerInCentOS) Uninstall() (err error) {
-	err = exec.RunCommand("yum", "remove", "-y", "bash-completion")
+	err = d.Execer.RunCommand("yum", "remove", "-y", "bash-completion")
 	return
 }
 

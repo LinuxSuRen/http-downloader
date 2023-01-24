@@ -2,8 +2,6 @@ package yum
 
 import (
 	"fmt"
-	"runtime"
-
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -15,7 +13,7 @@ type CommonInstaller struct {
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath("yum")
 		ok = err == nil
 	}
@@ -24,10 +22,10 @@ func (d *CommonInstaller) Available() (ok bool) {
 
 // Install installs the Conntrack
 func (d *CommonInstaller) Install() (err error) {
-	if err = exec.RunCommand("yum", "update", "-y"); err != nil {
+	if err = d.Execer.RunCommand("yum", "update", "-y"); err != nil {
 		return
 	}
-	if err = exec.RunCommand("yum", "install", "-y", d.Name); err != nil {
+	if err = d.Execer.RunCommand("yum", "install", "-y", d.Name); err != nil {
 		return
 	}
 	return
@@ -35,7 +33,7 @@ func (d *CommonInstaller) Install() (err error) {
 
 // Uninstall uninstalls the Conntrack
 func (d *CommonInstaller) Uninstall() (err error) {
-	err = exec.RunCommand("yum", "remove", "-y", d.Name)
+	err = d.Execer.RunCommand("yum", "remove", "-y", d.Name)
 	return
 }
 
