@@ -3,13 +3,17 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg"
+	"os"
+
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 func newFetchCmd(context.Context) (cmd *cobra.Command) {
-	opt := &fetchOption{}
+	opt := &fetchOption{
+		fetcher: &installer.DefaultFetcher{},
+	}
 	cmd = &cobra.Command{
 		Use:     "fetch",
 		Short:   "Fetch the latest hd config",
@@ -28,31 +32,30 @@ func newFetchCmd(context.Context) (cmd *cobra.Command) {
 	return
 }
 
-func (o *fetchOption) preRunE(_ *cobra.Command, _ []string) (err error) {
-	fetcher := &installer.DefaultFetcher{}
+func (o *fetchOption) preRunE(c *cobra.Command, _ []string) (err error) {
+	if c.Context() != nil {
+		o.fetcher.SetContext(c.Context())
+	}
 	if o.reset {
 		var configDir string
-		if configDir, err = fetcher.GetConfigDir(); err == nil {
-			if err = os.RemoveAll(configDir); err != nil {
-				err = fmt.Errorf("failed to remove directory: %s, error %v", configDir, err)
-				return
-			}
+		if configDir, err = o.fetcher.GetConfigDir(); err == nil {
+			err = os.RemoveAll(configDir)
+			err = pkg.ErrorWrap(err, "failed to remove directory: %s, error %v", configDir, err)
 		} else {
 			err = fmt.Errorf("failed to get config directory, error %v", err)
-			return
 		}
 	}
 	return
 }
 
 func (o *fetchOption) runE(cmd *cobra.Command, _ []string) (err error) {
-	fetcher := &installer.DefaultFetcher{}
-	return fetcher.FetchLatestRepo(o.Provider, o.branch, cmd.OutOrStdout())
+	return o.fetcher.FetchLatestRepo(o.Provider, o.branch, cmd.OutOrStdout())
 }
 
 type fetchOption struct {
 	searchOption
 
-	branch string
-	reset  bool
+	branch  string
+	reset   bool
+	fetcher installer.Fetcher
 }

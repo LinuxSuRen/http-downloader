@@ -2,8 +2,8 @@ package os
 
 import (
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg"
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/linuxsuren/http-downloader/pkg/os/apk"
@@ -47,6 +47,7 @@ type genericPackage struct {
 
 	// inner fields
 	proxyMap map[string]string
+	execer   exec.Execer
 }
 
 // CmdWithArgs is a command with arguments
@@ -63,10 +64,8 @@ func parseGenericPackages(configFile string, genericPackages *genericPackages) (
 		return
 	}
 
-	if err = yaml.Unmarshal(data, genericPackages); err != nil {
-		err = fmt.Errorf("failed to parse config file [%s], error: %v", configFile, err)
-		return
-	}
+	err = yaml.Unmarshal(data, genericPackages)
+	err = pkg.ErrorWrap(err, "failed to parse config file [%s], error: %v", configFile, err)
 	return
 }
 
@@ -153,7 +152,7 @@ func (i *genericPackage) Install() (err error) {
 		preInstall := i.PreInstall[index]
 
 		needInstall := false
-		if preInstall.IssuePrefix != "" && runtime.GOOS == "linux" {
+		if preInstall.IssuePrefix != "" && i.execer.OS() == exec.OSLinux {
 			var data []byte
 			if data, err = os.ReadFile("/etc/issue"); err != nil {
 				return
@@ -169,7 +168,7 @@ func (i *genericPackage) Install() (err error) {
 		if needInstall {
 			preInstall.Cmd.Args = i.sliceReplace(preInstall.Cmd.Args)
 
-			if err = exec.RunCommand(preInstall.Cmd.Cmd, preInstall.Cmd.Args...); err != nil {
+			if err = i.execer.RunCommand(preInstall.Cmd.Cmd, preInstall.Cmd.Args...); err != nil {
 				return
 			}
 		}

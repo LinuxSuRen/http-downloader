@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	cotesting "github.com/linuxsuren/cobra-extension/pkg/testing"
@@ -70,28 +71,36 @@ func TestInstallPreRunE(t *testing.T) {
 		args      args
 		expectErr bool
 	}{{
-		name:      "tool and category are empty",
-		opt:       &installOption{},
+		name: "tool and category are empty",
+		opt: &installOption{
+			downloadOption: &downloadOption{},
+		},
 		expectErr: true,
 	}, {
 		name: "a fake tool that have an invalid path, no category",
 		opt: &installOption{
-			downloadOption: downloadOption{searchOption: searchOption{Fetch: false}},
+			downloadOption: &downloadOption{
+				searchOption: searchOption{Fetch: false},
+				wait:         &sync.WaitGroup{},
+			},
 		},
 		args: args{
 			args: []string{"xx@xx@xx"},
+			cmd:  &cobra.Command{},
 		},
 		expectErr: true,
 	}, {
 		name: "have category",
 		opt: &installOption{
-			downloadOption: downloadOption{
+			downloadOption: &downloadOption{
 				searchOption: searchOption{Fetch: false},
 				Category:     "tool",
+				wait:         &sync.WaitGroup{},
 			},
 		},
 		args: args{
 			args: []string{"xx@xx@xx"},
+			cmd:  &cobra.Command{},
 		},
 		expectErr: false,
 	}} {
@@ -108,6 +117,7 @@ func TestInstallPreRunE(t *testing.T) {
 
 func TestShouldInstall(t *testing.T) {
 	opt := &installOption{
+		downloadOption: &downloadOption{},
 		execer: &exec.FakeExecer{
 			ExpectOutput: "v1.2.3",
 		},
@@ -122,7 +132,7 @@ func TestShouldInstall(t *testing.T) {
 			execer: &exec.FakeExecer{
 				ExpectOutput: "v1.2.3",
 			},
-			downloadOption: downloadOption{
+			downloadOption: &downloadOption{
 				Package: &installer.HDConfig{
 					Version: "v1.2.4",
 				},
@@ -160,8 +170,9 @@ func TestInstall(t *testing.T) {
 	}{{
 		name: "is a nativePackage, but it's exist",
 		opt: &installOption{
-			nativePackage: true,
-			execer:        exec.FakeExecer{},
+			downloadOption: &downloadOption{},
+			nativePackage:  true,
+			execer:         exec.FakeExecer{},
 		},
 		args:      args{cmd: &cobra.Command{}},
 		expectErr: false,

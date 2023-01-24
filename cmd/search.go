@@ -11,7 +11,9 @@ import (
 )
 
 func newSearchCmd(context.Context) (cmd *cobra.Command) {
-	opt := &searchOption{}
+	opt := &searchOption{
+		fetcher: &installer.DefaultFetcher{},
+	}
 
 	cmd = &cobra.Command{
 		Use:     "search",
@@ -28,6 +30,7 @@ type searchOption struct {
 	Fetch       bool
 	Provider    string
 	ProxyGitHub string
+	fetcher     installer.Fetcher
 }
 
 func (s *searchOption) addFlags(flags *pflag.FlagSet) {
@@ -41,7 +44,7 @@ Thanks to https://github.com/hunshcn/gh-proxy`)
 }
 
 func (s *searchOption) runE(_ *cobra.Command, args []string) (err error) {
-	err = search(args[0], s.Fetch, &installer.DefaultFetcher{})
+	err = search(args[0], s.Fetch, s.fetcher)
 	return
 }
 

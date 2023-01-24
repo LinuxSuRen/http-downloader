@@ -27,7 +27,7 @@ func init() {
 	}
 	yum.SetInstallerRegistry(defaultInstallerRegistry, defaultExecer)
 	apt.SetInstallerRegistry(defaultInstallerRegistry, defaultExecer)
-	docker.SetInstallerRegistry(defaultInstallerRegistry)
+	docker.SetInstallerRegistry(defaultInstallerRegistry, defaultExecer)
 
 	var userHome string
 	var err error

@@ -1,6 +1,7 @@
 package generic
 
 import (
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,4 +24,19 @@ func TestSliceReplace(t *testing.T) {
 	// an empty slice
 	noProxyInstaller := &CommonInstaller{}
 	assert.Equal(t, []string{"abc"}, noProxyInstaller.sliceReplace([]string{"abc"}))
+}
+
+func TestCommonInstaller(t *testing.T) {
+	installer := &CommonInstaller{
+		Execer: exec.FakeExecer{},
+	}
+	assert.Nil(t, installer.Install())
+	assert.Nil(t, installer.Uninstall())
+	assert.True(t, installer.Available())
+	assert.Nil(t, installer.Stop())
+	assert.Nil(t, installer.Start())
+
+	ok, err := installer.WaitForStart()
+	assert.True(t, ok)
+	assert.Nil(t, err)
 }

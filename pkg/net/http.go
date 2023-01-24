@@ -371,7 +371,7 @@ func DetectSizeWithRoundTripper(targetURL, output string, showProgress bool, noP
 		URL:            targetURL,
 		ShowProgress:   showProgress,
 		RoundTripper:   roundTripper,
-		NoProxy:        noProxy,
+		NoProxy:        false, // below HTTP request does not need proxy
 	}
 
 	var detectOffset int64

@@ -18,17 +18,15 @@ func (d *bitbucket) Available() (ok bool) {
 
 // Install installs the bitbucket
 func (d *bitbucket) Install() (err error) {
-	if err = exec.RunCommand("docker", "run", `--name=bitbucket`, "-d",
-		"-p", "7990:7990", "-p", "7999:7999", "atlassian/bitbucket"); err != nil {
-		return
-	}
+	err = d.Execer.RunCommand("docker", "run", `--name=bitbucket`, "-d",
+		"-p", "7990:7990", "-p", "7999:7999", "atlassian/bitbucket")
 	return
 }
 
 // Uninstall uninstalls the bitbucket
 func (d *bitbucket) Uninstall() (err error) {
 	if err = d.Stop(); err == nil {
-		err = exec.RunCommand("docker", "rm", "bitbucket")
+		err = d.Execer.RunCommand("docker", "rm", "bitbucket")
 	}
 	return
 }
@@ -41,12 +39,12 @@ func (d *bitbucket) WaitForStart() (ok bool, err error) {
 
 // Start starts the bitbucket service
 func (d *bitbucket) Start() (err error) {
-	err = exec.RunCommand("docker", "start", "bitbucket")
+	err = d.Execer.RunCommand("docker", "start", "bitbucket")
 	return
 }
 
 // Stop stops the bitbucket service
 func (d *bitbucket) Stop() (err error) {
-	err = exec.RunCommand("docker", "stop", "bitbucket")
+	err = d.Execer.RunCommand("docker", "stop", "bitbucket")
 	return
 }

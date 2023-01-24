@@ -58,7 +58,7 @@ func (d *dockerInstallerInUbuntu) Install() (err error) {
 		return
 	}
 	var release string
-	if release, err = exec.RunCommandAndReturn("lsb_release", "", "-cs"); err == nil {
+	if release, err = d.Execer.RunCommandAndReturn("lsb_release", "", "-cs"); err == nil {
 		item := fmt.Sprintf("deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu %s stable",
 			strings.TrimSpace(release))
 		if err = os.WriteFile("/etc/apt/sources.list.d/docker.list", []byte(item), 0622); err != nil {
@@ -81,25 +81,24 @@ func (d *dockerInstallerInUbuntu) Install() (err error) {
 
 // Uninstall uninstalls the Docker
 func (d *dockerInstallerInUbuntu) Uninstall() (err error) {
-	if err = exec.RunCommand("apt-get", "remove", "-y",
+	if err = d.Execer.RunCommand("apt-get", "remove", "-y",
 		"docker",
 		"docker-engine",
 		"docker.io",
 		"containerd",
-		"runc"); err != nil {
-		return
+		"runc"); err == nil {
+		err = d.Execer.RunCommand("apt-get", "purge", "-y",
+			"docker-ce",
+			"docker-ce-cli",
+			"containerd.io")
 	}
-	err = exec.RunCommand("apt-get", "purge", "-y",
-		"docker-ce",
-		"docker-ce-cli",
-		"containerd.io")
 	return
 }
 
 // WaitForStart waits for the service be started
 func (d *dockerInstallerInUbuntu) WaitForStart() (ok bool, err error) {
 	var result string
-	if result, err = exec.RunCommandAndReturn("systemctl", "", "status", "docker"); err != nil {
+	if result, err = d.Execer.RunCommandAndReturn("systemctl", "", "status", "docker"); err != nil {
 		return
 	} else if strings.Contains(result, "Unit docker.service could not be found") {
 		err = fmt.Errorf("unit docker.service could not be found")

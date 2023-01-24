@@ -1,6 +1,9 @@
 package fake
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/os/core"
+)
 
 // Installer only for test purpose
 type Installer struct {
@@ -9,7 +12,7 @@ type Installer struct {
 }
 
 // NewFakeInstaller returns a Installer
-func NewFakeInstaller(support bool, hasError bool) *Installer {
+func NewFakeInstaller(support bool, hasError bool) core.Installer {
 	return &Installer{
 		hasError: hasError,
 		support:  support,

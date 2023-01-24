@@ -4,3 +4,4 @@ bin/
 */**/*.xml
 coverage.out
 node_modules
+release/

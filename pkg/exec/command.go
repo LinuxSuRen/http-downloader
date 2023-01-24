@@ -14,10 +14,21 @@ type Execer interface {
 	LookPath(string) (string, error)
 	Command(name string, arg ...string) ([]byte, error)
 	RunCommand(name string, arg ...string) (err error)
+	RunCommandInDir(name, dir string, args ...string) error
+	RunCommandAndReturn(name, dir string, args ...string) (result string, err error)
+	RunCommandWithSudo(name string, args ...string) (err error)
+	RunCommandWithBuffer(name, dir string, stdout, stderr *bytes.Buffer, args ...string) error
 	RunCommandWithIO(name, dir string, stdout, stderr io.Writer, args ...string) (err error)
 	OS() string
 	Arch() string
 }
+
+const (
+	// OSLinux is the alias of Linux
+	OSLinux = "linux"
+	// OSDarwin is the alias of Darwin
+	OSDarwin = "darwin"
+)
 
 // DefaultExecer is a wrapper for the OS exec
 type DefaultExecer struct {
@@ -28,7 +39,7 @@ func (e DefaultExecer) LookPath(file string) (string, error) {
 	return exec.LookPath(file)
 }
 
-// Command is the wrapper  of os/exec.Command
+// Command is the wrapper of os/exec.Command
 func (e DefaultExecer) Command(name string, arg ...string) ([]byte, error) {
 	return exec.Command(name, arg...).CombinedOutput()
 }
@@ -83,9 +94,9 @@ func (e DefaultExecer) Arch() string {
 }
 
 // RunCommandAndReturn runs a command, then returns the output
-func RunCommandAndReturn(name, dir string, args ...string) (result string, err error) {
+func (e DefaultExecer) RunCommandAndReturn(name, dir string, args ...string) (result string, err error) {
 	stdout := &bytes.Buffer{}
-	if err = RunCommandWithBuffer(name, dir, stdout, nil, args...); err == nil {
+	if err = e.RunCommandWithBuffer(name, dir, stdout, nil, args...); err == nil {
 		result = stdout.String()
 	}
 	return
@@ -93,39 +104,27 @@ func RunCommandAndReturn(name, dir string, args ...string) (result string, err e
 
 // RunCommandWithBuffer runs a command with buffer
 // stdout and stderr could be nil
-func RunCommandWithBuffer(name, dir string, stdout, stderr *bytes.Buffer, args ...string) error {
+func (e DefaultExecer) RunCommandWithBuffer(name, dir string, stdout, stderr *bytes.Buffer, args ...string) error {
 	if stdout == nil {
 		stdout = &bytes.Buffer{}
 	}
 	if stderr != nil {
 		stderr = &bytes.Buffer{}
 	}
-	return RunCommandWithIO(name, dir, stdout, stderr, args...)
-}
-
-// RunCommandWithIO runs a command with given IO
-// Deprecated, use DefaultExecer.RunCommandWithIO instead
-func RunCommandWithIO(name, dir string, stdout, stderr io.Writer, args ...string) error {
-	execer := DefaultExecer{}
-	return execer.RunCommandWithIO(name, dir, stdout, stderr, args...)
+	return e.RunCommandWithIO(name, dir, stdout, stderr, args...)
 }
 
 // RunCommandInDir runs a command
-func RunCommandInDir(name, dir string, args ...string) error {
-	return RunCommandWithIO(name, dir, os.Stdout, os.Stderr, args...)
-}
-
-// RunCommand runs a command
-func RunCommand(name string, arg ...string) (err error) {
-	return RunCommandInDir(name, "", arg...)
+func (e DefaultExecer) RunCommandInDir(name, dir string, args ...string) error {
+	return e.RunCommandWithIO(name, dir, os.Stdout, os.Stderr, args...)
 }
 
 // RunCommandWithSudo runs a command with sudo
-func RunCommandWithSudo(name string, args ...string) (err error) {
+func (e DefaultExecer) RunCommandWithSudo(name string, args ...string) (err error) {
 	newArgs := make([]string, 0)
 	newArgs = append(newArgs, name)
 	newArgs = append(newArgs, args...)
-	return RunCommand("sudo", newArgs...)
+	return e.RunCommand("sudo", newArgs...)
 }
 
 func copyAndCapture(w io.Writer, r io.Reader) ([]byte, error) {

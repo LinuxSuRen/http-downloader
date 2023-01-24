@@ -33,19 +33,17 @@ func GreatThan(target, output string) (ok bool) {
 func GetSemVersion(output string) (semVersion semver.Version, err error) {
 	var verReg *regexp.Regexp
 	verReg, err = regexp.Compile(`(v\d.+\d+.\d+)|(\d.+\d+.\d+)`)
-	if err != nil {
-		return
-	}
+	if err == nil {
+		for _, line := range strings.Split(output, "\n") {
+			line = verReg.FindString(line)
+			if line == "" {
+				continue
+			}
 
-	for _, line := range strings.Split(output, "\n") {
-		line = verReg.FindString(line)
-		if line == "" {
-			continue
-		}
-
-		semVersion, err = semver.ParseTolerant(line)
-		if err == nil {
-			break
+			semVersion, err = semver.ParseTolerant(line)
+			if err == nil {
+				break
+			}
 		}
 	}
 	return

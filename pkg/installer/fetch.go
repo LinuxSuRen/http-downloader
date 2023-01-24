@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -31,10 +32,12 @@ type Fetcher interface {
 	GetConfigDir() (configDir string, err error)
 	FetchLatestRepo(provider string, branch string,
 		progress io.Writer) (err error)
+	SetContext(ctx context.Context)
 }
 
 // DefaultFetcher is the default fetcher which fetches the config files from a git repository
 type DefaultFetcher struct {
+	ctx context.Context
 }
 
 // GetConfigDir returns the directory of the config
@@ -44,6 +47,11 @@ func (f *DefaultFetcher) GetConfigDir() (configDir string, err error) {
 		configDir = path.Join(userHome, "/.config/hd-home")
 	}
 	return
+}
+
+// SetContext sets the context of the fetch
+func (f *DefaultFetcher) SetContext(ctx context.Context) {
+	f.ctx = ctx
 }
 
 // FetchLatestRepo fetches the hd-home as the config
@@ -76,13 +84,40 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 		if repo, err = git.PlainOpen(configDir); err == nil {
 			var wd *git.Worktree
 
+			var gitConfig *config.Config
+			if gitConfig, err = repo.Config(); err != nil {
+				return
+			}
+			if gitConfig.Branches == nil {
+				gitConfig.Branches = map[string]*config.Branch{
+					branch: {
+						Name:   branch,
+						Remote: remoteName,
+						Merge:  plumbing.NewBranchReferenceName(branch),
+					},
+				}
+			}
+
+			var branchObj *config.Branch
+			if branchObj, err = repo.Branch(branch); err != nil && err != git.ErrBranchNotFound {
+				return
+			}
+
+			if branchObj != nil {
+				branchObj.Remote = remoteName
+				gitConfig.Branches[branch] = branchObj
+			}
+			if err = repo.SetConfig(gitConfig); err != nil {
+				return
+			}
+
 			if wd, err = repo.Worktree(); err == nil {
 				if err = makeSureRemote(remoteName, repoAddr, repo); err != nil {
 					err = fmt.Errorf("cannot add remote: %s, address: %s, error: %v", remoteName, repoAddr, err)
 					return
 				}
 
-				if err = repo.Fetch(&git.FetchOptions{
+				if err = repo.FetchContext(f.ctx, &git.FetchOptions{
 					RemoteName: remoteName,
 					Progress:   progress,
 					Force:      true,
@@ -91,31 +126,34 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 					return
 				}
 
-				head, _ := repo.Head()
-				if head != nil {
-					// avoid force push from remote
-					if err = wd.Reset(&git.ResetOptions{
-						Commit: head.Hash(),
-						Mode:   git.HardReset,
-					}); err != nil {
-						err = fmt.Errorf("unable to reset to '%s'", head.Hash().String())
-						return
-					}
+				var head *plumbing.Reference
+				if head, err = repo.Reference(plumbing.NewRemoteReferenceName(remoteName, branch), true); err != nil {
+					return
+				}
+				// avoid force push from remote
+				if err = wd.Reset(&git.ResetOptions{
+					Commit: head.Hash(),
+					Mode:   git.HardReset,
+				}); err != nil {
+					err = fmt.Errorf("unable to reset to '%s'", head.Hash().String())
+					return
 				}
 
 				if err = wd.Checkout(&git.CheckoutOptions{
-					Branch: plumbing.NewRemoteReferenceName(remoteName, branch),
-					Create: false,
-					Keep:   true,
-				}); err != nil {
+					Branch: plumbing.NewBranchReferenceName(branch),
+					Create: true,
+					Force:  true,
+					//Keep:   true,
+				}); err != nil && !strings.Contains(err.Error(), "already exists") {
 					err = fmt.Errorf("unable to checkout git branch: %s, error: %v", branch, err)
 					return
 				}
 
-				if err = wd.Pull(&git.PullOptions{
-					RemoteName: remoteName,
-					Progress:   progress,
-					Force:      true,
+				if err = wd.PullContext(f.ctx, &git.PullOptions{
+					RemoteName:    remoteName,
+					ReferenceName: plumbing.NewBranchReferenceName(branch),
+					Progress:      progress,
+					Force:         true,
 				}); err != nil && err != git.NoErrAlreadyUpToDate {
 					err = fmt.Errorf("failed to pull git repository '%s', error: %v", repo, err)
 					return
@@ -128,7 +166,7 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 	} else {
 		_, _ = fmt.Fprintf(progress, "no local config exist, try to clone it\n")
 
-		if _, err = git.PlainClone(configDir, false, &git.CloneOptions{
+		if _, err = git.PlainCloneContext(f.ctx, configDir, false, &git.CloneOptions{
 			RemoteName: remoteName,
 			URL:        repoAddr,
 			Progress:   progress,
@@ -169,9 +207,12 @@ func (f *FakeFetcher) GetConfigDir() (configDir string, err error) {
 	return
 }
 
-// FetchLatestRepo is fake method
+// FetchLatestRepo is a fake method
 func (f *FakeFetcher) FetchLatestRepo(provider string, branch string,
 	progress io.Writer) (err error) {
 	err = f.FetchLatestRepoErr
 	return
 }
+
+// SetContext is a fake method
+func (f *FakeFetcher) SetContext(ctx context.Context) {}

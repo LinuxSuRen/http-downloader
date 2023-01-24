@@ -21,10 +21,10 @@ func (d *ffmpegInstallerInUbuntu) Available() (ok bool) {
 
 // Install installs the ffmpeg
 func (d *ffmpegInstallerInUbuntu) Install() (err error) {
-	if err = exec.RunCommand("apt-get", "update", "-y"); err != nil {
+	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err != nil {
 		return
 	}
-	if err = exec.RunCommand("apt-get", "install", "-y",
+	if err = d.Execer.RunCommand("apt-get", "install", "-y",
 		"ffmpeg"); err != nil {
 		return
 	}
@@ -33,7 +33,7 @@ func (d *ffmpegInstallerInUbuntu) Install() (err error) {
 
 // Uninstall uninstalls the ffmpeg
 func (d *ffmpegInstallerInUbuntu) Uninstall() (err error) {
-	err = exec.RunCommand("apt-get", "remove", "-y",
+	err = d.Execer.RunCommand("apt-get", "remove", "-y",
 		"ffmpeg")
 	return
 }

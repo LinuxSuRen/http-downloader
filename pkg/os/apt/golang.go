@@ -32,7 +32,7 @@ func (d *golangInstallerInUbuntu) Install() (err error) {
 
 // Uninstall uninstalls the golang
 func (d *golangInstallerInUbuntu) Uninstall() (err error) {
-	err = exec.RunCommand("apt-get", "remove", "-y", "golang-go")
+	err = d.Execer.RunCommand("apt-get", "remove", "-y", "golang-go")
 	return
 }
 

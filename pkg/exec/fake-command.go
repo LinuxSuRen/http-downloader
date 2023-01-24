@@ -1,6 +1,9 @@
 package exec
 
-import "io"
+import (
+	"bytes"
+	"io"
+)
 
 // FakeExecer is for the unit test purposes
 type FakeExecer struct {
@@ -22,6 +25,28 @@ func (f FakeExecer) Command(name string, arg ...string) ([]byte, error) {
 
 // RunCommand runs a command
 func (f FakeExecer) RunCommand(name string, arg ...string) error {
+	return f.ExpectError
+}
+
+// RunCommandInDir is a fake method
+func (f FakeExecer) RunCommandInDir(name, dir string, args ...string) error {
+	return f.ExpectError
+}
+
+// RunCommandAndReturn is a fake method
+func (f FakeExecer) RunCommandAndReturn(name, dir string, args ...string) (result string, err error) {
+	err = f.ExpectError
+	result = f.ExpectOutput
+	return
+}
+
+// RunCommandWithSudo is a fake method
+func (f FakeExecer) RunCommandWithSudo(name string, args ...string) (err error) {
+	return f.ExpectError
+}
+
+// RunCommandWithBuffer is a fake method
+func (f FakeExecer) RunCommandWithBuffer(name, dir string, stdout, stderr *bytes.Buffer, args ...string) error {
 	return f.ExpectError
 }
 

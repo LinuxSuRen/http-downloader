@@ -29,4 +29,10 @@ func TestLookPath(t *testing.T) {
 	assert.Equal(t, "arch", fake.Arch())
 	assert.Nil(t, fake.RunCommand("", ""))
 	assert.Nil(t, fake.RunCommandWithIO("", "", nil, nil))
+	assert.Nil(t, fake.RunCommandInDir("", ""))
+
+	_, err = fake.RunCommandAndReturn("", "")
+	assert.Nil(t, err)
+	assert.Nil(t, fake.RunCommandWithSudo("", ""))
+	assert.Nil(t, fake.RunCommandWithBuffer("", "", nil, nil))
 }

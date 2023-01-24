@@ -22,11 +22,8 @@ func (d *CommonInstaller) Available() (ok bool) {
 
 // Install installs the Conntrack
 func (d *CommonInstaller) Install() (err error) {
-	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err != nil {
-		return
-	}
-	if err = d.Execer.RunCommand("apt-get", "install", "-y", d.Name); err != nil {
-		return
+	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err == nil {
+		err = d.Execer.RunCommand("apt-get", "install", "-y", d.Name)
 	}
 	return
 }

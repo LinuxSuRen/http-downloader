@@ -24,7 +24,7 @@ func (d *asciinemaInstallerInUbuntu) Install() (err error) {
 	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err != nil {
 		return
 	}
-	if err = exec.RunCommand("apt-get", "install", "-y",
+	if err = d.Execer.RunCommand("apt-get", "install", "-y",
 		"asciinema"); err != nil {
 		return
 	}

@@ -62,7 +62,7 @@ func (d *dockerInstallerInCentOS) Uninstall() (err error) {
 // WaitForStart waits for the service be started
 func (d *dockerInstallerInCentOS) WaitForStart() (ok bool, err error) {
 	var result string
-	if result, err = exec.RunCommandAndReturn("systemctl", "", "status", "docker"); err != nil {
+	if result, err = d.Execer.RunCommandAndReturn("systemctl", "", "status", "docker"); err != nil {
 		return
 	} else if strings.Contains(result, "Unit docker.service could not be found") {
 		err = fmt.Errorf("unit docker.service could not be found")

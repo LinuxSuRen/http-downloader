@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"sync"
 	"testing"
 	"time"
 
@@ -68,7 +69,9 @@ func Test_newGetCmd(t *testing.T) {
 }
 
 func TestFetch(t *testing.T) {
-	opt := &downloadOption{}
+	opt := &downloadOption{
+		wait: &sync.WaitGroup{},
+	}
 	opt.Fetch = false
 	opt.fetcher = &installer.FakeFetcher{FetchLatestRepoErr: errors.New("fake")}
 
@@ -85,7 +88,9 @@ func TestFetch(t *testing.T) {
 }
 
 func TestPreRunE(t *testing.T) {
-	opt := &downloadOption{}
+	opt := &downloadOption{
+		wait: &sync.WaitGroup{},
+	}
 	opt.Fetch = true
 	opt.fetcher = &installer.FakeFetcher{FetchLatestRepoErr: errors.New("fake")}
 	opt.PrintSchema = true
@@ -94,17 +99,18 @@ func TestPreRunE(t *testing.T) {
 	assert.Nil(t, opt.preRunE(nil, nil))
 
 	// failed to fetch
+	fakeC := &cobra.Command{}
 	opt.PrintSchema = false
-	assert.NotNil(t, opt.preRunE(nil, nil))
+	assert.NotNil(t, opt.preRunE(fakeC, nil))
 
 	// pripnt categories
 	opt.fetcher = &installer.FakeFetcher{}
 	opt.PrintCategories = true
-	assert.Nil(t, opt.preRunE(nil, nil))
+	assert.Nil(t, opt.preRunE(fakeC, nil))
 
 	// not args provided
 	opt.PrintCategories = false
-	assert.NotNil(t, opt.preRunE(nil, nil))
+	assert.NotNil(t, opt.preRunE(fakeC, nil))
 }
 
 func TestRunE(t *testing.T) {

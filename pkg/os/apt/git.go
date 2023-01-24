@@ -21,20 +21,16 @@ func (d *gitInstallerInUbuntu) Available() (ok bool) {
 
 // Install installs the git
 func (d *gitInstallerInUbuntu) Install() (err error) {
-	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err != nil {
-		return
-	}
-	if err = d.Execer.RunCommand("apt-get", "install", "-y",
-		"git"); err != nil {
-		return
+	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err == nil {
+		err = d.Execer.RunCommand("apt-get", "install", "-y",
+			"git")
 	}
 	return
 }
 
 // Uninstall uninstalls the git
 func (d *gitInstallerInUbuntu) Uninstall() (err error) {
-	err = d.Execer.RunCommand("apt-get", "remove", "-y",
-		"git")
+	err = d.Execer.RunCommand("apt-get", "remove", "-y", "git")
 	return
 }
 
