@@ -2,8 +2,6 @@ package apt
 
 import (
 	"fmt"
-	"runtime"
-
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -14,7 +12,7 @@ type golangInstallerInUbuntu struct {
 
 // Available check if support current platform
 func (d *golangInstallerInUbuntu) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath("apt-get")
 		ok = err == nil
 	}
@@ -23,10 +21,10 @@ func (d *golangInstallerInUbuntu) Available() (ok bool) {
 
 // Install installs the golang
 func (d *golangInstallerInUbuntu) Install() (err error) {
-	if err = exec.RunCommand("apt-get", "update", "-y"); err != nil {
+	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err != nil {
 		return
 	}
-	if err = exec.RunCommand("apt-get", "install", "-y", "golang-go"); err != nil {
+	if err = d.Execer.RunCommand("apt-get", "install", "-y", "golang-go"); err != nil {
 		return
 	}
 	return
@@ -34,7 +32,7 @@ func (d *golangInstallerInUbuntu) Install() (err error) {
 
 // Uninstall uninstalls the golang
 func (d *golangInstallerInUbuntu) Uninstall() (err error) {
-	err = exec.RunCommand("apt-get", "remove", "-y", "golang-go")
+	err = d.Execer.RunCommand("apt-get", "remove", "-y", "golang-go")
 	return
 }
 

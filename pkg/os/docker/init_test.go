@@ -1,4 +1,4 @@
-package yum
+package docker
 
 import (
 	"testing"
@@ -11,24 +11,19 @@ import (
 func TestCommonCase(t *testing.T) {
 	registry := &core.FakeRegistry{}
 	SetInstallerRegistry(registry, exec.FakeExecer{
-		ExpectOutput: "Active: active",
-		ExpectOS:     "linux",
+		ExpectOS: "linux",
 	})
 
 	registry.Walk(func(s string, i core.Installer) {
 		t.Run(s, func(t *testing.T) {
 			assert.True(t, i.Available())
-			if s != "golang" {
-				assert.Nil(t, i.Install())
-			}
+			assert.Nil(t, i.Start())
+			assert.Nil(t, i.Stop())
+			assert.Nil(t, i.Install())
 			assert.Nil(t, i.Uninstall())
-			if s != "docker" {
-				assert.Nil(t, i.Start())
-				assert.Nil(t, i.Stop())
-			}
 			ok, err := i.WaitForStart()
-			assert.True(t, ok)
 			assert.Nil(t, err)
+			assert.True(t, ok)
 		})
 	})
 }

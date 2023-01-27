@@ -3,11 +3,14 @@ package cmd
 import (
 	"context"
 	"errors"
+	"sync"
+	"testing"
+
 	cotesting "github.com/linuxsuren/cobra-extension/pkg/testing"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
+	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func Test_newInstallCmd(t *testing.T) {
@@ -68,28 +71,36 @@ func TestInstallPreRunE(t *testing.T) {
 		args      args
 		expectErr bool
 	}{{
-		name:      "tool and category are empty",
-		opt:       &installOption{},
+		name: "tool and category are empty",
+		opt: &installOption{
+			downloadOption: &downloadOption{},
+		},
 		expectErr: true,
 	}, {
 		name: "a fake tool that have an invalid path, no category",
 		opt: &installOption{
-			downloadOption: downloadOption{searchOption: searchOption{Fetch: false}},
+			downloadOption: &downloadOption{
+				searchOption: searchOption{Fetch: false},
+				wait:         &sync.WaitGroup{},
+			},
 		},
 		args: args{
 			args: []string{"xx@xx@xx"},
+			cmd:  &cobra.Command{},
 		},
 		expectErr: true,
 	}, {
 		name: "have category",
 		opt: &installOption{
-			downloadOption: downloadOption{
+			downloadOption: &downloadOption{
 				searchOption: searchOption{Fetch: false},
 				Category:     "tool",
+				wait:         &sync.WaitGroup{},
 			},
 		},
 		args: args{
 			args: []string{"xx@xx@xx"},
+			cmd:  &cobra.Command{},
 		},
 		expectErr: false,
 	}} {
@@ -106,12 +117,32 @@ func TestInstallPreRunE(t *testing.T) {
 
 func TestShouldInstall(t *testing.T) {
 	opt := &installOption{
-		execer: &exec.FakeExecer{},
-		tool:   "fake",
+		downloadOption: &downloadOption{},
+		execer: &exec.FakeExecer{
+			ExpectOutput: "v1.2.3",
+		},
+		tool: "fake",
 	}
 	should, exist := opt.shouldInstall()
 	assert.False(t, should)
 	assert.True(t, exist)
+
+	{
+		optGreater := &installOption{
+			execer: &exec.FakeExecer{
+				ExpectOutput: "v1.2.3",
+			},
+			downloadOption: &downloadOption{
+				Package: &installer.HDConfig{
+					Version: "v1.2.4",
+				},
+			},
+			tool: "fake",
+		}
+		should, exist := optGreater.shouldInstall()
+		assert.True(t, should)
+		assert.True(t, exist)
+	}
 
 	// force to install
 	opt.force = true
@@ -139,8 +170,9 @@ func TestInstall(t *testing.T) {
 	}{{
 		name: "is a nativePackage, but it's exist",
 		opt: &installOption{
-			nativePackage: true,
-			execer:        exec.FakeExecer{},
+			downloadOption: &downloadOption{},
+			nativePackage:  true,
+			execer:         exec.FakeExecer{},
 		},
 		args:      args{cmd: &cobra.Command{}},
 		expectErr: false,

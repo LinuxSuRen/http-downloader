@@ -3,27 +3,25 @@ package cmd
 import (
 	"context"
 	"fmt"
-	sysos "os"
-	"path"
-	"runtime"
-	"strings"
-
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/os"
+	"github.com/linuxsuren/http-downloader/pkg/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	sysos "os"
+	"path"
+	"runtime"
+	"strings"
 )
 
 // newInstallCmd returns the install command
 func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &installOption{
-		downloadOption: downloadOption{
-			RoundTripper: getRoundTripper(ctx),
-		},
-		execer: &exec.DefaultExecer{},
+		downloadOption: newDownloadOption(ctx),
+		execer:         &exec.DefaultExecer{},
 	}
 	cmd = &cobra.Command{
 		Use:     "install",
@@ -72,7 +70,7 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 }
 
 type installOption struct {
-	downloadOption
+	*downloadOption
 	Download     bool
 	CleanPackage bool
 	fromSource   bool
@@ -88,10 +86,15 @@ type installOption struct {
 }
 
 func (o *installOption) shouldInstall() (should, exist bool) {
-	if _, lookErr := o.execer.LookPath(o.tool); lookErr == nil {
+	var greater bool
+	if name, lookErr := o.execer.LookPath(o.tool); lookErr == nil {
 		exist = true
+		if data, err := o.execer.Command(name, "version"); err == nil &&
+			(o.downloadOption.Package != nil && o.downloadOption.Package.Version != "") {
+			greater = version.GreatThan(o.downloadOption.Package.Version, string(data))
+		}
 	}
-	should = o.force || !exist
+	should = o.force || !exist || greater
 	return
 }
 
@@ -160,8 +163,8 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		if should, exist := o.shouldInstall(); !should {
 			if exist {
 				cmd.Printf("%s is already exist, please use the flag --force if you install it again\n", o.tool)
+				return
 			}
-			return
 		}
 
 		if err = o.downloadOption.runE(cmd, args); err != nil {
@@ -169,6 +172,9 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
+	if o.Package == nil {
+		o.Package = &installer.HDConfig{}
+	}
 	if o.target != "" {
 		o.Package.TargetDirectory = o.target
 	}
@@ -188,6 +194,7 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		CleanPackage:     o.CleanPackage,
 		AdditionBinaries: o.Package.AdditionBinaries,
 		TargetDirectory:  o.Package.TargetDirectory,
+		Execer:           o.execer,
 	}
 	// install requirements tools in the post phase
 	if len(o.Package.Requirements) > 0 {
@@ -294,7 +301,7 @@ func (o *installOption) buildGoSource() (binaryPath string, err error) {
 		return
 	}
 
-	if err = exec.RunCommandInDir("go", sysos.TempDir(), strings.Split(o.buildGoInstallCmd(), " ")[1:]...); err != nil {
+	if err = o.execer.RunCommandInDir("go", sysos.TempDir(), strings.Split(o.buildGoInstallCmd(), " ")[1:]...); err != nil {
 		err = fmt.Errorf("faield to run go install command, error: %v", err)
 		return
 	}
@@ -325,7 +332,7 @@ func (o *installOption) runGogetCommand(repo, name string) (binaryPath string, e
 	// run goget command
 	tmpPath := sysos.TempDir()
 	binaryPath = path.Join(tmpPath, name)
-	if err = exec.RunCommandInDir("goget", tmpPath, repo); err != nil {
+	if err = o.execer.RunCommandInDir("goget", tmpPath, repo); err != nil {
 		err = fmt.Errorf("faield to run go install command, error: %v", err)
 	}
 	return

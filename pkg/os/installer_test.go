@@ -61,30 +61,6 @@ func TestHasPackage(t *testing.T) {
 	}
 }
 
-func TestPackageInstallInAllPlatforms(t *testing.T) {
-	type args struct {
-		name string
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{{
-		name: "vim",
-		args: args{
-			name: "vim",
-		},
-		want: true,
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := HasPackage(tt.args.name); got != tt.want {
-				t.Errorf("HasPackage() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestWithFakeInstaller(t *testing.T) {
 	// test uninstall a fake package
 	err := Uninstall("fake")

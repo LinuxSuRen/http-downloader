@@ -2,8 +2,6 @@ package yum
 
 import (
 	"fmt"
-	"runtime"
-
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -14,7 +12,7 @@ type conntrackInstallerInCentOS struct {
 
 // Available check if support current platform
 func (d *conntrackInstallerInCentOS) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath("yum")
 		ok = err == nil
 	}
@@ -23,7 +21,7 @@ func (d *conntrackInstallerInCentOS) Available() (ok bool) {
 
 // Install installs the Docker
 func (d *conntrackInstallerInCentOS) Install() (err error) {
-	if err = exec.RunCommand("yum", "install", "-y",
+	if err = d.Execer.RunCommand("yum", "install", "-y",
 		"conntrack"); err != nil {
 		return
 	}
@@ -32,7 +30,7 @@ func (d *conntrackInstallerInCentOS) Install() (err error) {
 
 // Uninstall uninstalls the Docker
 func (d *conntrackInstallerInCentOS) Uninstall() (err error) {
-	err = exec.RunCommand("yum", "remove", "-y",
+	err = d.Execer.RunCommand("yum", "remove", "-y",
 		"conntrack")
 	return
 }

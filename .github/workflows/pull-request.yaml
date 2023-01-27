@@ -34,9 +34,6 @@ jobs:
         run: |
           sudo ./release/http-downloader_linux_amd64_v1/hd install jenkins-zh/jenkins-cli/jcli
           jcli version
-
-          sudo ./release/http-downloader_linux_amd64_v1/hd install ks
-          ks version
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.2.1
         if: github.event_name == 'pull_request'

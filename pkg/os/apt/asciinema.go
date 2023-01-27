@@ -2,8 +2,6 @@ package apt
 
 import (
 	"fmt"
-	"runtime"
-
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -14,7 +12,7 @@ type asciinemaInstallerInUbuntu struct {
 
 // Available check if support current platform
 func (d *asciinemaInstallerInUbuntu) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath("apt-get")
 		ok = err == nil
 	}
@@ -23,10 +21,10 @@ func (d *asciinemaInstallerInUbuntu) Available() (ok bool) {
 
 // Install installs the asciinema
 func (d *asciinemaInstallerInUbuntu) Install() (err error) {
-	if err = exec.RunCommand("apt-get", "update", "-y"); err != nil {
+	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err != nil {
 		return
 	}
-	if err = exec.RunCommand("apt-get", "install", "-y",
+	if err = d.Execer.RunCommand("apt-get", "install", "-y",
 		"asciinema"); err != nil {
 		return
 	}
@@ -35,7 +33,7 @@ func (d *asciinemaInstallerInUbuntu) Install() (err error) {
 
 // Uninstall uninstalls the asciinema
 func (d *asciinemaInstallerInUbuntu) Uninstall() (err error) {
-	err = exec.RunCommand("apt-get", "remove", "-y",
+	err = d.Execer.RunCommand("apt-get", "remove", "-y",
 		"asciinema")
 	return
 }

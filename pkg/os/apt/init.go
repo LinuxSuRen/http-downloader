@@ -7,10 +7,6 @@ import (
 
 // SetInstallerRegistry sets the installer of registry
 func SetInstallerRegistry(registry core.InstallerRegistry, defaultExecer exec.Execer) {
-	if defaultExecer == nil {
-		defaultExecer = exec.DefaultExecer{}
-	}
-
 	registry.Registry("docker", &dockerInstallerInUbuntu{Execer: defaultExecer})
 	registry.Registry("conntrack", &conntrackInstallerInUbuntu{Execer: defaultExecer})
 	registry.Registry("socat", &socatInstallerInUbuntu{Execer: defaultExecer})

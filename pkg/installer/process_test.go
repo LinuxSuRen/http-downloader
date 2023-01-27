@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"os"
 	"path"
 	"testing"
@@ -16,7 +17,9 @@ func TestInstallerExtractFiles(t *testing.T) {
 }
 
 func TestOverwriteBinary(t *testing.T) {
-	installer := &Installer{}
+	installer := &Installer{
+		Execer: &exec.FakeExecer{},
+	}
 
 	sourceFile := path.Join(os.TempDir(), "fake-1")
 	targetFile := path.Join(os.TempDir(), "fake-2")
@@ -31,4 +34,36 @@ func TestOverwriteBinary(t *testing.T) {
 	}()
 
 	assert.Nil(t, installer.OverWriteBinary(sourceFile, targetFile))
+}
+
+func TestInstall(t *testing.T) {
+	tests := []struct {
+		name      string
+		installer *Installer
+		hasErr    bool
+	}{{
+		name: "empty",
+		installer: &Installer{
+			Execer: exec.FakeExecer{},
+		},
+		hasErr: true,
+	}, {
+		name: "fake linux",
+		installer: &Installer{
+			Execer: exec.FakeExecer{
+				ExpectOS: exec.OSLinux,
+			},
+		},
+		hasErr: false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.installer.Install()
+			if tt.hasErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
+		})
+	}
 }

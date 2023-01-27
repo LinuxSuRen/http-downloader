@@ -33,3 +33,5 @@ gen-mock:
 update:
 	git fetch
 	git reset --hard origin/$(shell git branch --show-current)
+goreleaser:
+	goreleaser build --snapshot --rm-dist

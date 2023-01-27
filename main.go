@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
-	"github.com/linuxsuren/http-downloader/cmd"
 	"os"
+
+	"github.com/linuxsuren/http-downloader/cmd"
 )
 
 func main() {
-	if err := cmd.NewRoot(context.TODO()).Execute(); err != nil {
+	ctx := context.Background()
+	if err := cmd.NewRoot(ctx).ExecuteContext(ctx); err != nil {
 		os.Exit(1)
 	}
 }

@@ -2,15 +2,13 @@ package installer
 
 import (
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/common"
+	"github.com/linuxsuren/http-downloader/pkg/compress"
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
-
-	"github.com/linuxsuren/http-downloader/pkg/common"
-	"github.com/linuxsuren/http-downloader/pkg/compress"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // Install installs a package
@@ -38,13 +36,13 @@ func (o *Installer) Install() (err error) {
 
 	if err == nil {
 		if o.Package != nil && o.Package.PreInstalls != nil {
-			if err = runCommandList(o.Package.PreInstalls); err != nil {
+			if err = o.runCommandList(o.Package.PreInstalls); err != nil {
 				return
 			}
 		}
 
 		if o.Package != nil && o.Package.Installation != nil {
-			err = exec.RunCommand(o.Package.Installation.Cmd, o.Package.Installation.Args...)
+			err = o.Execer.RunCommand(o.Package.Installation.Cmd, o.Package.Installation.Args...)
 		} else {
 			if err = o.OverWriteBinary(source, target); err != nil {
 				return
@@ -64,7 +62,7 @@ func (o *Installer) Install() (err error) {
 				configFilePath := configFile.Path
 				configDir := filepath.Dir(configFilePath)
 
-				if configFile.OS == runtime.GOOS {
+				if configFile.OS == o.Execer.OS() {
 					if err = os.MkdirAll(configDir, 0750); err != nil {
 						err = fmt.Errorf("cannot create config dir: %s, error: %v", configDir, err)
 						return
@@ -81,11 +79,11 @@ func (o *Installer) Install() (err error) {
 		}
 
 		if err == nil && o.Package != nil && o.Package.PostInstalls != nil {
-			err = runCommandList(o.Package.PostInstalls)
+			err = o.runCommandList(o.Package.PostInstalls)
 		}
 
 		if err == nil && o.Package != nil && o.Package.TestInstalls != nil {
-			err = runCommandList(o.Package.TestInstalls)
+			err = o.runCommandList(o.Package.TestInstalls)
 		}
 
 		if err == nil && o.CleanPackage {
@@ -97,38 +95,41 @@ func (o *Installer) Install() (err error) {
 	return
 }
 
-// OverWriteBinary install a binrary file
+// OverWriteBinary install a binary file
 func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 	fmt.Println("install", sourceFile, "to", targetPath)
-	switch runtime.GOOS {
-	case "linux", "darwin":
-		if err = exec.RunCommand("chmod", "u+x", sourceFile); err != nil {
+	switch o.Execer.OS() {
+	case exec.OSLinux, exec.OSDarwin:
+		if err = o.Execer.RunCommand("chmod", "u+x", sourceFile); err != nil {
 			return
 		}
 
 		if common.IsDirWriteable(path.Dir(targetPath)) != nil {
-			if err = exec.RunCommandWithSudo("rm", "-rf", targetPath); err != nil {
+			if err = o.Execer.RunCommandWithSudo("rm", "-rf", targetPath); err != nil {
 				return
 			}
 		} else {
-			if err = exec.RunCommand("rm", "-rf", targetPath); err != nil {
+			if err = o.Execer.RunCommand("rm", "-rf", targetPath); err != nil {
 				return
 			}
 		}
 
 		if common.IsDirWriteable(path.Dir(targetPath)) != nil {
-			err = exec.RunCommandWithSudo("mv", sourceFile, targetPath)
+			err = o.Execer.RunCommandWithSudo("mv", sourceFile, targetPath)
 		} else {
-			err = exec.RunCommand("mv", sourceFile, targetPath)
+			err = o.Execer.RunCommand("mv", sourceFile, targetPath)
 		}
 	default:
-		sourceF, _ := os.Open(sourceFile)
-		targetF, _ := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, 0600)
-		if _, err = io.Copy(targetF, sourceF); err != nil {
-			err = fmt.Errorf("cannot copy %s from %s to %v, error: %v", o.Name, sourceFile, targetPath, err)
+		sourceF, sourceE := os.Open(sourceFile)
+		targetF, targetE := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, 0600)
+		if sourceE != nil || targetE != nil {
+			err = fmt.Errorf("failed to open source file: %v, or target file: %v", sourceE, targetE)
+			return
 		}
 
-		if err == nil {
+		if _, err = io.Copy(targetF, sourceF); err != nil {
+			err = fmt.Errorf("cannot copy %s from %s to %v, error: %v", o.Name, sourceFile, targetPath, err)
+		} else {
 			_ = os.RemoveAll(sourceFile)
 		}
 	}

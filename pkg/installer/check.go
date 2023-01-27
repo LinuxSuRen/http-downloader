@@ -175,6 +175,9 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 			o.Org, o.Repo, version, o.Name, o.OS, o.Arch, packagingFormat)
 	}
 
+	// set the default values
+	o.Tar = true
+
 	// try to parse from config
 	userHome, _ := homedir.Dir()
 	configDir := userHome + "/.config/hd-home"
@@ -288,6 +291,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 					}
 					o.Name = cfg.Binary
 				}
+				o.Package.Version = hdPkg.Version
 			} else {
 				err = fmt.Errorf("failed to parse YAML file: %s, error: %v", matchedFile, err)
 			}

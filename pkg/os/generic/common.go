@@ -3,7 +3,6 @@ package generic
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"syscall"
 
@@ -44,7 +43,7 @@ func (c CmdWithArgs) Run() (err error) {
 		}
 	} else {
 		fmt.Println(c.Cmd, strings.Join(c.Args, " "))
-		err = exec.RunCommand(c.Cmd, c.Args...)
+		err = c.Execer.RunCommand(c.Cmd, c.Args...)
 	}
 	return
 }
@@ -79,7 +78,7 @@ func (d *CommonInstaller) urlReplace(old string) string {
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	ok = d.OS == "" || runtime.GOOS == d.OS
+	ok = d.OS == "" || d.Execer.OS() == d.OS
 	return
 }
 

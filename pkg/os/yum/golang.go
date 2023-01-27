@@ -4,10 +4,8 @@ import (
 	// Enable go embed
 	_ "embed"
 	"fmt"
-	"os"
-	"runtime"
-
 	"github.com/linuxsuren/http-downloader/pkg/exec"
+	"os"
 )
 
 //go:embed resource/go-repo.repo
@@ -20,7 +18,7 @@ type golangInstallerInCentOS struct {
 
 // Available check if support current platform
 func (d *golangInstallerInCentOS) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath("yum")
 		ok = err == nil
 	}
@@ -29,7 +27,7 @@ func (d *golangInstallerInCentOS) Available() (ok bool) {
 
 // Install installs the golang
 func (d *golangInstallerInCentOS) Install() (err error) {
-	if err = exec.RunCommand("rpm", "--import", "https://mirror.go-repo.io/centos/RPM-GPG-KEY-GO-REPO"); err != nil {
+	if err = d.Execer.RunCommand("rpm", "--import", "https://mirror.go-repo.io/centos/RPM-GPG-KEY-GO-REPO"); err != nil {
 		return
 	}
 
@@ -37,7 +35,7 @@ func (d *golangInstallerInCentOS) Install() (err error) {
 		err = fmt.Errorf("failed to save go-repo.repo, error: %v", err)
 		return
 	}
-	if err = exec.RunCommand("yum", "install", "-y", "golang"); err != nil {
+	if err = d.Execer.RunCommand("yum", "install", "-y", "golang"); err != nil {
 		return
 	}
 	return
@@ -45,7 +43,7 @@ func (d *golangInstallerInCentOS) Install() (err error) {
 
 // Uninstall uninstalls the golang
 func (d *golangInstallerInCentOS) Uninstall() (err error) {
-	err = exec.RunCommand("yum", "remove", "-y", "golang")
+	err = d.Execer.RunCommand("yum", "remove", "-y", "golang")
 	return
 }
 

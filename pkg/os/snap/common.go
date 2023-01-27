@@ -2,8 +2,6 @@ package snap
 
 import (
 	"fmt"
-	"runtime"
-
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -19,7 +17,7 @@ type CommonInstaller struct {
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if runtime.GOOS == "linux" {
+	if d.Execer.OS() == "linux" {
 		_, err := d.Execer.LookPath(SnapName)
 		ok = err == nil
 	}
@@ -30,7 +28,7 @@ func (d *CommonInstaller) Available() (ok bool) {
 func (d *CommonInstaller) Install() (err error) {
 	args := []string{"install", d.Name}
 	args = append(args, d.Args...)
-	if err = exec.RunCommand(SnapName, args...); err != nil {
+	if err = d.Execer.RunCommand(SnapName, args...); err != nil {
 		return
 	}
 	return
@@ -38,7 +36,7 @@ func (d *CommonInstaller) Install() (err error) {
 
 // Uninstall uninstalls the target package
 func (d *CommonInstaller) Uninstall() (err error) {
-	err = exec.RunCommand(SnapName, "remove", d.Name)
+	err = d.Execer.RunCommand(SnapName, "remove", d.Name)
 	return
 }
 

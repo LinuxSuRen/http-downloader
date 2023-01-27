@@ -13,7 +13,7 @@ func (r *FakeRegistry) Registry(id string, installer Installer) {
 	r.data[id] = installer
 }
 
-// Walk allows to interate all the installers
+// Walk allows to iterate all the installers
 func (r *FakeRegistry) Walk(walkFunc func(string, Installer)) {
 	if r.data != nil {
 		for id, installer := range r.data {

@@ -31,11 +31,13 @@ func DownloadFileWithMultipleThread(targetURL, targetFilePath string, thread int
 }
 
 // DownloadFileWithMultipleThreadKeepParts downloads the files with multiple threads
+// deprecated
 func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, thread int, keepParts, showProgress bool) (err error) {
 	return net.DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath, thread, keepParts, showProgress)
 }
 
 // DownloadWithContinue downloads the files continuously
+// deprecated
 func DownloadWithContinue(targetURL, output string, index, continueAt, end int64, showProgress bool) (err error) {
 	downloader := &net.ContinueDownloader{}
 	return downloader.DownloadWithContinue(targetURL, output, index, continueAt, end, showProgress)

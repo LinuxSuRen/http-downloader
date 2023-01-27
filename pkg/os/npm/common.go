@@ -24,13 +24,13 @@ func (d *CommonInstaller) Available() (ok bool) {
 
 // Install installs the target package
 func (d *CommonInstaller) Install() (err error) {
-	err = exec.RunCommand("npm", "i", "-g", d.Name)
+	err = d.Execer.RunCommand("npm", "i", "-g", d.Name)
 	return
 }
 
 // Uninstall uninstalls the target package
 func (d *CommonInstaller) Uninstall() (err error) {
-	err = exec.RunCommand("npm", "uninstall", "-g", d.Name)
+	err = d.Execer.RunCommand("npm", "uninstall", "-g", d.Name)
 	return
 }
 

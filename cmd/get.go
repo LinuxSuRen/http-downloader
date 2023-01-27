@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"path"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
@@ -20,9 +22,7 @@ import (
 
 // newGetCmd return the get command
 func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
-	opt := &downloadOption{
-		RoundTripper: getRoundTripper(ctx),
-	}
+	opt := newDownloadOption(ctx)
 	cmd = &cobra.Command{
 		Use:     "get",
 		Short:   "download the file",
@@ -68,8 +68,18 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 	return
 }
 
+func newDownloadOption(ctx context.Context) *downloadOption {
+	return &downloadOption{
+		RoundTripper: getRoundTripper(ctx),
+		fetcher:      &installer.DefaultFetcher{},
+		wait:         &sync.WaitGroup{},
+	}
+}
+
 type downloadOption struct {
 	searchOption
+	cancel context.CancelFunc
+	wait   *sync.WaitGroup
 
 	URL              string
 	Category         string
@@ -94,12 +104,13 @@ type downloadOption struct {
 	PrintCategories   bool
 
 	// inner fields
-	name    string
-	Tar     bool
-	Package *installer.HDConfig
-	org     string
-	repo    string
-	fetcher installer.Fetcher
+	name          string
+	Tar           bool
+	Package       *installer.HDConfig
+	org           string
+	repo          string
+	fetcher       installer.Fetcher
+	ExpectVersion string // should be like >v1.1.0
 }
 
 const (
@@ -111,14 +122,19 @@ const (
 
 func (o *downloadOption) fetch() (err error) {
 	if !o.Fetch {
+		o.wait.Add(1)
+		go func() {
+			// no need to handle the error due to this is a background task
+			if o.fetcher != nil {
+				err = o.fetcher.FetchLatestRepo(o.Provider, installer.ConfigBranch, bytes.NewBuffer(nil))
+			}
+			o.wait.Done()
+		}()
 		return
 	}
 
 	// fetch the latest config
 	fmt.Println("start to fetch the config")
-	if o.fetcher == nil {
-		o.fetcher = &installer.DefaultFetcher{}
-	}
 	if err = o.fetcher.FetchLatestRepo(o.Provider, installer.ConfigBranch, sysos.Stdout); err != nil {
 		err = fmt.Errorf("unable to fetch the latest config, error: %v", err)
 		return
@@ -133,6 +149,11 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 		return
 	}
 
+	if cmd.Context() != nil {
+		ctx, cancel := context.WithCancel(cmd.Context())
+		o.cancel = cancel
+		o.fetcher.SetContext(ctx)
+	}
 	if err = o.fetch(); err != nil {
 		return
 	}
@@ -147,6 +168,7 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 	}
 
 	targetURL := args[0]
+	o.Package = &installer.HDConfig{}
 	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
 		ins := &installer.Installer{
 			Provider: o.Provider,
@@ -186,6 +208,13 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 }
 
 func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
+	defer func() {
+		if o.cancel != nil {
+			o.cancel()
+			o.wait.Wait()
+		}
+	}()
+
 	// only print the schema for documentation
 	if o.PrintSchema {
 		var data []byte
