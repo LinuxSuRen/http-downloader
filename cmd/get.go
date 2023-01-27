@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"net/http"
 	"net/url"
 	sysos "os"
@@ -126,7 +127,7 @@ func (o *downloadOption) fetch() (err error) {
 		go func() {
 			// no need to handle the error due to this is a background task
 			if o.fetcher != nil {
-				err = o.fetcher.FetchLatestRepo(o.Provider, installer.ConfigBranch, bytes.NewBuffer(nil))
+				err = o.fetcher.FetchLatestRepo(o.Provider, installer.ConfigBranch, bytes.NewBuffer([]byte{}))
 			}
 			o.wait.Done()
 		}()
@@ -169,7 +170,11 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 
 	targetURL := args[0]
 	o.Package = &installer.HDConfig{}
-	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
+	if strings.HasPrefix(targetURL, "magnet:?") {
+		// download via external tool
+		o.URL = targetURL
+		return
+	} else if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
 		ins := &installer.Installer{
 			Provider: o.Provider,
 			OS:       o.OS,
@@ -187,10 +192,6 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 		o.repo = ins.Repo
 	}
 	o.URL = targetURL
-
-	if o.ProxyGitHub != "" {
-		o.URL = strings.Replace(o.URL, "github.com", fmt.Sprintf("%s/github.com", o.ProxyGitHub), 1)
-	}
 
 	if o.Output == "" {
 		var urlObj *url.URL
@@ -246,6 +247,11 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
+	if strings.HasPrefix(o.URL, "magnet:?") {
+		err = downloadMagnetFile(o.ProxyGitHub, o.URL)
+		return
+	}
+
 	cmd.Printf("start to download from %s\n", o.URL)
 	if o.Thread <= 1 {
 		downloader := &net.ContinueDownloader{}
@@ -259,6 +265,29 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 			WithoutProxy(o.NoProxy).
 			WithRoundTripper(o.RoundTripper)
 		err = downloader.Download(o.URL, o.Output, o.Thread)
+	}
+	return
+}
+
+func downloadMagnetFile(proxyGitHub, target string) (err error) {
+	targetCmd := "gotorrent"
+	execer := exec.DefaultExecer{}
+	is := installer.Installer{
+		Provider:    "github",
+		Execer:      execer,
+		ProxyGitHub: proxyGitHub,
+	}
+	if err = is.CheckDepAndInstall(map[string]string{
+		targetCmd: "linuxsuren/gotorrent",
+	}); err != nil {
+		return
+	}
+
+	var targetBinary string
+	if targetBinary, err = execer.LookPath(targetCmd); err == nil {
+		sysCallArgs := []string{targetCmd}
+		sysCallArgs = append(sysCallArgs, []string{"download", target}...)
+		err = execer.SystemCall(targetBinary, sysCallArgs, sysos.Environ())
 	}
 	return
 }

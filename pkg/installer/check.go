@@ -35,6 +35,15 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 	if o.Execer == nil {
 		o.Execer = &exec.DefaultExecer{}
 	}
+	if o.OS == "" {
+		o.OS = o.Execer.OS()
+	}
+	if o.Arch == "" {
+		o.Arch = o.Execer.Arch()
+	}
+	if o.TargetDirectory == "" {
+		o.TargetDirectory = "/usr/local/bin"
+	}
 
 	for tool, formula := range tools {
 		if _, lookErr := o.Execer.LookPath(tool); lookErr == nil {
@@ -64,6 +73,9 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 				return
 			}
 
+			if o.ProxyGitHub != "" {
+				targetURL = strings.Replace(targetURL, "github.com", fmt.Sprintf("%s/github.com", o.ProxyGitHub), 1)
+			}
 			if err = net.DownloadFileWithMultipleThreadKeepParts(targetURL, output, 4, true, true); err == nil {
 				o.CleanPackage = true
 				o.Source = output

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
@@ -27,15 +29,23 @@ func newFetchCmd(context.Context) (cmd *cobra.Command) {
 		"The branch of git repository (not support currently)")
 	flags.BoolVarP(&opt.reset, "reset", "", false,
 		"If you want to reset the hd-config which means delete and clone it again")
+	flags.IntVarP(&opt.retry, "retry", "", 6, "Retry times due to timeout error")
+	flags.DurationVarP(&opt.timeout, "timeout", "", time.Second*10, "Timeout of fetching")
 
 	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, ProviderGitee))
 	return
 }
 
-func (o *fetchOption) preRunE(c *cobra.Command, _ []string) (err error) {
+func (o *fetchOption) setTimeout(c *cobra.Command) {
 	if c.Context() != nil {
-		o.fetcher.SetContext(c.Context())
+		var ctx context.Context
+		ctx, o.cancel = context.WithTimeout(c.Context(), o.timeout)
+		o.fetcher.SetContext(ctx)
 	}
+}
+
+func (o *fetchOption) preRunE(c *cobra.Command, _ []string) (err error) {
+	o.setTimeout(c)
 	if o.reset {
 		var configDir string
 		if configDir, err = o.fetcher.GetConfigDir(); err == nil {
@@ -48,8 +58,21 @@ func (o *fetchOption) preRunE(c *cobra.Command, _ []string) (err error) {
 	return
 }
 
-func (o *fetchOption) runE(cmd *cobra.Command, _ []string) (err error) {
-	return o.fetcher.FetchLatestRepo(o.Provider, o.branch, cmd.OutOrStdout())
+func (o *fetchOption) runE(c *cobra.Command, _ []string) (err error) {
+	var i int
+	for i = 0; i < o.retry; i++ {
+		err = o.fetcher.FetchLatestRepo(o.Provider, o.branch, c.OutOrStdout())
+		if err == nil || (!strings.Contains(err.Error(), "context deadline exceeded") &&
+			!strings.Contains(err.Error(), "i/o timeout")) {
+			break
+		}
+		o.setTimeout(c)
+		c.Print(".")
+	}
+	if i >= 1 {
+		c.Println()
+	}
+	return
 }
 
 type fetchOption struct {
@@ -58,4 +81,7 @@ type fetchOption struct {
 	branch  string
 	reset   bool
 	fetcher installer.Fetcher
+	cancel  context.CancelFunc
+	retry   int
+	timeout time.Duration
 }

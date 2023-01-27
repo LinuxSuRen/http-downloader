@@ -74,8 +74,9 @@ type Installer struct {
 	Fetch            bool
 	AdditionBinaries []string
 
-	Org  string
-	Repo string
+	Org         string
+	Repo        string
+	ProxyGitHub string
 
 	Execer exec.Execer
 }

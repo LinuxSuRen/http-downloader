@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"runtime"
 	"sync"
+	"syscall"
 )
 
 // Execer is an interface for OS-related operations
@@ -19,6 +20,7 @@ type Execer interface {
 	RunCommandWithSudo(name string, args ...string) (err error)
 	RunCommandWithBuffer(name, dir string, stdout, stderr *bytes.Buffer, args ...string) error
 	RunCommandWithIO(name, dir string, stdout, stderr io.Writer, args ...string) (err error)
+	SystemCall(name string, argv []string, envv []string) (err error)
 	OS() string
 	Arch() string
 }
@@ -125,6 +127,11 @@ func (e DefaultExecer) RunCommandWithSudo(name string, args ...string) (err erro
 	newArgs = append(newArgs, name)
 	newArgs = append(newArgs, args...)
 	return e.RunCommand("sudo", newArgs...)
+}
+
+// SystemCall is the wrapper of syscall.Exec
+func (e DefaultExecer) SystemCall(name string, argv []string, envv []string) (err error) {
+	return syscall.Exec(name, argv, envv)
 }
 
 func copyAndCapture(w io.Writer, r io.Reader) ([]byte, error) {
