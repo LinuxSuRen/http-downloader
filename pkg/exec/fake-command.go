@@ -55,6 +55,11 @@ func (f FakeExecer) RunCommandWithIO(name, dir string, stdout, stderr io.Writer,
 	return f.ExpectError
 }
 
+// SystemCall is a fake method
+func (f FakeExecer) SystemCall(name string, argv []string, envv []string) error {
+	return f.ExpectError
+}
+
 // OS returns the os name
 func (f FakeExecer) OS() string {
 	return f.ExpectOS

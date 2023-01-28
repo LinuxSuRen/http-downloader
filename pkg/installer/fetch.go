@@ -3,6 +3,7 @@ package installer
 import (
 	"context"
 	"fmt"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"io"
 	"os"
 	"path"
@@ -111,6 +112,7 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 				return
 			}
 
+			var head *plumbing.Reference
 			if wd, err = repo.Worktree(); err == nil {
 				if err = makeSureRemote(remoteName, repoAddr, repo); err != nil {
 					err = fmt.Errorf("cannot add remote: %s, address: %s, error: %v", remoteName, repoAddr, err)
@@ -126,7 +128,6 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 					return
 				}
 
-				var head *plumbing.Reference
 				if head, err = repo.Reference(plumbing.NewRemoteReferenceName(remoteName, branch), true); err != nil {
 					return
 				}
@@ -159,6 +160,20 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 					return
 				}
 				err = nil
+			}
+
+			if head, err = repo.Head(); err == nil {
+				var log object.CommitIter
+				if log, err = repo.Log(&git.LogOptions{From: head.Hash()}); err == nil {
+					var next *object.Commit
+					for next, err = log.Next(); err == nil; next, err = log.Next() {
+						if !strings.HasPrefix(next.Message, "Auto commit by bot, ci skip") {
+							_, _ = fmt.Fprintln(progress, "Last updated", next.Author.When)
+							_, _ = fmt.Fprintln(progress, strings.TrimSpace(next.Message))
+							break
+						}
+					}
+				}
 			}
 		} else {
 			err = fmt.Errorf("failed to open git local repository, error: %v", err)

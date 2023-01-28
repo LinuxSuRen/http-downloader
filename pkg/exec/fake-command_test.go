@@ -35,4 +35,5 @@ func TestLookPath(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Nil(t, fake.RunCommandWithSudo("", ""))
 	assert.Nil(t, fake.RunCommandWithBuffer("", "", nil, nil))
+	assert.Nil(t, fake.SystemCall("", nil, nil))
 }

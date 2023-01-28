@@ -2,11 +2,9 @@ package generic
 
 import (
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"os"
 	"strings"
-	"syscall"
-
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // CommonInstaller is the installer of a common bash
@@ -39,7 +37,7 @@ func (c CmdWithArgs) Run() (err error) {
 			sysCallArgs := []string{c.Cmd}
 			sysCallArgs = append(sysCallArgs, c.Args...)
 			fmt.Println(c.Cmd, strings.Join(sysCallArgs, " "))
-			err = syscall.Exec(targetBinary, sysCallArgs, os.Environ())
+			err = c.Execer.SystemCall(targetBinary, sysCallArgs, os.Environ())
 		}
 	} else {
 		fmt.Println(c.Cmd, strings.Join(c.Args, " "))
