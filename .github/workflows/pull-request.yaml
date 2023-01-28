@@ -10,7 +10,7 @@ jobs:
     name: Build
     runs-on: ubuntu-20.04
     steps:
-      - name: Set up Go 1.16
+      - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: 1.18
@@ -26,10 +26,11 @@ jobs:
           sudo mv upx-3.96-amd64_linux/upx $(which upx)
           upx -V
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2.9.1
+        uses: goreleaser/goreleaser-action@v4.1.1
         with:
-          version: latest
-          args: release --skip-publish --rm-dist
+          github_token: ${{ secrets.GH_PUBLISH_SECRETS }}
+          version: v1.14.0
+          args: release --skip-publish --rm-dist --snapshot
       - name: Test against the cmd
         run: |
           sudo ./release/http-downloader_linux_amd64_v1/hd install jenkins-zh/jenkins-cli/jcli
@@ -49,7 +50,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-20.04
     steps:
-      - name: Set up Go 1.16
+      - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: 1.18
