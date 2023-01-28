@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 )
 
 // Install installs a package
@@ -64,13 +65,27 @@ func (o *Installer) Install() (err error) {
 
 				if configFile.OS == o.Execer.OS() {
 					if err = os.MkdirAll(configDir, 0750); err != nil {
-						err = fmt.Errorf("cannot create config dir: %s, error: %v", configDir, err)
-						return
+						if strings.Contains(err.Error(), "permission denied") {
+							err = o.Execer.RunCommandWithSudo("mkdir", "-p", configDir)
+						}
+
+						if err != nil {
+							err = fmt.Errorf("cannot create config dir: %s, error: %v", configDir, err)
+							return
+						}
 					}
 
 					if err = os.WriteFile(configFilePath, []byte(configFile.Content), 0622); err != nil {
-						err = fmt.Errorf("cannot write config file: %s, error: %v", configFilePath, err)
-						return
+						if strings.Contains(err.Error(), "permission denied") {
+							if err = o.Execer.RunCommandWithSudo("touch", configFilePath); err == nil {
+								err = o.Execer.RunCommandWithSudo("chmod", "+w", configFilePath)
+							}
+						}
+
+						if err != nil {
+							err = fmt.Errorf("cannot write config file: %s, error: %v", configFilePath, err)
+							return
+						}
 					}
 
 					fmt.Printf("config file [%s] is ready.\n", configFilePath)

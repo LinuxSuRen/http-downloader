@@ -252,19 +252,23 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	cmd.Printf("start to download from %s\n", o.URL)
+	targetURL := o.URL
+	if o.ProxyGitHub != "" {
+		targetURL = strings.Replace(targetURL, "github.com", fmt.Sprintf("%s/github.com", o.ProxyGitHub), 1)
+	}
+	cmd.Printf("start to download from %s\n", targetURL)
 	if o.Thread <= 1 {
 		downloader := &net.ContinueDownloader{}
 		downloader.WithoutProxy(o.NoProxy).
 			WithRoundTripper(o.RoundTripper)
-		err = downloader.DownloadWithContinue(o.URL, o.Output, o.ContinueAt, -1, 0, o.ShowProgress)
+		err = downloader.DownloadWithContinue(targetURL, o.Output, o.ContinueAt, -1, 0, o.ShowProgress)
 	} else {
 		downloader := &net.MultiThreadDownloader{}
 		downloader.WithKeepParts(o.KeepPart).
 			WithShowProgress(o.ShowProgress).
 			WithoutProxy(o.NoProxy).
 			WithRoundTripper(o.RoundTripper)
-		err = downloader.Download(o.URL, o.Output, o.Thread)
+		err = downloader.Download(targetURL, o.Output, o.Thread)
 	}
 	return
 }
