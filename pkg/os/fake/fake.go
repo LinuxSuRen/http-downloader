@@ -2,6 +2,7 @@ package fake
 
 import (
 	"fmt"
+
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 )
 
@@ -9,6 +10,7 @@ import (
 type Installer struct {
 	hasError bool
 	support  bool
+	data     map[string]string
 }
 
 // NewFakeInstaller returns a Installer
@@ -63,4 +65,9 @@ func (d *Installer) Stop() (err error) {
 		err = fmt.Errorf("fake error")
 	}
 	return
+}
+
+// SetURLReplace is a fake method
+func (d *Installer) SetURLReplace(data map[string]string) {
+	d.data = data
 }

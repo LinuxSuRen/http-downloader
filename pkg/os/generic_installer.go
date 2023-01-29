@@ -1,10 +1,13 @@
 package os
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg"
 	"os"
 	"strings"
+	"text/template"
+
+	"github.com/linuxsuren/http-downloader/pkg"
 
 	"github.com/linuxsuren/http-downloader/pkg/os/apk"
 	"github.com/linuxsuren/http-downloader/pkg/os/dnf"
@@ -47,6 +50,7 @@ type genericPackage struct {
 
 	// inner fields
 	proxyMap map[string]string
+	env      map[string]string
 	execer   exec.Execer
 }
 
@@ -71,15 +75,16 @@ func parseGenericPackages(configFile string, genericPackages *genericPackages) (
 
 // GenericInstallerRegistry registries a generic installer
 func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry) (err error) {
+	defaultExecer := exec.DefaultExecer{}
 	genericPackages := &genericPackages{}
 	if err = parseGenericPackages(configFile, genericPackages); err != nil {
 		return
 	}
-	defaultExecer := exec.DefaultExecer{}
 
 	// registry all the packages
 	for i := range genericPackages.Packages {
 		genericPackage := genericPackages.Packages[i]
+		genericPackage.execer = defaultExecer
 
 		switch genericPackage.PackageManager {
 		case "apt-get":
@@ -148,6 +153,7 @@ func (i *genericPackage) Available() (ok bool) {
 	return
 }
 func (i *genericPackage) Install() (err error) {
+	i.loadEnv()
 	for index := range i.PreInstall {
 		preInstall := i.PreInstall[index]
 
@@ -167,6 +173,7 @@ func (i *genericPackage) Install() (err error) {
 
 		if needInstall {
 			preInstall.Cmd.Args = i.sliceReplace(preInstall.Cmd.Args)
+			fmt.Println(preInstall.Cmd.Args)
 
 			if err = i.execer.RunCommand(preInstall.Cmd.Cmd, preInstall.Cmd.Args...); err != nil {
 				return
@@ -212,16 +219,19 @@ func (i *genericPackage) SetURLReplace(data map[string]string) {
 func (i *genericPackage) sliceReplace(args []string) []string {
 	for index, arg := range args {
 		if result := i.urlReplace(arg); result != arg {
-			args[index] = result
+			args[index] = strings.TrimSpace(result)
 		}
 	}
 	return args
 }
 func (i *genericPackage) urlReplace(old string) string {
-	if i.proxyMap == nil {
-		return old
-	}
+	if tpl, err := template.New("env").Parse(old); err == nil {
+		buf := bytes.NewBuffer([]byte{})
 
+		if err = tpl.Execute(buf, i.env); err == nil {
+			old = buf.String()
+		}
+	}
 	for k, v := range i.proxyMap {
 		if !strings.Contains(old, k) {
 			continue
@@ -229,4 +239,18 @@ func (i *genericPackage) urlReplace(old string) string {
 		old = strings.ReplaceAll(old, k, v)
 	}
 	return old
+}
+func (i *genericPackage) loadEnv() {
+	if i.env == nil {
+		i.env = map[string]string{}
+	}
+	if i.execer.OS() == exec.OSLinux {
+		if data, readErr := os.ReadFile("/etc/os-release"); readErr == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				if pair := strings.Split(line, "="); len(pair) == 2 {
+					i.env[fmt.Sprintf("OS_%s", pair[0])] = strings.TrimPrefix(strings.TrimSuffix(pair[1], `"`), `"`)
+				}
+			}
+		}
+	}
 }

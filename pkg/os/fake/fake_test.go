@@ -1,9 +1,10 @@
 package fake
 
 import (
+	"testing"
+
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewFakeInstaller(t *testing.T) {
@@ -18,4 +19,14 @@ func TestNewFakeInstaller(t *testing.T) {
 	ok, err := installer.WaitForStart()
 	assert.True(t, ok)
 	assert.NotNil(t, err)
+
+	proxyAbleInstaller := &Installer{}
+	proxyAbleInstaller.SetURLReplace(map[string]string{
+		"key": "value",
+	})
+	assert.Equal(t, map[string]string{
+		"key": "value",
+	}, proxyAbleInstaller.data)
+
+	var _ core.ProxyAble = &Installer{}
 }
