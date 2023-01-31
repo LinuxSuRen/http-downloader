@@ -6,12 +6,16 @@ import (
 	"path"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-func newSetupCommand() (cmd *cobra.Command) {
-	opt := &setupOption{}
+func newSetupCommand(v *viper.Viper, stdio terminal.Stdio) (cmd *cobra.Command) {
+	opt := &setupOption{
+		stdio: stdio,
+		v:     v,
+	}
 	cmd = &cobra.Command{
 		Use:   "setup",
 		Short: "Init the configuration of hd",
@@ -21,18 +25,27 @@ func newSetupCommand() (cmd *cobra.Command) {
 }
 
 type setupOption struct {
+	stdio terminal.Stdio
+	v     *viper.Viper
 }
 
 func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
-	selector := &survey.Select{
-		Message: "Select proxy-github",
-		Options: []string{"gh.api.99988866.xyz", "ghproxy.com", "mirror.ghproxy.com", ""},
-		Default: viper.Get("proxy-github"),
+	var (
+		proxyGitHub string
+		provider    string
+	)
+
+	if proxyGitHub, err = selectFromList([]string{"ghproxy.com", "gh.api.99988866.xyz", "mirror.ghproxy.com", ""},
+		o.v.GetString("proxy-github"),
+		"Select proxy-github", o.stdio); err == nil {
+		o.v.Set("proxy-github", proxyGitHub)
+	} else {
+		return
 	}
 
-	var choose string
-	if err = survey.AskOne(selector, &choose); err == nil {
-		viper.Set("proxy-github", choose)
+	if provider, err = selectFromList([]string{"github", "gitee"}, o.v.GetString("provider"),
+		"Select provider", o.stdio); err == nil {
+		o.v.Set("provider", provider)
 	} else {
 		return
 	}
@@ -43,6 +56,16 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	err = viper.WriteConfigAs(path.Join(configDir, "hd.yaml"))
+	err = o.v.WriteConfigAs(path.Join(configDir, "hd.yaml"))
+	return
+}
+
+func selectFromList(items []string, defaultItem, title string, stdio terminal.Stdio) (val string, err error) {
+	selector := &survey.Select{
+		Message: title,
+		Options: items,
+		Default: defaultItem,
+	}
+	err = survey.AskOne(selector, &val, survey.WithStdio(stdio.In, stdio.Out, stdio.Err))
 	return
 }
