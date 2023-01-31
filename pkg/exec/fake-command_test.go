@@ -9,15 +9,15 @@ import (
 
 func TestLookPath(t *testing.T) {
 	fake := FakeExecer{
-		ExpectError:  errors.New("fake"),
-		ExpectOutput: "output",
-		ExpectOS:     "os",
-		ExpectArch:   "arch",
+		ExpectLookPathError: errors.New("fake"),
+		ExpectOutput:        "output",
+		ExpectOS:            "os",
+		ExpectArch:          "arch",
 	}
 	_, err := fake.LookPath("")
 	assert.NotNil(t, err)
 
-	fake.ExpectError = nil
+	fake.ExpectLookPathError = nil
 	_, err = fake.LookPath("")
 	assert.Nil(t, err)
 

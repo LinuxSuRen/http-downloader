@@ -151,7 +151,10 @@ func TestShouldInstall(t *testing.T) {
 	assert.True(t, exist)
 
 	// not exist
-	opt.execer = &exec.FakeExecer{ExpectError: errors.New("fake")}
+	opt.execer = &exec.FakeExecer{
+		ExpectError:         errors.New("fake"),
+		ExpectLookPathError: errors.New("error"),
+	}
 	should, exist = opt.shouldInstall()
 	assert.True(t, should)
 	assert.False(t, exist)

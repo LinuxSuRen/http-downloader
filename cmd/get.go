@@ -80,6 +80,7 @@ func newDownloadOption(ctx context.Context) *downloadOption {
 		RoundTripper: getRoundTripper(ctx),
 		fetcher:      &installer.DefaultFetcher{},
 		wait:         &sync.WaitGroup{},
+		execer:       exec.DefaultExecer{},
 	}
 }
 
@@ -118,6 +119,7 @@ type downloadOption struct {
 	org           string
 	repo          string
 	fetcher       installer.Fetcher
+	execer        exec.Execer
 	ExpectVersion string // should be like >v1.1.0
 }
 
@@ -216,9 +218,6 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 }
 
 func findAnchor(n *html.Node) (items []string) {
-	if n == nil {
-		return nil
-	}
 	if n.Type == html.ElementNode && n.Data == "a" {
 		for _, a := range n.Attr {
 			if a.Key == "href" && strings.Contains(a.Val, "magnet") {
@@ -273,7 +272,7 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if o.Magnet || strings.HasPrefix(o.URL, "magnet:?") {
-		err = downloadMagnetFile(o.ProxyGitHub, o.URL)
+		err = downloadMagnetFile(o.ProxyGitHub, o.URL, o.execer)
 		return
 	}
 
@@ -298,9 +297,8 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	return
 }
 
-func downloadMagnetFile(proxyGitHub, target string) (err error) {
+func downloadMagnetFile(proxyGitHub, target string, execer exec.Execer) (err error) {
 	targetCmd := "gotorrent"
-	execer := exec.DefaultExecer{}
 	is := installer.Installer{
 		Provider:    "github",
 		Execer:      execer,
@@ -332,11 +330,15 @@ func downloadMagnetFile(proxyGitHub, target string) (err error) {
 			}
 			items := findAnchor(docutf8)
 
-			selector := &survey.Select{
-				Message: "Select item",
-				Options: items,
+			if len(items) > 1 {
+				selector := &survey.Select{
+					Message: "Select item",
+					Options: items,
+				}
+				err = survey.AskOne(selector, &target)
+			} else if len(items) > 0 {
+				target = items[0]
 			}
-			err = survey.AskOne(selector, &target)
 		}
 	}
 

@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/h2non/gock"
 	"github.com/linuxsuren/http-downloader/mock/mhttp"
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -235,6 +237,62 @@ func TestRunE(t *testing.T) {
 			} else {
 				assert.Nil(t, err, "should not error in [%d][%s]", i, tt.name)
 			}
+		})
+	}
+}
+
+func TestDownloadMagnetFile(t *testing.T) {
+	tests := []struct {
+		name        string
+		proxyGitHub string
+		target      string
+		prepare     func()
+		execer      exec.Execer
+		expectErr   bool
+	}{{
+		name:        "proxyGitHub and target is empty",
+		proxyGitHub: "",
+		target:      "",
+		execer:      exec.FakeExecer{},
+	}, {
+		name:        "failed to download",
+		proxyGitHub: "",
+		target:      "fake",
+		execer:      exec.FakeExecer{ExpectError: errors.New("error")},
+		expectErr:   true,
+	}, {
+		name:        "one target item",
+		proxyGitHub: "",
+		target:      "http://fake.com",
+		prepare: func() {
+			gock.New("http://fake.com").
+				Get("/").
+				Reply(http.StatusOK).
+				File("testdata/magnet.html")
+		},
+		execer:    exec.FakeExecer{},
+		expectErr: false,
+	}, {
+		name:        "HTTP server error response",
+		proxyGitHub: "",
+		target:      "http://fake.com",
+		prepare: func() {
+			gock.New("http://fake.com").
+				Get("/").
+				ReplyError(errors.New("error"))
+		},
+		execer:    exec.FakeExecer{},
+		expectErr: true,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			if tt.prepare == nil {
+				tt.prepare = func() {}
+			}
+			tt.prepare()
+			err := downloadMagnetFile(tt.proxyGitHub, tt.target, tt.execer)
+			assert.Equal(t, tt.expectErr, err != nil, err)
 		})
 	}
 }
