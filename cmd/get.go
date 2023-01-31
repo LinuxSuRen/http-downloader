@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	"io"
 	"net/http"
 	"net/url"
 	sysos "os"
@@ -12,6 +12,11 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/linuxsuren/http-downloader/pkg/exec"
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/charset"
 
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
@@ -62,6 +67,7 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 		"Print the category list")
 	flags.IntVarP(&opt.PrintVersionCount, "print-version-count", "", 20,
 		"The number of the version list")
+	flags.BoolVarP(&opt.Magnet, "magnet", "", false, "Fetch magnet list from a website")
 
 	_ = cmd.RegisterFlagCompletionFunc("proxy-github", ArrayCompletion("gh.api.99988866.xyz",
 		"ghproxy.com", "mirror.ghproxy.com"))
@@ -74,6 +80,7 @@ func newDownloadOption(ctx context.Context) *downloadOption {
 		RoundTripper: getRoundTripper(ctx),
 		fetcher:      &installer.DefaultFetcher{},
 		wait:         &sync.WaitGroup{},
+		execer:       exec.DefaultExecer{},
 	}
 }
 
@@ -91,6 +98,7 @@ type downloadOption struct {
 	MaxAttempts      int
 	AcceptPreRelease bool
 	RoundTripper     http.RoundTripper
+	Magnet           bool
 
 	ContinueAt int64
 
@@ -111,6 +119,7 @@ type downloadOption struct {
 	org           string
 	repo          string
 	fetcher       installer.Fetcher
+	execer        exec.Execer
 	ExpectVersion string // should be like >v1.1.0
 }
 
@@ -170,7 +179,7 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 
 	targetURL := args[0]
 	o.Package = &installer.HDConfig{}
-	if strings.HasPrefix(targetURL, "magnet:?") {
+	if o.Magnet || strings.HasPrefix(targetURL, "magnet:?") {
 		// download via external tool
 		o.URL = targetURL
 		return
@@ -204,6 +213,21 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 		} else {
 			err = fmt.Errorf("cannot parse the target URL, error: '%v'", err)
 		}
+	}
+	return
+}
+
+func findAnchor(n *html.Node) (items []string) {
+	if n.Type == html.ElementNode && n.Data == "a" {
+		for _, a := range n.Attr {
+			if a.Key == "href" && strings.Contains(a.Val, "magnet") {
+				items = append(items, strings.TrimSpace(n.FirstChild.Data))
+				break
+			}
+		}
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		items = append(items, findAnchor(c)...)
 	}
 	return
 }
@@ -247,8 +271,8 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	if strings.HasPrefix(o.URL, "magnet:?") {
-		err = downloadMagnetFile(o.ProxyGitHub, o.URL)
+	if o.Magnet || strings.HasPrefix(o.URL, "magnet:?") {
+		err = downloadMagnetFile(o.ProxyGitHub, o.URL, o.execer)
 		return
 	}
 
@@ -273,9 +297,8 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	return
 }
 
-func downloadMagnetFile(proxyGitHub, target string) (err error) {
+func downloadMagnetFile(proxyGitHub, target string, execer exec.Execer) (err error) {
 	targetCmd := "gotorrent"
-	execer := exec.DefaultExecer{}
 	is := installer.Installer{
 		Provider:    "github",
 		Execer:      execer,
@@ -284,6 +307,43 @@ func downloadMagnetFile(proxyGitHub, target string) (err error) {
 	if err = is.CheckDepAndInstall(map[string]string{
 		targetCmd: "linuxsuren/gotorrent",
 	}); err != nil {
+		return
+	}
+
+	if strings.HasPrefix(target, "http") {
+		var resp *http.Response
+		if resp, err = http.Get(target); err == nil && resp.StatusCode == http.StatusOK {
+			var data []byte
+			data, err = io.ReadAll(resp.Body)
+			if err != nil {
+				return
+			}
+
+			var reader io.Reader
+			if reader, err = charset.NewReader(strings.NewReader(string(data)), "UTF-8"); err != nil {
+				return
+			}
+
+			var docutf8 *html.Node
+			if docutf8, err = html.Parse(reader); err != nil {
+				return
+			}
+			items := findAnchor(docutf8)
+
+			if len(items) > 1 {
+				selector := &survey.Select{
+					Message: "Select item",
+					Options: items,
+				}
+				err = survey.AskOne(selector, &target)
+			} else if len(items) > 0 {
+				target = items[0]
+			}
+		}
+	}
+
+	fmt.Println(target)
+	if target == "" || err != nil {
 		return
 	}
 

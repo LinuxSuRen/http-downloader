@@ -32,8 +32,9 @@ func TestCommonCase(t *testing.T) {
 
 	errRegistry := &core.FakeRegistry{}
 	SetInstallerRegistry(errRegistry, exec.FakeExecer{
-		ExpectError: errors.New("error"),
-		ExpectOS:    "linux",
+		ExpectLookPathError: errors.New("error"),
+		ExpectError:         errors.New("error"),
+		ExpectOS:            "linux",
 	})
 	errRegistry.Walk(func(s string, i core.Installer) {
 		t.Run(s, func(t *testing.T) {

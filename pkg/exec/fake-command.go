@@ -7,15 +7,16 @@ import (
 
 // FakeExecer is for the unit test purposes
 type FakeExecer struct {
-	ExpectError  error
-	ExpectOutput string
-	ExpectOS     string
-	ExpectArch   string
+	ExpectError         error
+	ExpectLookPathError error
+	ExpectOutput        string
+	ExpectOS            string
+	ExpectArch          string
 }
 
 // LookPath is a fake method
 func (f FakeExecer) LookPath(path string) (string, error) {
-	return "", f.ExpectError
+	return "", f.ExpectLookPathError
 }
 
 // Command is a fake method
