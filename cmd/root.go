@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/AlecAivazis/survey/v2/terminal"
 	extpkg "github.com/linuxsuren/cobra-extension/pkg"
 	extver "github.com/linuxsuren/cobra-extension/version"
 	"github.com/spf13/cobra"
@@ -23,8 +24,15 @@ func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 		panic(err)
 	}
 
+	v := viper.GetViper()
+	stdio := terminal.Stdio{
+		Out: os.Stdout,
+		In:  os.Stdin,
+		Err: os.Stderr,
+	}
+
 	cmd.AddCommand(
-		newGetCmd(cxt), newInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt), newSetupCommand(),
+		newGetCmd(cxt), newInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt), newSetupCommand(v, stdio),
 		extver.NewVersionCmd("linuxsuren", "http-downloader", "hd", nil),
 		extpkg.NewCompletionCmd(cmd))
 	return
