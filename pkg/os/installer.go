@@ -8,6 +8,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
+	"github.com/linuxsuren/http-downloader/pkg/os/dnf"
 	"github.com/linuxsuren/http-downloader/pkg/os/docker"
 	"github.com/linuxsuren/http-downloader/pkg/os/yum"
 	"github.com/mitchellh/go-homedir"
@@ -28,6 +29,7 @@ func init() {
 	yum.SetInstallerRegistry(defaultInstallerRegistry, defaultExecer)
 	apt.SetInstallerRegistry(defaultInstallerRegistry, defaultExecer)
 	docker.SetInstallerRegistry(defaultInstallerRegistry, defaultExecer)
+	dnf.SetInstallerRegistry(defaultInstallerRegistry, defaultExecer)
 
 	var userHome string
 	var err error
