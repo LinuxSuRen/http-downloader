@@ -26,6 +26,10 @@ func (d *dockerInstallerInUbuntu) Available() (ok bool) {
 
 // Install installs the Docker
 func (d *dockerInstallerInUbuntu) Install() (err error) {
+	if d.isDebian() {
+		return d.installOnDebian()
+	}
+
 	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err != nil {
 		return
 	}
@@ -76,6 +80,63 @@ func (d *dockerInstallerInUbuntu) Install() (err error) {
 		"docker-ce", "docker-ce-cli", "containerd.io"); err != nil {
 		return
 	}
+	return
+}
+
+func (d *dockerInstallerInUbuntu) isDebian() bool {
+	output, err := d.Execer.RunCommandAndReturn("lsb_release", "", "-d")
+	if err == nil {
+		return strings.Contains(output, "Debian")
+	}
+	return false
+}
+
+// see also https://docs.docker.com/engine/install/debian/
+func (d *dockerInstallerInUbuntu) installOnDebian() (err error) {
+	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err != nil {
+		return
+	}
+
+	if err = d.Execer.RunCommand("apt-get", "install", "-y",
+		"ca-certificates", "curl", "gnupg", "lsb-release"); err != nil {
+		return
+	}
+
+	const dockerGPG = "docker.gpg"
+	defer func() {
+		_ = d.Execer.RunCommand("rm", "-rf", dockerGPG)
+	}()
+	if err = d.Execer.RunCommand("curl", "-fsSL",
+		"https://download.docker.com/linux/debian/gpg", "-o", dockerGPG); err == nil {
+		if err = d.Execer.RunCommand("gpg",
+			"--dearmor",
+			"-o",
+			"/etc/apt/keyrings/docker.gpg", dockerGPG); err != nil {
+			err = fmt.Errorf("failed to install docker-archive-keyring.gpg, error: %v", err)
+			return
+		}
+	} else {
+		err = fmt.Errorf("failed to download docker gpg file, error: %v", err)
+		return
+	}
+
+	var release string
+	if release, err = d.Execer.RunCommandAndReturn("lsb_release", "", "-cs"); err == nil {
+		item := fmt.Sprintf("deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian %s stable",
+			strings.TrimSpace(release))
+		if err = os.WriteFile("/etc/apt/sources.list.d/docker.list", []byte(item), 0622); err != nil {
+			err = fmt.Errorf("failed to write docker.list, error: %v", err)
+			return
+		}
+	} else {
+		err = fmt.Errorf("failed to run command lsb_release -cs, error: %v", err)
+		return
+	}
+
+	if err = d.Execer.RunCommand("apt-get", "update", "-y"); err != nil {
+		return
+	}
+	err = d.Execer.RunCommand("apt-get", "install", "docker-ce", "docker-ce-cli", "containerd.io", "-y")
 	return
 }
 
