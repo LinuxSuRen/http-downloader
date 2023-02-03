@@ -102,6 +102,10 @@ func (d *dockerInstallerInUbuntu) installOnDebian() (err error) {
 		return
 	}
 
+	if err = os.MkdirAll("/etc/apt/keyrings", 0644); err != nil {
+		return
+	}
+
 	const dockerGPG = "docker.gpg"
 	defer func() {
 		_ = d.Execer.RunCommand("rm", "-rf", dockerGPG)
