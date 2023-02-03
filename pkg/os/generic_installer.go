@@ -3,7 +3,10 @@ package os
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
+	"path"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -59,6 +62,28 @@ type CmdWithArgs struct {
 	Cmd        string   `yaml:"cmd"`
 	Args       []string `yaml:"args"`
 	SystemCall bool     `yaml:"systemCall"`
+	WriteTo    *WriteTo `yaml:"writeTo"`
+}
+
+// WriteTo represents the task to write content to file
+type WriteTo struct {
+	File    string
+	Mod     string
+	Content string
+}
+
+// Write writes content to file
+func (w *WriteTo) Write() (err error) {
+	var mod int
+	if mod, err = strconv.Atoi(w.Mod); err != nil {
+		mod = 0644
+	}
+
+	parent := path.Dir(w.File)
+	if err = os.MkdirAll(parent, 0644); err == nil {
+		err = os.WriteFile(w.File, []byte(w.Content), fs.FileMode(mod))
+	}
+	return
 }
 
 func parseGenericPackages(configFile string, genericPackages *genericPackages) (err error) {
@@ -172,11 +197,19 @@ func (i *genericPackage) Install() (err error) {
 		}
 
 		if needInstall {
-			preInstall.Cmd.Args = i.sliceReplace(preInstall.Cmd.Args)
-			fmt.Println(preInstall.Cmd.Args)
+			if preInstall.Cmd.WriteTo != nil {
+				if err = preInstall.Cmd.WriteTo.Write(); err != nil {
+					return
+				}
+			}
 
-			if err = i.execer.RunCommand(preInstall.Cmd.Cmd, preInstall.Cmd.Args...); err != nil {
-				return
+			if preInstall.Cmd.Cmd != "" {
+				preInstall.Cmd.Args = i.sliceReplace(preInstall.Cmd.Args)
+				fmt.Println(preInstall.Cmd.Args)
+
+				if err = i.execer.RunCommand(preInstall.Cmd.Cmd, preInstall.Cmd.Args...); err != nil {
+					return
+				}
 			}
 		}
 	}

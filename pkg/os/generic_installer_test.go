@@ -2,6 +2,8 @@ package os
 
 import (
 	"errors"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/linuxsuren/http-downloader/pkg/exec"
@@ -77,4 +79,29 @@ func TestURLReplace(t *testing.T) {
 	assert.NotNil(t, withErrorPreInstall.Install())
 	assert.NotNil(t, withErrorPreInstall.Uninstall())
 	assert.True(t, withErrorPreInstall.Available())
+
+	tmpFile, err := os.CreateTemp(os.TempDir(), "installer")
+	assert.Nil(t, err)
+	defer func() {
+		os.Remove(tmpFile.Name())
+	}()
+	writeToFileInstall := &genericPackage{
+		execer: exec.FakeExecer{
+			ExpectOS: exec.OSLinux,
+		},
+		PreInstall: []preInstall{{
+			Cmd: CmdWithArgs{
+				WriteTo: &WriteTo{
+					File:    tmpFile.Name(),
+					Content: "sample",
+				},
+			},
+		}},
+		CommonInstaller: fake.NewFakeInstaller(true, false),
+	}
+	err = writeToFileInstall.Install()
+	assert.Nil(t, err)
+	data, err := io.ReadAll(tmpFile)
+	assert.Nil(t, err)
+	assert.Equal(t, "sample", string(data))
 }
