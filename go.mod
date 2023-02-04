@@ -17,14 +17,15 @@ require (
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.9.0
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.1
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/creack/pty v1.1.17
-
-require github.com/prometheus/client_golang v1.11.1 // indirect
+require (
+	github.com/antonmedv/expr v1.11.1
+	github.com/creack/pty v1.1.17
+)
 
 require (
 	github.com/Microsoft/go-winio v0.4.16 // indirect

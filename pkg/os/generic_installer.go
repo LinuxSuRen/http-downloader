@@ -6,10 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 	"text/template"
 
+	"github.com/antonmedv/expr"
 	"github.com/linuxsuren/http-downloader/pkg"
 
 	"github.com/linuxsuren/http-downloader/pkg/os/apk"
@@ -70,18 +72,61 @@ type WriteTo struct {
 	File    string
 	Mod     string
 	Content string
+	When    string
+
+	// inner fields
+	env map[string]string
 }
 
 // Write writes content to file
 func (w *WriteTo) Write() (err error) {
+	w.Content = strings.TrimSpace(w.Content)
+	var should bool
+	if should, err = w.Should(); err != nil || !should || w.Content == "" {
+		return
+	}
+
 	var mod int
 	if mod, err = strconv.Atoi(w.Mod); err != nil {
 		mod = 0644
 	}
 
+	if len(w.env) > 0 {
+		var tpl *template.Template
+		if tpl, err = template.New("write").Parse(w.Content); err != nil {
+			return
+		}
+
+		buf := bytes.NewBuffer([]byte{})
+		if err = tpl.Execute(buf, w.env); err != nil {
+			return
+		}
+		w.Content = buf.String()
+	}
+
 	parent := path.Dir(w.File)
 	if err = os.MkdirAll(parent, 0644); err == nil {
 		err = os.WriteFile(w.File, []byte(w.Content), fs.FileMode(mod))
+	}
+	return
+}
+
+// Should eval the "when" expr, then return bool value.
+// Return true if the "when" expr is empty.
+// See also https://github.com/antonmedv/expr/blob/master/docs/Language-Definition.md
+func (w *WriteTo) Should() (ok bool, err error) {
+	var result interface{}
+	if w.When == "" {
+		ok = true
+		return
+	}
+	if result, err = expr.Eval(w.When, w.env); err == nil {
+		switch result.(type) {
+		case bool:
+			ok = result.(bool)
+		default:
+			err = fmt.Errorf("unexpect type: %s", reflect.TypeOf(result))
+		}
 	}
 	return
 }
@@ -197,17 +242,19 @@ func (i *genericPackage) Install() (err error) {
 		}
 
 		if needInstall {
-			if preInstall.Cmd.WriteTo != nil {
-				if err = preInstall.Cmd.WriteTo.Write(); err != nil {
+			cmd := preInstall.Cmd
+			if cmd.WriteTo != nil {
+				cmd.WriteTo.env = i.env
+				if err = cmd.WriteTo.Write(); err != nil {
 					return
 				}
 			}
 
-			if preInstall.Cmd.Cmd != "" {
-				preInstall.Cmd.Args = i.sliceReplace(preInstall.Cmd.Args)
-				fmt.Println(preInstall.Cmd.Args)
+			if cmd.Cmd != "" {
+				cmd.Args = i.sliceReplace(cmd.Args)
+				fmt.Println(cmd.Args)
 
-				if err = i.execer.RunCommand(preInstall.Cmd.Cmd, preInstall.Cmd.Args...); err != nil {
+				if err = i.execer.RunCommand(cmd.Cmd, cmd.Args...); err != nil {
 					return
 				}
 			}

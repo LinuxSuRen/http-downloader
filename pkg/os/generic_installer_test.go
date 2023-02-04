@@ -105,3 +105,79 @@ func TestURLReplace(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "sample", string(data))
 }
+
+func TestShould(t *testing.T) {
+	tests := []struct {
+		name    string
+		writeTo *WriteTo
+		wantOK  bool
+		wantErr bool
+	}{{
+		name:    "expr is empty",
+		writeTo: &WriteTo{},
+		wantOK:  true,
+		wantErr: false,
+	}, {
+		name: "1==1",
+		writeTo: &WriteTo{
+			When: "1==1",
+		},
+		wantOK:  true,
+		wantErr: false,
+	}, {
+		name: "not bool expr",
+		writeTo: &WriteTo{
+			When: "not-expect",
+		},
+		wantOK:  false,
+		wantErr: true,
+	}, {
+		name: "false",
+		writeTo: &WriteTo{
+			When: "false",
+		},
+		wantOK:  false,
+		wantErr: false,
+	}, {
+		name: "true",
+		writeTo: &WriteTo{
+			When: "true",
+		},
+		wantOK:  true,
+		wantErr: false,
+	}, {
+		name: "expr is number",
+		writeTo: &WriteTo{
+			When: "123",
+		},
+		wantOK:  false,
+		wantErr: true,
+	}, {
+		name: "with env, equal",
+		writeTo: &WriteTo{
+			env: map[string]string{
+				"OS": "ubuntu",
+			},
+			When: "OS=='ubuntu'",
+		},
+		wantOK:  true,
+		wantErr: false,
+	}, {
+		name: "with env, not equal",
+		writeTo: &WriteTo{
+			env: map[string]string{
+				"OS": "ubuntu",
+			},
+			When: "OS!='ubuntu'",
+		},
+		wantOK:  true,
+		wantErr: false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ok, err := tt.writeTo.Should()
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.wantErr, err != nil, err)
+		})
+	}
+}
