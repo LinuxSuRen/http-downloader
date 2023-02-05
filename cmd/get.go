@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/common"
+	"github.com/linuxsuren/http-downloader/pkg/log"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	sysos "os"
@@ -45,6 +48,8 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 		"If you accept preRelease as the binary asset from GitHub")
 	flags.BoolVarP(&opt.AcceptPreRelease, "pre", "", false,
 		"Same with option --accept-preRelease")
+	flags.BoolVarP(&opt.Force, "force", "f", false, "Overwrite the exist file if this is true")
+	flags.IntVarP(&opt.Mod, "mod", "", -1, "The file permission, -1 means using the system default")
 
 	flags.IntVarP(&opt.Timeout, "time", "", 10,
 		`The default timeout in seconds with the HTTP request`)
@@ -99,6 +104,8 @@ type downloadOption struct {
 	AcceptPreRelease bool
 	RoundTripper     http.RoundTripper
 	Magnet           bool
+	Force            bool
+	Mod              int
 
 	ContinueAt int64
 
@@ -233,6 +240,7 @@ func findAnchor(n *html.Node) (items []string) {
 }
 
 func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
+	logger := log.GetLoggerFromContextOrDefault(cmd)
 	defer func() {
 		if o.cancel != nil {
 			o.cancel()
@@ -271,6 +279,13 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
+	// check if want to overwrite the exist file
+	logger.Println("output file is", o.Output)
+	if common.Exist(o.Output) && !o.Force {
+		logger.Printf("The output file: '%s' was exist, please use flag --force if you want to overwrite it.\n", o.Output)
+		return
+	}
+
 	if o.Magnet || strings.HasPrefix(o.URL, "magnet:?") {
 		err = downloadMagnetFile(o.ProxyGitHub, o.URL, o.execer)
 		return
@@ -279,8 +294,9 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	targetURL := o.URL
 	if o.ProxyGitHub != "" {
 		targetURL = strings.Replace(targetURL, "github.com", fmt.Sprintf("%s/github.com", o.ProxyGitHub), 1)
+		targetURL = strings.Replace(targetURL, "raw.githubusercontent.com", fmt.Sprintf("%s/https://raw.githubusercontent.com", o.ProxyGitHub), 1)
 	}
-	cmd.Printf("start to download from %s\n", targetURL)
+	logger.Printf("start to download from %s\n", targetURL)
 	if o.Thread <= 1 {
 		downloader := &net.ContinueDownloader{}
 		downloader.WithoutProxy(o.NoProxy).
@@ -293,6 +309,11 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 			WithoutProxy(o.NoProxy).
 			WithRoundTripper(o.RoundTripper)
 		err = downloader.Download(targetURL, o.Output, o.Thread)
+	}
+
+	// set file permission
+	if o.Mod != -1 {
+		err = sysos.Chmod(o.Output, fs.FileMode(o.Mod))
 	}
 	return
 }

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/linuxsuren/http-downloader/pkg/log"
 	"os"
 	"runtime"
 
@@ -31,6 +32,7 @@ func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 		Err: os.Stderr,
 	}
 
+	cxt = context.WithValue(cxt, log.LoggerContextKey, log.GetLogger())
 	cmd.AddCommand(
 		newGetCmd(cxt), newInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt), newSetupCommand(v, stdio),
 		extver.NewVersionCmd("linuxsuren", "http-downloader", "hd", nil),

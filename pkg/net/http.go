@@ -242,12 +242,26 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 		unit := total / int64(thread)
 		offset := total - unit*int64(thread)
 		var wg sync.WaitGroup
+		var partItems []string
+		var m sync.Mutex
+
+		defer func() {
+			// remove all partial files
+			for _, part := range partItems {
+				_ = os.RemoveAll(part)
+			}
+		}()
 
 		fmt.Printf("start to download with %d threads, size: %d, unit: %d\n", thread, total, unit)
 		for i := 0; i < thread; i++ {
 			wg.Add(1)
 			go func(index int, wg *sync.WaitGroup) {
 				defer wg.Done()
+				output := fmt.Sprintf("%s-%d", targetFilePath, index)
+
+				m.Lock()
+				partItems = append(partItems, output)
+				m.Unlock()
 
 				end := unit*int64(index+1) - 1
 				if index == thread-1 {
@@ -259,7 +273,7 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 				downloader := &ContinueDownloader{}
 				downloader.WithoutProxy(d.noProxy).
 					WithRoundTripper(d.roundTripper)
-				if downloadErr := downloader.DownloadWithContinue(targetURL, fmt.Sprintf("%s-%d", targetFilePath, index),
+				if downloadErr := downloader.DownloadWithContinue(targetURL, output,
 					int64(index), start, end, d.showProgress); downloadErr != nil {
 					fmt.Println(downloadErr)
 				}

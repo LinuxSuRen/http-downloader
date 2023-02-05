@@ -35,9 +35,10 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 		provider    string
 	)
 
-	if proxyGitHub, err = selectFromList([]string{"ghproxy.com", "gh.api.99988866.xyz", "mirror.ghproxy.com", ""},
+	if proxyGitHub, err = selectFromList([]string{"", "ghproxy.com", "gh.api.99988866.xyz", "mirror.ghproxy.com"},
 		o.v.GetString("proxy-github"),
 		"Select proxy-github", o.stdio); err == nil {
+		fmt.Println(proxyGitHub)
 		o.v.Set("proxy-github", proxyGitHub)
 	} else {
 		return
@@ -56,6 +57,7 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
+	fmt.Println(o.v.GetString("proxy-github"))
 	err = o.v.WriteConfigAs(path.Join(configDir, "hd.yaml"))
 	return
 }

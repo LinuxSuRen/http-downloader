@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/linuxsuren/http-downloader/pkg"
+	"github.com/linuxsuren/http-downloader/pkg/log"
 	"os"
 	"strings"
 	"time"
@@ -59,6 +60,8 @@ func (o *fetchOption) preRunE(c *cobra.Command, _ []string) (err error) {
 }
 
 func (o *fetchOption) runE(c *cobra.Command, _ []string) (err error) {
+	logger := log.GetLoggerFromContextOrDefault(c)
+
 	var i int
 	for i = 0; i < o.retry; i++ {
 		err = o.fetcher.FetchLatestRepo(o.Provider, o.branch, c.OutOrStdout())
@@ -67,10 +70,10 @@ func (o *fetchOption) runE(c *cobra.Command, _ []string) (err error) {
 			break
 		}
 		o.setTimeout(c)
-		c.Print(".")
+		logger.Print(".")
 	}
 	if i >= 1 {
-		c.Println()
+		logger.Println()
 	}
 	return
 }

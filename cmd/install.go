@@ -11,6 +11,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"log"
 	sysos "os"
 	"path"
 	"runtime"
@@ -89,7 +90,13 @@ func (o *installOption) shouldInstall() (should, exist bool) {
 	var greater bool
 	if name, lookErr := o.execer.LookPath(o.tool); lookErr == nil {
 		exist = true
-		if data, err := o.execer.Command(name, "version"); err == nil &&
+		versionCmd := "version"
+		if o.downloadOption != nil && o.downloadOption.Package != nil && o.downloadOption.Package.VersionCmd != "" {
+			versionCmd = o.downloadOption.Package.VersionCmd
+		}
+
+		log.Println("check target version via", name, versionCmd)
+		if data, err := o.execer.Command(name, versionCmd); err == nil &&
 			(o.downloadOption.Package != nil && o.downloadOption.Package.Version != "") {
 			greater = version.GreatThan(o.downloadOption.Package.Version, string(data))
 		}
@@ -160,6 +167,7 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 
 	// install a package from hd-home
 	if o.Download {
+		log.Println("check if it should be installed")
 		if should, exist := o.shouldInstall(); !should {
 			if exist {
 				cmd.Printf("%s is already exist, please use the flag --force if you install it again\n", o.tool)
@@ -175,7 +183,7 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 	if o.Package == nil {
 		o.Package = &installer.HDConfig{}
 	}
-	if o.target != "" {
+	if o.target != "" && o.Package.TargetDirectory == "" {
 		o.Package.TargetDirectory = o.target
 	}
 	if o.Package.TargetDirectory == "" {
@@ -185,6 +193,7 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
+	log.Println("target directory", o.Package.TargetDirectory)
 	process := &installer.Installer{
 		Source:           o.downloadOption.Output,
 		Name:             o.name,

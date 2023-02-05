@@ -32,6 +32,7 @@ type HDConfig struct {
 	PostInstalls      []CmdWithArgs     `yaml:"postInstalls"`
 	TestInstalls      []CmdWithArgs     `yaml:"testInstalls"`
 	Version           string            `yaml:"version"`
+	VersionCmd        string            `yaml:"versionCmd"`
 
 	Org, Repo string
 }
