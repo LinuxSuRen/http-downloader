@@ -23,11 +23,9 @@ require (
 )
 
 require (
-	github.com/antonmedv/expr v1.11.1
+	github.com/antonmedv/expr v1.12.0
 	github.com/creack/pty v1.1.17
 )
-
-require github.com/prometheus/client_golang v1.11.1 // indirect
 
 require (
 	github.com/Microsoft/go-winio v0.4.16 // indirect
