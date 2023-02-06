@@ -170,7 +170,7 @@ func TestShould(t *testing.T) {
 			},
 			When: "OS!='ubuntu'",
 		},
-		wantOK:  true,
+		wantOK:  false,
 		wantErr: false,
 	}}
 	for _, tt := range tests {

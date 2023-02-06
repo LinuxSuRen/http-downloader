@@ -27,6 +27,8 @@ require (
 	github.com/creack/pty v1.1.17
 )
 
+require github.com/prometheus/client_golang v1.11.1 // indirect
+
 require (
 	github.com/Microsoft/go-winio v0.4.16 // indirect
 	github.com/Netflix/go-expect v0.0.0-20220104043353-73e0943537d2

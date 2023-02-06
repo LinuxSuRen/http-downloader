@@ -121,9 +121,9 @@ func (w *WriteTo) Should() (ok bool, err error) {
 		return
 	}
 	if result, err = expr.Eval(w.When, w.env); err == nil {
-		switch result.(type) {
+		switch tt := result.(type) {
 		case bool:
-			ok = result.(bool)
+			ok = tt
 		default:
 			err = fmt.Errorf("unexpect type: %s", reflect.TypeOf(result))
 		}

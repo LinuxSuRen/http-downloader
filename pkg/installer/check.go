@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"net/http"
 	"net/url"
 	sysos "os"
@@ -76,6 +77,7 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 			if o.ProxyGitHub != "" {
 				targetURL = strings.Replace(targetURL, "github.com", fmt.Sprintf("%s/github.com", o.ProxyGitHub), 1)
 			}
+			log.Println("start to download", targetURL)
 			if err = net.DownloadFileWithMultipleThreadKeepParts(targetURL, output, 4, true, true); err == nil {
 				o.CleanPackage = true
 				o.Source = output
@@ -194,6 +196,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 	userHome, _ := homedir.Dir()
 	configDir := userHome + "/.config/hd-home"
 	matchedFile := configDir + "/config/" + o.Org + "/" + o.Repo + ".yml"
+	log.Printf("start to find '%s' from local cache\n", path)
 	if ok, _ := common.PathExists(matchedFile); ok {
 		var data []byte
 		if data, err = sysos.ReadFile(matchedFile); err == nil {
@@ -224,6 +227,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 				}
 
 				if version == "latest" || version == "" {
+					log.Println("try to find the latest version")
 					ghClient := pkg.ReleaseClient{
 						Org:  o.Org,
 						Repo: o.Repo,
@@ -243,6 +247,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 							o.Org, o.Repo, version, o.Name, o.OS, o.Arch, packagingFormat)
 					}
 				} else {
+					log.Printf("using provided version: %s\n", version)
 					hdPkg.VersionNum = common.ParseVersionNum(version)
 					if packageURL == "" {
 						packageURL = fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s-%s-%s.%s",
@@ -316,6 +321,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 func getDynamicVersion(version string) (realVersion string, err error) {
 	if version != "" && (strings.HasPrefix(version, "http://") || strings.HasPrefix(version, "https://")) {
 		var resp *http.Response
+		log.Println("get dynamic version", version)
 		if resp, err = http.Get(version); err != nil || resp.StatusCode != http.StatusOK {
 			err = fmt.Errorf("cannot get version from '%s', error is '%v', status code is '%d'", version, err, resp.StatusCode)
 			return

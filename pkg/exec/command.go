@@ -63,25 +63,23 @@ func (e DefaultExecer) RunCommandWithIO(name, dir string, stdout, stderr io.Writ
 	stdoutIn, _ := command.StdoutPipe()
 	stderrIn, _ := command.StderrPipe()
 	err = command.Start()
-	if err != nil {
-		return
+	if err == nil {
+		// cmd.Wait() should be called only after we finish reading
+		// from stdoutIn and stderrIn.
+		// wg ensures that we finish
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			_, _ = copyAndCapture(stdout, stdoutIn)
+			wg.Done()
+		}()
+
+		_, _ = copyAndCapture(stderr, stderrIn)
+
+		wg.Wait()
+
+		err = command.Wait()
 	}
-
-	// cmd.Wait() should be called only after we finish reading
-	// from stdoutIn and stderrIn.
-	// wg ensures that we finish
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		_, _ = copyAndCapture(stdout, stdoutIn)
-		wg.Done()
-	}()
-
-	_, _ = copyAndCapture(stderr, stderrIn)
-
-	wg.Wait()
-
-	err = command.Wait()
 	return
 }
 
@@ -110,7 +108,7 @@ func (e DefaultExecer) RunCommandWithBuffer(name, dir string, stdout, stderr *by
 	if stdout == nil {
 		stdout = &bytes.Buffer{}
 	}
-	if stderr != nil {
+	if stderr == nil {
 		stderr = &bytes.Buffer{}
 	}
 	return e.RunCommandWithIO(name, dir, stdout, stderr, args...)
