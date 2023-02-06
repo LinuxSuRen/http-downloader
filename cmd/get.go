@@ -50,6 +50,7 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 		"Same with option --accept-preRelease")
 	flags.BoolVarP(&opt.Force, "force", "f", false, "Overwrite the exist file if this is true")
 	flags.IntVarP(&opt.Mod, "mod", "", -1, "The file permission, -1 means using the system default")
+	flags.BoolVarP(&opt.SkipTLS, "skip-tls", "k", false, "Skip the TLS")
 
 	flags.IntVarP(&opt.Timeout, "time", "", 10,
 		`The default timeout in seconds with the HTTP request`)
@@ -106,6 +107,7 @@ type downloadOption struct {
 	Magnet           bool
 	Force            bool
 	Mod              int
+	SkipTLS          bool
 
 	ContinueAt int64
 
@@ -297,23 +299,43 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		targetURL = strings.Replace(targetURL, "raw.githubusercontent.com", fmt.Sprintf("%s/https://raw.githubusercontent.com", o.ProxyGitHub), 1)
 	}
 	logger.Printf("start to download from %s\n", targetURL)
+	var suggestedFilenameAware net.SuggestedFilenameAware
 	if o.Thread <= 1 {
 		downloader := &net.ContinueDownloader{}
+		suggestedFilenameAware = downloader
 		downloader.WithoutProxy(o.NoProxy).
-			WithRoundTripper(o.RoundTripper)
+			WithRoundTripper(o.RoundTripper).
+			WithInsecureSkipVerify(o.SkipTLS)
 		err = downloader.DownloadWithContinue(targetURL, o.Output, o.ContinueAt, -1, 0, o.ShowProgress)
 	} else {
 		downloader := &net.MultiThreadDownloader{}
+		suggestedFilenameAware = downloader
 		downloader.WithKeepParts(o.KeepPart).
 			WithShowProgress(o.ShowProgress).
 			WithoutProxy(o.NoProxy).
-			WithRoundTripper(o.RoundTripper)
+			WithRoundTripper(o.RoundTripper).
+			WithInsecureSkipVerify(o.SkipTLS)
 		err = downloader.Download(targetURL, o.Output, o.Thread)
 	}
 
 	// set file permission
 	if o.Mod != -1 {
 		err = sysos.Chmod(o.Output, fs.FileMode(o.Mod))
+	}
+
+	if err == nil {
+		logger.Printf("downloaded: %s\n", o.Output)
+	}
+
+	if suggested := suggestedFilenameAware.GetSuggestedFilename(); suggested != "" {
+		confirm := &survey.Confirm{
+			Message: fmt.Sprintf("Do you want to rename filename from '%s' to '%s'?", o.Output, suggested),
+		}
+		var yes bool
+		if confirmErr := survey.AskOne(confirm, &yes); confirmErr == nil && yes {
+			fmt.Println("rename")
+			err = sysos.Rename(o.Output, suggested)
+		}
 	}
 	return
 }

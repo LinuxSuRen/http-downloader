@@ -88,7 +88,7 @@ func (w *WriteTo) Write() (err error) {
 
 	var mod int
 	if mod, err = strconv.Atoi(w.Mod); err != nil {
-		mod = 0644
+		mod = 0750
 	}
 
 	if len(w.env) > 0 {
@@ -105,7 +105,7 @@ func (w *WriteTo) Write() (err error) {
 	}
 
 	parent := path.Dir(w.File)
-	if err = os.MkdirAll(parent, 0644); err == nil {
+	if err = os.MkdirAll(parent, 0750); err == nil {
 		err = os.WriteFile(w.File, []byte(w.Content), fs.FileMode(mod))
 	}
 	return

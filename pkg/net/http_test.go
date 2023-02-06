@@ -251,7 +251,7 @@ func TestDetectSize(t *testing.T) {
 	roundTripper.EXPECT().
 		RoundTrip(mockRequest).Return(mockResponse, nil)
 
-	total, rangeSupport, err := net.DetectSizeWithRoundTripper(targetURL, os.TempDir(), false, false, roundTripper)
+	total, rangeSupport, err := net.DetectSizeWithRoundTripper(targetURL, os.TempDir(), false, false, false, roundTripper)
 	assert.Nil(t, err)
 	assert.Equal(t, int64(102), total)
 	assert.True(t, rangeSupport)
@@ -260,10 +260,11 @@ func TestDetectSize(t *testing.T) {
 func TestMultiThreadDownloader(t *testing.T) {
 	const url = "https://foo.com"
 	tests := []struct {
-		name    string
-		thread  int
-		prepare func(*testing.T, *net.MultiThreadDownloader)
-		wantErr bool
+		name           string
+		thread         int
+		expectFilename string
+		prepare        func(*testing.T, *net.MultiThreadDownloader)
+		wantErr        bool
 	}{{
 		name:   "download with 2 threads",
 		thread: 2,
@@ -319,7 +320,8 @@ func TestMultiThreadDownloader(t *testing.T) {
 			downloader.WithoutProxy(true).
 				WithShowProgress(false).
 				WithRoundTripper(roundTripper).
-				WithKeepParts(false)
+				WithKeepParts(false).
+				WithInsecureSkipVerify(true)
 		},
 		wantErr: false,
 	}, {
@@ -363,8 +365,9 @@ func TestMultiThreadDownloader(t *testing.T) {
 		},
 		wantErr: false,
 	}, {
-		name:   "invalid content length",
-		thread: 1,
+		name:           "invalid content length",
+		thread:         1,
+		expectFilename: "suggestedFilename",
 		prepare: func(t *testing.T, downloader *net.MultiThreadDownloader) {
 			// for regular download
 			ctrl := gomock.NewController(t)
@@ -372,7 +375,7 @@ func TestMultiThreadDownloader(t *testing.T) {
 			mockRequest4, _ := http.NewRequest(http.MethodGet, url, nil)
 			mockRequest4.Header.Set("Range", "bytes=2-")
 			mockResponse4 := &http.Response{
-				StatusCode: http.StatusOK,
+				StatusCode: http.StatusPartialContent,
 				Proto:      "HTTP/1.1",
 				Request:    mockRequest4,
 				Header: map[string][]string{
@@ -382,12 +385,27 @@ func TestMultiThreadDownloader(t *testing.T) {
 			}
 			roundTripper.EXPECT().
 				RoundTrip(mockRequest4).Return(mockResponse4, nil)
+
+			mockRequest5, _ := http.NewRequest(http.MethodGet, url, nil)
+			mockRequest5.Header.Set("Range", "bytes=0-")
+			mockResponse5 := &http.Response{
+				StatusCode: http.StatusOK,
+				Proto:      "HTTP/1.1",
+				Header: map[string][]string{
+					"Content-Disposition": {`filename="suggestedFilename"`},
+				},
+				Request: mockRequest5,
+				Body:    io.NopCloser(bytes.NewBufferString("responseBody")),
+			}
+			roundTripper.EXPECT().
+				RoundTrip(mockRequest5).Return(mockResponse5, nil)
+
 			downloader.WithoutProxy(true).
 				WithShowProgress(false).
 				WithRoundTripper(roundTripper).
 				WithKeepParts(false)
 		},
-		wantErr: true,
+		wantErr: false,
 	}}
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -411,6 +429,7 @@ func TestMultiThreadDownloader(t *testing.T) {
 			} else {
 				assert.Nil(t, err, "should not have error in case [%d]-[%s]", i, tt.name)
 			}
+			assert.Equal(t, tt.expectFilename, downloader.GetSuggestedFilename())
 		})
 	}
 }

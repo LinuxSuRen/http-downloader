@@ -102,7 +102,7 @@ func (d *dockerInstallerInUbuntu) installOnDebian() (err error) {
 		return
 	}
 
-	if err = os.MkdirAll("/etc/apt/keyrings", 0644); err != nil {
+	if err = os.MkdirAll("/etc/apt/keyrings", 0750); err != nil {
 		return
 	}
 
