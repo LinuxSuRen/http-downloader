@@ -77,3 +77,12 @@ func TestWithFakeInstaller(t *testing.T) {
 	err = Uninstall("fake-with-err")
 	assert.NotNil(t, err)
 }
+
+func TestSearchPackages(t *testing.T) {
+	// currently, this function only support Linux
+	if runtime.GOOS != "linux" {
+		return
+	}
+	pkgs := SearchPackages("vim")
+	assert.NotEmpty(t, pkgs)
+}

@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/common"
-	"github.com/linuxsuren/http-downloader/pkg/log"
 	"io"
 	"io/fs"
 	"net/http"
@@ -16,6 +14,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/linuxsuren/http-downloader/pkg/common"
+	"github.com/linuxsuren/http-downloader/pkg/log"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"golang.org/x/net/html"
@@ -25,6 +26,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/net"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
@@ -43,6 +45,7 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 	// set flags
 	flags := cmd.Flags()
 	opt.addFlags(flags)
+	opt.addPlatformFlags(flags)
 	flags.StringVarP(&opt.Output, "output", "o", "", "Write output to <file> instead of stdout.")
 	flags.BoolVarP(&opt.AcceptPreRelease, "accept-preRelease", "", false,
 		"If you accept preRelease as the binary asset from GitHub")
@@ -63,8 +66,6 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 		`Download file with multi-threads. It only works when its value is bigger than 1`)
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
-	flags.StringVarP(&opt.OS, "os", "", runtime.GOOS, "The OS of target binary file")
-	flags.StringVarP(&opt.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
 	flags.BoolVarP(&opt.PrintSchema, "print-schema", "", false,
 		"Print the schema of HDConfig if the flag is true without other function")
 	flags.BoolVarP(&opt.PrintVersion, "print-version", "", false,
@@ -226,6 +227,11 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 	return
 }
 
+func (o *downloadOption) addPlatformFlags(flags *pflag.FlagSet) {
+	flags.StringVarP(&o.OS, "os", "", runtime.GOOS, "The OS of target binary file")
+	flags.StringVarP(&o.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
+}
+
 func findAnchor(n *html.Node) (items []string) {
 	if n.Type == html.ElementNode && n.Data == "a" {
 		for _, a := range n.Attr {
@@ -295,8 +301,8 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 
 	targetURL := o.URL
 	if o.ProxyGitHub != "" {
-		targetURL = strings.Replace(targetURL, "github.com", fmt.Sprintf("%s/github.com", o.ProxyGitHub), 1)
-		targetURL = strings.Replace(targetURL, "raw.githubusercontent.com", fmt.Sprintf("%s/https://raw.githubusercontent.com", o.ProxyGitHub), 1)
+		targetURL = strings.Replace(targetURL, "https://github.com", fmt.Sprintf("https://%s/github.com", o.ProxyGitHub), 1)
+		targetURL = strings.Replace(targetURL, "https://raw.githubusercontent.com", fmt.Sprintf("https://%s/https://raw.githubusercontent.com", o.ProxyGitHub), 1)
 	}
 	logger.Printf("start to download from %s\n", targetURL)
 	var suggestedFilenameAware net.SuggestedFilenameAware

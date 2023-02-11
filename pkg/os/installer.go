@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
@@ -67,6 +68,26 @@ func HasPackage(name string) bool {
 		}
 	}
 	return false
+}
+
+// SearchPackages searches the packages by keyword
+func SearchPackages(keyword string) (pkgs []string) {
+	for key, pms := range defaultInstallerRegistry.installerMap {
+		if strings.Contains(key, keyword) {
+			var available bool
+			for _, pm := range pms {
+				if pm.Available() {
+					available = true
+					break
+				}
+			}
+
+			if available {
+				pkgs = append(pkgs, key)
+			}
+		}
+	}
+	return
 }
 
 // InstallWithProxy installs a package with name

@@ -439,6 +439,9 @@ func FindByKeyword(keyword, configDir string) (result []string) {
 			result = append(result, path.Join(org, repo))
 		}
 	}
+
+	// find in the generic packages
+	result = append(result, os.SearchPackages(keyword)...)
 	return
 }
 

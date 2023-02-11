@@ -3,11 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
+
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	sysos "os"
 )
 
 func newSearchCmd(context.Context) (cmd *cobra.Command) {
@@ -43,14 +44,14 @@ Available proxy: gh.api.99988866.xyz, ghproxy.com
 Thanks to https://github.com/hunshcn/gh-proxy`)
 }
 
-func (s *searchOption) runE(_ *cobra.Command, args []string) (err error) {
-	err = search(args[0], s.Fetch, s.fetcher)
+func (s *searchOption) runE(c *cobra.Command, args []string) (err error) {
+	err = search(args[0], s.Fetch, s.fetcher, c.OutOrStdout())
 	return
 }
 
-func search(keyword string, fetch bool, fetcher installer.Fetcher) (err error) {
+func search(keyword string, fetch bool, fetcher installer.Fetcher, writer io.Writer) (err error) {
 	if fetch {
-		if err = fetcher.FetchLatestRepo("", "", sysos.Stdout); err != nil {
+		if err = fetcher.FetchLatestRepo("", "", writer); err != nil {
 			return
 		}
 	}
@@ -62,7 +63,7 @@ func search(keyword string, fetch bool, fetcher installer.Fetcher) (err error) {
 
 	result := installer.FindByKeyword(keyword, configDir)
 	for _, item := range result {
-		fmt.Println(item)
+		fmt.Fprintln(writer, item)
 	}
 	return
 }
