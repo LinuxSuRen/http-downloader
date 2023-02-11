@@ -3,6 +3,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
+	sysos "os"
+	"path"
+	"strings"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/exec"
@@ -11,11 +16,6 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"log"
-	sysos "os"
-	"path"
-	"runtime"
-	"strings"
 )
 
 // newInstallCmd returns the install command
@@ -37,6 +37,7 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 
 	flags := cmd.Flags()
 	opt.addFlags(flags)
+	opt.addPlatformFlags(flags)
 	flags.StringVarP(&opt.Category, "category", "c", "",
 		"The category of the potentials packages")
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
@@ -63,8 +64,6 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 	flags.BoolVarP(&opt.NoProxy, "no-proxy", "", viper.GetBool("no-proxy"), "Indicate no HTTP proxy taken")
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
-	flags.StringVarP(&opt.OS, "os", "", runtime.GOOS, "The OS of target binary file")
-	flags.StringVarP(&opt.Arch, "arch", "", runtime.GOARCH, "The arch of target binary file")
 
 	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, ProviderGitee))
 	return
@@ -151,8 +150,8 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		var proxy map[string]string
 		if o.ProxyGitHub != "" {
 			proxy = map[string]string{
-				"raw.githubusercontent.com": fmt.Sprintf("%s/https://raw.githubusercontent.com", o.ProxyGitHub),
-				"github.com":                fmt.Sprintf("%s/https://github.com", o.ProxyGitHub),
+				"https://raw.githubusercontent.com": fmt.Sprintf("https://%s/https://raw.githubusercontent.com", o.ProxyGitHub),
+				"https://github.com":                fmt.Sprintf("https://%s/https://github.com", o.ProxyGitHub),
 			}
 		}
 		err = os.InstallWithProxy(args[0], proxy)
