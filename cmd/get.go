@@ -301,8 +301,12 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 
 	targetURL := o.URL
 	if o.ProxyGitHub != "" {
-		targetURL = strings.Replace(targetURL, "https://github.com", fmt.Sprintf("https://%s/github.com", o.ProxyGitHub), 1)
-		targetURL = strings.Replace(targetURL, "https://raw.githubusercontent.com", fmt.Sprintf("https://%s/https://raw.githubusercontent.com", o.ProxyGitHub), 1)
+		if strings.HasPrefix(targetURL, "https://github.com") {
+			targetURL = strings.Replace(targetURL, "https://github.com", fmt.Sprintf("https://%s/github.com", o.ProxyGitHub), 1)
+		}
+		if strings.HasPrefix(targetURL, "https://raw.githubusercontent.com") {
+			targetURL = strings.Replace(targetURL, "https://raw.githubusercontent.com", fmt.Sprintf("https://%s/https://raw.githubusercontent.com", o.ProxyGitHub), 1)
+		}
 	}
 	logger.Printf("start to download from %s\n", targetURL)
 	var suggestedFilenameAware net.SuggestedFilenameAware

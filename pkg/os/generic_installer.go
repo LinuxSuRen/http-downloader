@@ -64,6 +64,7 @@ type CmdWithArgs struct {
 	Cmd        string   `yaml:"cmd"`
 	Args       []string `yaml:"args"`
 	SystemCall bool     `yaml:"systemCall"`
+	When       string   `yaml:"when"`
 	WriteTo    *WriteTo `yaml:"writeTo"`
 }
 
