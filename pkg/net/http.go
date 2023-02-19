@@ -1,6 +1,7 @@
 package net
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
@@ -29,6 +30,7 @@ type HTTPDownloader struct {
 	URL                string
 	ShowProgress       bool
 	InsecureSkipVerify bool
+	Context            context.Context
 
 	UserName string
 	Password string
@@ -98,7 +100,10 @@ func (h *HTTPDownloader) fetchProxyFromEnv(scheme string) {
 func (h *HTTPDownloader) DownloadFile() error {
 	filepath, downloadURL, showProgress := h.TargetFilePath, h.URL, h.ShowProgress
 	// Get the data
-	req, err := http.NewRequest(http.MethodGet, downloadURL, nil)
+	if h.Context == nil {
+		h.Context = context.Background()
+	}
+	req, err := http.NewRequestWithContext(h.Context, http.MethodGet, downloadURL, nil)
 	if err != nil {
 		return err
 	}
@@ -223,6 +228,7 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 type ContinueDownloader struct {
 	downloader *HTTPDownloader
 
+	Context            context.Context
 	roundTripper       http.RoundTripper
 	noProxy            bool
 	insecureSkipVerify bool
@@ -251,6 +257,12 @@ func (c *ContinueDownloader) WithInsecureSkipVerify(insecureSkipVerify bool) *Co
 	return c
 }
 
+// WithContext sets the context
+func (c *ContinueDownloader) WithContext(ctx context.Context) *ContinueDownloader {
+	c.Context = ctx
+	return c
+}
+
 // DownloadWithContinue downloads the files continuously
 func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, index, continueAt, end int64, showProgress bool) (err error) {
 	c.downloader = &HTTPDownloader{
@@ -260,6 +272,7 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 		NoProxy:            c.noProxy,
 		RoundTripper:       c.roundTripper,
 		InsecureSkipVerify: c.insecureSkipVerify,
+		Context:            c.Context,
 	}
 	if index >= 0 {
 		c.downloader.Title = fmt.Sprintf("Downloading part %d", index)

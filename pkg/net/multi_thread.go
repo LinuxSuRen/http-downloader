@@ -1,9 +1,11 @@
 package net
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync"
 )
 
@@ -76,10 +78,21 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 			}
 		}()
 
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		ctx, cancel := context.WithCancel(context.Background())
+		var canceled bool
+
+		go func() {
+			<-c
+			canceled = true
+			cancel()
+		}()
+
 		fmt.Printf("start to download with %d threads, size: %d, unit: %d\n", thread, total, unit)
 		for i := 0; i < thread; i++ {
 			wg.Add(1)
-			go func(index int, wg *sync.WaitGroup) {
+			go func(index int, wg *sync.WaitGroup, ctx context.Context) {
 				defer wg.Done()
 				output := fmt.Sprintf("%s-%d", targetFilePath, index)
 
@@ -97,16 +110,20 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 				downloader := &ContinueDownloader{}
 				downloader.WithoutProxy(d.noProxy).
 					WithRoundTripper(d.roundTripper).
-					WithInsecureSkipVerify(d.insecureSkipVerify)
+					WithInsecureSkipVerify(d.insecureSkipVerify).
+					WithContext(ctx)
 				if downloadErr := downloader.DownloadWithContinue(targetURL, output,
 					int64(index), start, end, d.showProgress); downloadErr != nil {
 					fmt.Println(downloadErr)
 				}
-			}(i, &wg)
+			}(i, &wg, ctx)
 		}
 
 		wg.Wait()
 		ProgressIndicator{}.Close()
+		if canceled {
+			return
+		}
 
 		// concat all these partial files
 		var f *os.File

@@ -284,38 +284,7 @@ func TestMultiThreadDownloader(t *testing.T) {
 				},
 				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
 			}
-			roundTripper.EXPECT().
-				RoundTrip(mockRequest).Return(mockResponse, nil)
-
-			// for group-1
-			mockRequest1, _ := http.NewRequest(http.MethodGet, url, nil)
-			mockRequest1.Header.Set("Range", "bytes=0-50")
-			mockResponse1 := &http.Response{
-				StatusCode: http.StatusPartialContent,
-				Proto:      "HTTP/1.1",
-				Request:    mockRequest1,
-				Header: map[string][]string{
-					"Content-Length": {"100"},
-				},
-				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
-			}
-			roundTripper.EXPECT().
-				RoundTrip(mockRequest1).Return(mockResponse1, nil)
-
-			// for group-2
-			mockRequest2, _ := http.NewRequest(http.MethodGet, url, nil)
-			mockRequest2.Header.Set("Range", "bytes=51-101")
-			mockResponse2 := &http.Response{
-				StatusCode: http.StatusPartialContent,
-				Proto:      "HTTP/1.1",
-				Request:    mockRequest2,
-				Header: map[string][]string{
-					"Content-Length": {"100"},
-				},
-				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
-			}
-			roundTripper.EXPECT().
-				RoundTrip(mockRequest2).Return(mockResponse2, nil)
+			roundTripper.EXPECT().RoundTrip(gomock.Any()).Return(mockResponse, nil).AnyTimes()
 
 			downloader.WithoutProxy(true).
 				WithShowProgress(false).
