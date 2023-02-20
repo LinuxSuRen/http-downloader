@@ -134,7 +134,8 @@ func TestShouldInstall(t *testing.T) {
 			},
 			downloadOption: &downloadOption{
 				Package: &installer.HDConfig{
-					Version: "v1.2.4",
+					Version:    "v1.2.4",
+					VersionCmd: "-v",
 				},
 			},
 			tool: "fake",

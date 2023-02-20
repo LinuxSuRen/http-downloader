@@ -89,15 +89,18 @@ func (o *installOption) shouldInstall() (should, exist bool) {
 	var greater bool
 	if name, lookErr := o.execer.LookPath(o.tool); lookErr == nil {
 		exist = true
-		versionCmd := "version"
+
+		var versionCmd string
 		if o.downloadOption != nil && o.downloadOption.Package != nil && o.downloadOption.Package.VersionCmd != "" {
 			versionCmd = o.downloadOption.Package.VersionCmd
 		}
 
-		log.Println("check target version via", name, versionCmd)
-		if data, err := o.execer.Command(name, versionCmd); err == nil &&
-			(o.downloadOption.Package != nil && o.downloadOption.Package.Version != "") {
-			greater = version.GreatThan(o.downloadOption.Package.Version, string(data))
+		if versionCmd != "" {
+			log.Println("check target version via", name, versionCmd)
+			if data, err := o.execer.Command(name, versionCmd); err == nil &&
+				(o.downloadOption.Package != nil && o.downloadOption.Package.Version != "") {
+				greater = version.GreatThan(o.downloadOption.Package.Version, string(data))
+			}
 		}
 	}
 	should = o.force || !exist || greater
