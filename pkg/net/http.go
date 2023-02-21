@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -44,10 +45,10 @@ type HTTPDownloader struct {
 	// PreStart returns false will don't continue
 	PreStart func(*http.Response) bool
 
-	Thread      int
-	Title       string
-	Timeout     int
-	MaxAttempts int
+	Thread  int
+	Title   string
+	Timeout time.Duration
+	// MaxAttempts int
 
 	Debug             bool
 	RoundTripper      http.RoundTripper
@@ -121,6 +122,9 @@ func (h *HTTPDownloader) DownloadFile() error {
 	} else {
 		trp := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: h.InsecureSkipVerify},
+			DialContext: (&net.Dialer{
+				Timeout: h.Timeout,
+			}).DialContext,
 		}
 
 		if !h.NoProxy {
@@ -136,13 +140,9 @@ func (h *HTTPDownloader) DownloadFile() error {
 		}
 		tr = trp
 	}
-	client := &RetryClient{
-		Client: http.Client{
-			Transport: tr,
-			Timeout:   time.Duration(h.Timeout) * time.Second,
-		},
-		MaxAttempts: h.MaxAttempts,
-	}
+	client := *NewRetryClient(http.Client{
+		Transport: tr,
+	})
 	var resp *http.Response
 
 	if resp, err = client.Do(req); err != nil {
@@ -196,10 +196,7 @@ func (h *HTTPDownloader) DownloadFile() error {
 	}
 
 	h.progressIndicator.Writer = out
-
-	if showProgress {
-		h.progressIndicator.Init()
-	}
+	h.progressIndicator.Init()
 
 	// Write the body to file
 	_, err = io.Copy(h.progressIndicator, resp.Body)
@@ -228,6 +225,7 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 type ContinueDownloader struct {
 	downloader *HTTPDownloader
 
+	Timeout            time.Duration
 	Context            context.Context
 	roundTripper       http.RoundTripper
 	noProxy            bool
@@ -263,6 +261,12 @@ func (c *ContinueDownloader) WithContext(ctx context.Context) *ContinueDownloade
 	return c
 }
 
+// WithTimeout sets the timeout
+func (c *ContinueDownloader) WithTimeout(timeout time.Duration) *ContinueDownloader {
+	c.Timeout = timeout
+	return c
+}
+
 // DownloadWithContinue downloads the files continuously
 func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, index, continueAt, end int64, showProgress bool) (err error) {
 	c.downloader = &HTTPDownloader{
@@ -273,6 +277,7 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 		RoundTripper:       c.roundTripper,
 		InsecureSkipVerify: c.insecureSkipVerify,
 		Context:            c.Context,
+		Timeout:            c.Timeout,
 	}
 	if index >= 0 {
 		c.downloader.Title = fmt.Sprintf("Downloading part %d", index)
@@ -296,7 +301,7 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 
 // DetectSizeWithRoundTripper returns the size of target resource
 func DetectSizeWithRoundTripper(targetURL, output string, showProgress, noProxy, insecureSkipVerify bool,
-	roundTripper http.RoundTripper) (total int64, rangeSupport bool, err error) {
+	roundTripper http.RoundTripper, timeout time.Duration) (total int64, rangeSupport bool, err error) {
 	downloader := HTTPDownloader{
 		TargetFilePath:     output,
 		URL:                targetURL,
@@ -304,6 +309,7 @@ func DetectSizeWithRoundTripper(targetURL, output string, showProgress, noProxy,
 		RoundTripper:       roundTripper,
 		NoProxy:            false, // below HTTP request does not need proxy
 		InsecureSkipVerify: insecureSkipVerify,
+		Timeout:            timeout,
 	}
 
 	var detectOffset int64

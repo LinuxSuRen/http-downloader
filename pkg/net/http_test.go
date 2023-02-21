@@ -127,7 +127,7 @@ var _ = Describe("http test", func() {
 			request, _ := http.NewRequest(http.MethodGet, "", nil)
 			response := &http.Response{}
 			roundTripper.EXPECT().
-				RoundTrip(request).Return(response, fmt.Errorf("fake error"))
+				RoundTrip(request).Return(response, fmt.Errorf("fake error")).AnyTimes()
 			err := downloader.DownloadFile()
 			Expect(err).To(HaveOccurred())
 		})
@@ -251,7 +251,7 @@ func TestDetectSize(t *testing.T) {
 	roundTripper.EXPECT().
 		RoundTrip(mockRequest).Return(mockResponse, nil)
 
-	total, rangeSupport, err := net.DetectSizeWithRoundTripper(targetURL, os.TempDir(), false, false, false, roundTripper)
+	total, rangeSupport, err := net.DetectSizeWithRoundTripper(targetURL, os.TempDir(), false, false, false, roundTripper, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, int64(102), total)
 	assert.True(t, rangeSupport)
