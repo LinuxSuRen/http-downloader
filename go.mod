@@ -3,7 +3,7 @@ module github.com/linuxsuren/http-downloader
 go 1.18
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.3.2
+	github.com/AlecAivazis/survey/v2 v2.3.6
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/golang/mock v1.6.0
 	github.com/google/go-github/v29 v29.0.3
@@ -31,7 +31,6 @@ require (
 require (
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
-	github.com/prometheus/client_golang v1.11.1 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 )
 
