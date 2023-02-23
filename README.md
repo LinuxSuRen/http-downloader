@@ -24,6 +24,11 @@ curl -L https://ghproxy.com/https://github.com/linuxsuren/http-downloader/releas
 mv hd /usr/bin/hd
 ```
 
+for Windows users (you might need to add this program into the Windows Defence exclude list):
+```
+winget install 'HTTP downloader'
+```
+
 Want to go through the code? [GitPod](https://gitpod.io/#https://github.com/linuxsuren/http-downloader) definitely can help you.
 
 # Usage
