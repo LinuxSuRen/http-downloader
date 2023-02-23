@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"time"
 )
 
 // MultiThreadDownloader is a download with multi-thread
@@ -17,6 +18,7 @@ type MultiThreadDownloader struct {
 
 	roundTripper      http.RoundTripper
 	suggestedFilename string
+	timeout           time.Duration
 }
 
 // GetSuggestedFilename returns the suggested filename
@@ -27,6 +29,12 @@ func (d *MultiThreadDownloader) GetSuggestedFilename() string {
 // WithInsecureSkipVerify set if skip the insecure verify
 func (d *MultiThreadDownloader) WithInsecureSkipVerify(insecureSkipVerify bool) *MultiThreadDownloader {
 	d.insecureSkipVerify = insecureSkipVerify
+	return d
+}
+
+// WithTimeout sets the timeout
+func (d *MultiThreadDownloader) WithTimeout(timeout time.Duration) *MultiThreadDownloader {
+	d.timeout = timeout
 	return d
 }
 
@@ -60,7 +68,7 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 	var total int64
 	var rangeSupport bool
 	if total, rangeSupport, err = DetectSizeWithRoundTripper(targetURL, targetFilePath, d.showProgress,
-		d.noProxy, d.insecureSkipVerify, d.roundTripper); rangeSupport && err != nil {
+		d.noProxy, d.insecureSkipVerify, d.roundTripper, d.timeout); rangeSupport && err != nil {
 		return
 	}
 
@@ -89,8 +97,9 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 			cancel()
 		}()
 
-		fmt.Printf("start to download with %d threads, size: %d, unit: %d\n", thread, total, unit)
+		fmt.Printf("start to download with %d threads, size: %d, unit: %d", thread, total, unit)
 		for i := 0; i < thread; i++ {
+			fmt.Println() // TODO take position, should take over by progerss bars
 			wg.Add(1)
 			go func(index int, wg *sync.WaitGroup, ctx context.Context) {
 				defer wg.Done()
@@ -111,7 +120,7 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 				downloader.WithoutProxy(d.noProxy).
 					WithRoundTripper(d.roundTripper).
 					WithInsecureSkipVerify(d.insecureSkipVerify).
-					WithContext(ctx)
+					WithContext(ctx).WithTimeout(d.timeout)
 				if downloadErr := downloader.DownloadWithContinue(targetURL, output,
 					int64(index), start, end, d.showProgress); downloadErr != nil {
 					fmt.Println(downloadErr)
@@ -120,9 +129,19 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 		}
 
 		wg.Wait()
-		ProgressIndicator{}.Close()
+		// ProgressIndicator{}.Close()
 		if canceled {
+			err = fmt.Errorf("download process canceled")
 			return
+		}
+
+		// make the cursor right
+		// TODO the progress component should take over it
+		if thread > 1 {
+			// line := GetCurrentLine()
+			time.Sleep(time.Second)
+			fmt.Printf("\033[%dE\n", thread) // move to the target line
+			time.Sleep(time.Second * 5)
 		}
 
 		// concat all these partial files
@@ -153,6 +172,7 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 		downloader.WithoutProxy(d.noProxy)
 		downloader.WithRoundTripper(d.roundTripper)
 		downloader.WithInsecureSkipVerify(d.insecureSkipVerify)
+		downloader.WithTimeout(d.timeout)
 		err = downloader.DownloadWithContinue(targetURL, targetFilePath, -1, 0, 0, true)
 		d.suggestedFilename = downloader.GetSuggestedFilename()
 	}

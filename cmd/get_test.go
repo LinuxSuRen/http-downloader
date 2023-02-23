@@ -35,7 +35,7 @@ func Test_newGetCmd(t *testing.T) {
 	}, {
 		name: "pre",
 	}, {
-		name: "time",
+		name: "timeout",
 	}, {
 		name: "max-attempts",
 	}, {
@@ -63,9 +63,10 @@ func Test_newGetCmd(t *testing.T) {
 		tt := flags[i]
 		t.Run(tt.name, func(t *testing.T) {
 			flag := cmd.Flag(tt.name)
-			assert.NotNil(t, flag)
-			assert.NotEmpty(t, flag.Usage)
-			assert.Equal(t, tt.shorthand, flag.Shorthand)
+			if assert.NotNil(t, flag, tt.name) {
+				assert.NotEmpty(t, flag.Usage)
+				assert.Equal(t, tt.shorthand, flag.Shorthand)
+			}
 		})
 	}
 }

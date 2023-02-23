@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/log"
@@ -55,7 +56,7 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 	flags.IntVarP(&opt.Mod, "mod", "", -1, "The file permission, -1 means using the system default")
 	flags.BoolVarP(&opt.SkipTLS, "skip-tls", "k", false, "Skip the TLS")
 
-	flags.IntVarP(&opt.Timeout, "time", "", 10,
+	flags.DurationVarP(&opt.Timeout, "timeout", "", 15*time.Minute,
 		`The default timeout in seconds with the HTTP request`)
 	flags.IntVarP(&opt.MaxAttempts, "max-attempts", "", 10,
 		`Max times to attempt to download, zero means there's no retry action'`)
@@ -100,7 +101,7 @@ type downloadOption struct {
 	Category         string
 	Output           string
 	ShowProgress     bool
-	Timeout          int
+	Timeout          time.Duration
 	NoProxy          bool
 	MaxAttempts      int
 	AcceptPreRelease bool
@@ -311,7 +312,8 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		suggestedFilenameAware = downloader
 		downloader.WithoutProxy(o.NoProxy).
 			WithRoundTripper(o.RoundTripper).
-			WithInsecureSkipVerify(o.SkipTLS)
+			WithInsecureSkipVerify(o.SkipTLS).
+			WithTimeout(o.Timeout)
 		err = downloader.DownloadWithContinue(targetURL, o.Output, o.ContinueAt, -1, 0, o.ShowProgress)
 	} else {
 		downloader := &net.MultiThreadDownloader{}
@@ -320,7 +322,8 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 			WithShowProgress(o.ShowProgress).
 			WithoutProxy(o.NoProxy).
 			WithRoundTripper(o.RoundTripper).
-			WithInsecureSkipVerify(o.SkipTLS)
+			WithInsecureSkipVerify(o.SkipTLS).
+			WithTimeout(o.Timeout)
 		err = downloader.Download(targetURL, o.Output, o.Thread)
 	}
 

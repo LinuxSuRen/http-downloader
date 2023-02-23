@@ -2,8 +2,12 @@ package net
 
 import (
 	"fmt"
-	"github.com/gosuri/uiprogress"
 	"io"
+	"os"
+	"sync"
+
+	"github.com/k0kubun/go-ansi"
+	"github.com/schollz/progressbar/v3"
 )
 
 // ProgressIndicator hold the progress of io operation
@@ -14,58 +18,64 @@ type ProgressIndicator struct {
 
 	// bytes.Buffer
 	Total float64
-	count float64
-	bar   *uiprogress.Bar
+	line  int
+	bar   *progressbar.ProgressBar
 }
 
-var process *uiprogress.Progress
+var line int = 0
+var currentLine int = 0
+var guard sync.Mutex = sync.Mutex{}
+
+// GetCurrentLine returns the current line
+func GetCurrentLine() int {
+	return currentLine
+}
 
 // Init set the default value for progress indicator
 func (i *ProgressIndicator) Init() {
-	// start rendering
-	if process == nil {
-		process = uiprogress.New()
-		process.Start()
-	}
-	i.bar = process.AddBar(100) // Add a new bar
-
-	// optionally, append and prepend completion and elapsed time
-	i.bar.AppendCompleted()
-	//i.bar.PrependElapsed()
-
-	if i.Title != "" {
-		i.bar.PrependFunc(func(_ *uiprogress.Bar) string {
-			return fmt.Sprintf("%s: ", i.Title)
-		})
-	}
+	i.line = line
+	line++
+	i.bar = progressbar.NewOptions64(int64(i.Total),
+		progressbar.OptionSetWriter(ansi.NewAnsiStdout()),
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowBytes(true),
+		progressbar.OptionSetWidth(10),
+		progressbar.OptionFullWidth(),
+		progressbar.OptionSetDescription(fmt.Sprintf("[cyan][reset] %s", i.Title)),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "[green]=[reset]",
+			SaucerHead:    "[green]>[reset]",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}))
 }
 
 // Close shutdowns the ui process
 func (i ProgressIndicator) Close() {
-	if process != nil {
-		process.Stop()
-		process = nil
-	}
+	_ = i.bar.Close()
 }
 
 // Write writes the progress
+// See also https://en.wikipedia.org/wiki/ANSI_escape_code#Sequence_elements
 func (i *ProgressIndicator) Write(p []byte) (n int, err error) {
-	n, err = i.Writer.Write(p)
-	i.setBar(n)
+	guard.Lock()
+	defer guard.Unlock()
+	bias := currentLine - i.line
+	currentLine = i.line
+	if bias > 0 {
+		// move up
+		fmt.Fprintf(os.Stdout, "\r\033[%dA", bias)
+	} else if bias < 0 {
+		// move down
+		fmt.Fprintf(os.Stdout, "\r\033[%dB", -bias)
+	}
+	n, err = io.MultiWriter(i.Writer, i.bar).Write(p)
 	return
 }
 
 // Read reads the progress
 func (i *ProgressIndicator) Read(p []byte) (n int, err error) {
-	n, err = i.Reader.Read(p)
-	i.setBar(n)
+	n, err = io.MultiReader(i.Reader, i.bar).Read(p)
 	return
-}
-
-func (i *ProgressIndicator) setBar(n int) {
-	i.count += float64(n)
-
-	if i.bar != nil {
-		_ = i.bar.Set((int)(i.count * 100 / i.Total))
-	}
 }
