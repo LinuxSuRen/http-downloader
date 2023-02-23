@@ -18,7 +18,7 @@ curl -L https://github.com/linuxsuren/http-downloader/releases/latest/download/h
 mv hd /usr/bin/hd
 ```
 
-for Windows users:
+for Windows users (you might need to add this program into the Windows Defence exclude list):
 ```
 winget install 'HTTP downloader'
 ```
