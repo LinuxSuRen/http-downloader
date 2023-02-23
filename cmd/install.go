@@ -33,6 +33,7 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 		Example: "hd install goget",
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
+		GroupID: coreGroup.ID,
 	}
 
 	flags := cmd.Flags()

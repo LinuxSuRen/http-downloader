@@ -3,9 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/log"
 	"os"
 	"runtime"
+
+	"github.com/linuxsuren/http-downloader/pkg/log"
 
 	"github.com/AlecAivazis/survey/v2/terminal"
 	extpkg "github.com/linuxsuren/cobra-extension/pkg"
@@ -14,12 +15,21 @@ import (
 	"github.com/spf13/viper"
 )
 
+var coreGroup *cobra.Group
+var configGroup *cobra.Group
+
+func init() {
+	coreGroup = &cobra.Group{ID: "core", Title: "Core"}
+	configGroup = &cobra.Group{ID: "conig", Title: "Config"}
+}
+
 // NewRoot returns the root command
 func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 	cmd = &cobra.Command{
 		Use:   "hd",
 		Short: "HTTP download tool",
 	}
+	cmd.AddGroup(coreGroup, configGroup)
 
 	if err := loadConfig(); err != nil {
 		panic(err)

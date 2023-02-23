@@ -3,11 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg"
-	"github.com/linuxsuren/http-downloader/pkg/log"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/linuxsuren/http-downloader/pkg"
+	"github.com/linuxsuren/http-downloader/pkg/log"
 
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
@@ -22,6 +23,7 @@ func newFetchCmd(context.Context) (cmd *cobra.Command) {
 		Short:   "Fetch the latest hd config",
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
+		GroupID: configGroup.ID,
 	}
 
 	flags := cmd.Flags()

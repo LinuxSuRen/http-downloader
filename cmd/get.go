@@ -37,10 +37,12 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := newDownloadOption(ctx)
 	cmd = &cobra.Command{
 		Use:     "get",
-		Short:   "download the file",
+		Aliases: []string{"download"},
+		Short:   "Download the file",
 		Example: "hd get jenkins-zh/jenkins-cli/jcli --thread 6",
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
+		GroupID: coreGroup.ID,
 	}
 
 	// set flags
