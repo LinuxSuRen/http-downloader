@@ -17,9 +17,10 @@ func newSetupCommand(v *viper.Viper, stdio terminal.Stdio) (cmd *cobra.Command) 
 		v:     v,
 	}
 	cmd = &cobra.Command{
-		Use:   "setup",
-		Short: "Init the configuration of hd",
-		RunE:  opt.runE,
+		Use:     "setup",
+		Short:   "Init the configuration of hd",
+		RunE:    opt.runE,
+		GroupID: configGroup.ID,
 	}
 	return
 }

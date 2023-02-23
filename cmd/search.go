@@ -22,6 +22,7 @@ func newSearchCmd(context.Context) (cmd *cobra.Command) {
 		Short:   "Search packages from the hd config repo",
 		Args:    cobra.MinimumNArgs(1),
 		RunE:    opt.runE,
+		GroupID: configGroup.ID,
 	}
 	opt.addFlags(cmd.Flags())
 	return
