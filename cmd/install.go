@@ -39,6 +39,7 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 	flags := cmd.Flags()
 	opt.addFlags(flags)
 	opt.addPlatformFlags(flags)
+	opt.addDownloadFlags(flags)
 	flags.StringVarP(&opt.Category, "category", "c", "",
 		"The category of the potentials packages")
 	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")

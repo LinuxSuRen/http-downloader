@@ -146,7 +146,7 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 
 		// concat all these partial files
 		var f *os.File
-		if f, err = os.OpenFile(targetFilePath, os.O_CREATE|os.O_WRONLY, 0600); err == nil {
+		if f, err = os.Create(targetFilePath); err == nil {
 			defer func() {
 				_ = f.Close()
 			}()
