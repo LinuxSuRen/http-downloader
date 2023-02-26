@@ -35,13 +35,13 @@ Want to go through the code? [GitPod](https://gitpod.io/#https://github.com/linu
 
 ## Download
 ```shell
-hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/jcli-linux-amd64.tar.gz --thread 6
+hd get https://github.com/jenkins-zh/jenkins-cli/releases/latest/download/mde-linux-amd64.tar.gz --thread 6
 ```
 
 Or use a simple way instead of typing the whole URL:
 
 ```shell
-hd get jcli
+hd get mde
 ```
 
 Or you might want to download a pre-released binary package from GitHub:
@@ -54,7 +54,8 @@ hd get --pre ks
 You can also install a package from GitHub:
 
 ```shell
-hd install jcli -t 6
+#!title: Install mde with specific threads
+hd install mde -t 6
 ```
 
 or install by a category name:

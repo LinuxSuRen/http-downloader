@@ -49,14 +49,13 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 	flags := cmd.Flags()
 	opt.addFlags(flags)
 	opt.addPlatformFlags(flags)
+	opt.addDownloadFlags(flags)
 	flags.StringVarP(&opt.Output, "output", "o", "", "Write output to <file> instead of stdout.")
 	flags.BoolVarP(&opt.AcceptPreRelease, "accept-preRelease", "", false,
 		"If you accept preRelease as the binary asset from GitHub")
 	flags.BoolVarP(&opt.AcceptPreRelease, "pre", "", false,
 		"Same with option --accept-preRelease")
 	flags.BoolVarP(&opt.Force, "force", "f", false, "Overwrite the exist file if this is true")
-	flags.IntVarP(&opt.Mod, "mod", "", -1, "The file permission, -1 means using the system default")
-	flags.BoolVarP(&opt.SkipTLS, "skip-tls", "k", false, "Skip the TLS")
 
 	flags.DurationVarP(&opt.Timeout, "timeout", "", 15*time.Minute,
 		`The default timeout in seconds with the HTTP request`)
@@ -142,6 +141,11 @@ const (
 	// ProviderGitee represents https://gitee.com
 	ProviderGitee = "gitee"
 )
+
+func (o *downloadOption) addDownloadFlags(flags *pflag.FlagSet) {
+	flags.IntVarP(&o.Mod, "mod", "", -1, "The file permission, -1 means using the system default")
+	flags.BoolVarP(&o.SkipTLS, "skip-tls", "k", false, "Skip the TLS")
+}
 
 func (o *downloadOption) fetch() (err error) {
 	if !o.Fetch {
@@ -331,7 +335,10 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 
 	// set file permission
 	if o.Mod != -1 {
-		err = sysos.Chmod(o.Output, fs.FileMode(o.Mod))
+		logger.Printf("Setting file permission to %d", o.Mod)
+		if err = sysos.Chmod(o.Output, fs.FileMode(o.Mod)); err != nil {
+			return
+		}
 	}
 
 	if err == nil {

@@ -17,16 +17,6 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.18
-      - name: Upgrade upx
-        run: |
-          # try to fix https://github.com/jenkins-zh/jenkins-cli/issues/493
-          wget https://github.com/upx/upx/releases/download/v3.96/upx-3.96-amd64_linux.tar.xz
-          tar xvf upx-3.96-amd64_linux.tar.xz
-          upx-3.96-amd64_linux/upx -V
-          sudo mv upx-3.96-amd64_linux/upx $(which upx)
-          rm -rf upx-3.96-amd64_linux
-          rm -rf xvf upx-3.96-amd64_linux.tar.xz
-          upx -V
       - name: Image Registry Login
         run: |
           docker login --username ${{ secrets.DOCKER_HUB_USER }} --password ${{secrets.DOCKER_HUB_TOKEN}}
