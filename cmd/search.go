@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/linuxsuren/http-downloader/pkg/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -46,11 +47,13 @@ Thanks to https://github.com/hunshcn/gh-proxy`)
 }
 
 func (s *searchOption) runE(c *cobra.Command, args []string) (err error) {
-	err = search(args[0], s.Fetch, s.fetcher, c.OutOrStdout())
+	logger := log.GetLoggerFromContextOrDefault(c)
+
+	err = search(args[0], s.Fetch, s.fetcher, c.OutOrStdout(), logger)
 	return
 }
 
-func search(keyword string, fetch bool, fetcher installer.Fetcher, writer io.Writer) (err error) {
+func search(keyword string, fetch bool, fetcher installer.Fetcher, writer io.Writer, logger *log.LevelLog) (err error) {
 	if fetch {
 		if err = fetcher.FetchLatestRepo("", "", writer); err != nil {
 			return
@@ -62,6 +65,7 @@ func search(keyword string, fetch bool, fetcher installer.Fetcher, writer io.Wri
 		return
 	}
 
+	logger.Info("start to search in:", configDir)
 	result := installer.FindByKeyword(keyword, configDir)
 	for _, item := range result {
 		fmt.Fprintln(writer, item)

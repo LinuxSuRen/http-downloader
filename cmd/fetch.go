@@ -34,8 +34,6 @@ func newFetchCmd(context.Context) (cmd *cobra.Command) {
 		"If you want to reset the hd-config which means delete and clone it again")
 	flags.IntVarP(&opt.retry, "retry", "", 6, "Retry times due to timeout error")
 	flags.DurationVarP(&opt.timeout, "timeout", "", time.Second*10, "Timeout of fetching")
-
-	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, ProviderGitee))
 	return
 }
 

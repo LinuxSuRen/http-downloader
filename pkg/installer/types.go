@@ -1,11 +1,21 @@
 package installer
 
-import "github.com/linuxsuren/http-downloader/pkg/exec"
+import (
+	"fmt"
+
+	"github.com/linuxsuren/http-downloader/pkg/exec"
+)
 
 // PackagingFormat is used for containing config depending on machine
 type PackagingFormat struct {
 	Windows string `yaml:"windows"`
 	Linux   string `yaml:"linux"`
+	Format  string
+}
+
+// String returns a pretty string
+func (f PackagingFormat) String() string {
+	return fmt.Sprintf("Windows: %s, Linux: %s, Format: %s", f.Windows, f.Linux, f.Format)
 }
 
 // HDConfig is the config of http-downloader

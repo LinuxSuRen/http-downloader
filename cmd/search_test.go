@@ -9,21 +9,24 @@ import (
 	"testing"
 
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/linuxsuren/http-downloader/pkg/log"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_search(t *testing.T) {
+	logger := log.GetLogger()
+
 	buf := &bytes.Buffer{}
-	err := search("keyword", true, &installer.FakeFetcher{}, buf)
+	err := search("keyword", true, &installer.FakeFetcher{}, buf, logger)
 	assert.Nil(t, err)
 	assert.Empty(t, buf.String())
 
 	// expect an error with GetConfigDir
-	err = search("", true, &installer.FakeFetcher{GetConfigDirErr: errors.New("fake")}, buf)
+	err = search("", true, &installer.FakeFetcher{GetConfigDirErr: errors.New("fake")}, buf, logger)
 	assert.NotNil(t, err)
 
 	// expect an error with FetchLatestRepo
-	err = search("", true, &installer.FakeFetcher{FetchLatestRepoErr: errors.New("fake")}, buf)
+	err = search("", true, &installer.FakeFetcher{FetchLatestRepoErr: errors.New("fake")}, buf, logger)
 	assert.NotNil(t, err)
 
 	tempDir, err := os.MkdirTemp("", "config")
@@ -41,7 +44,7 @@ func Test_search(t *testing.T) {
 	err = os.WriteFile(path.Join(orgDir, "fake.yml"), []byte{}, os.ModeAppend)
 	assert.Nil(t, err)
 
-	err = search("repo", true, &installer.FakeFetcher{ConfigDir: tempDir}, buf)
+	err = search("repo", true, &installer.FakeFetcher{ConfigDir: tempDir}, buf, logger)
 	assert.Nil(t, err)
 }
 

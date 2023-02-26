@@ -168,8 +168,13 @@ func (o *Installer) GetVersion(path string) (version string, err error) {
 	return
 }
 
-func getOrgAndRepo(orgAndRepo string) (string, string) {
-	return strings.Split(orgAndRepo, "/")[0], strings.Split(orgAndRepo, "/")[1]
+func getOrgAndRepo(orgAndRepo string) (org string, repo string) {
+	items := strings.Split(orgAndRepo, "/")
+	if len(items) >= 2 {
+		org = items[0]
+		repo = items[1]
+	}
+	return
 }
 
 // ProviderURLParse parse the URL
@@ -217,6 +222,7 @@ func (o *Installer) ProviderURLParse(path string, acceptPreRelease bool) (packag
 				}
 				cfg.Org = o.Org
 				cfg.Repo = o.Repo
+				cfg.FormatOverrides.Format = o.Package.FormatOverrides.Format
 				o.Package = &cfg
 				o.AdditionBinaries = cfg.AdditionBinaries
 				o.Tar = cfg.Tar != "false"
@@ -481,14 +487,17 @@ func chooseOneFromArray(options []string) (result string, err error) {
 }
 
 func getPackagingFormat(installer *Installer) string {
+	if installer.Package != nil && installer.Package.FormatOverrides.Format != "" {
+		return installer.Package.FormatOverrides.Format
+	}
 	platformType := strings.ToLower(installer.OS)
 	if platformType == "windows" {
-		if installer.Package != nil {
+		if installer.Package != nil && installer.Package.FormatOverrides.Windows != "" {
 			return installer.Package.FormatOverrides.Windows
 		}
 		return "zip"
 	}
-	if installer.Package != nil {
+	if installer.Package != nil && installer.Package.FormatOverrides.Linux != "" {
 		return installer.Package.FormatOverrides.Linux
 	}
 	return "tar.gz"

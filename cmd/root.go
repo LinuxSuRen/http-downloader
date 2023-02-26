@@ -47,7 +47,24 @@ func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 		newGetCmd(cxt), newInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt), newSetupCommand(v, stdio),
 		extver.NewVersionCmd("linuxsuren", "http-downloader", "hd", nil),
 		extpkg.NewCompletionCmd(cmd))
+
+	for _, c := range cmd.Commands() {
+		registerFlagCompletionFunc(c, "provider", ArrayCompletion(ProviderGitHub, ProviderGitee))
+		registerFlagCompletionFunc(c, "proxy-github", ArrayCompletion("gh.api.99988866.xyz",
+			"ghproxy.com", "mirror.ghproxy.com"))
+		registerFlagCompletionFunc(c, "os", ArrayCompletion("window", "linux", "darwin"))
+		registerFlagCompletionFunc(c, "arch", ArrayCompletion("amd64", "arm64"))
+		registerFlagCompletionFunc(c, "format", ArrayCompletion("tar.gz", "zip", "msi"))
+	}
 	return
+}
+
+func registerFlagCompletionFunc(cmd *cobra.Command, flag string, completionFunc CompletionFunc) {
+	if p := cmd.Flag(flag); p != nil {
+		if err := cmd.RegisterFlagCompletionFunc(flag, completionFunc); err != nil {
+			cmd.Println(err)
+		}
+	}
 }
 
 func loadConfig() (err error) {

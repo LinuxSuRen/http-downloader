@@ -3,11 +3,12 @@ package installer
 import (
 	"context"
 	"fmt"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"io"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -45,7 +46,7 @@ type DefaultFetcher struct {
 func (f *DefaultFetcher) GetConfigDir() (configDir string, err error) {
 	var userHome string
 	if userHome, err = homedir.Dir(); err == nil {
-		configDir = path.Join(userHome, "/.config/hd-home")
+		configDir = path.Join(userHome, fmt.Sprintf(".config%shd-home", string(os.PathSeparator)))
 	}
 	return
 }
@@ -80,6 +81,7 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 		return
 	}
 
+	_, _ = fmt.Fprintf(progress, "fetch config into: %s\n", configDir)
 	if ok, _ := common.PathExists(configDir); ok {
 		var repo *git.Repository
 		if repo, err = git.PlainOpen(configDir); err == nil {

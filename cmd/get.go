@@ -61,11 +61,7 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 		`The default timeout in seconds with the HTTP request`)
 	flags.IntVarP(&opt.MaxAttempts, "max-attempts", "", 10,
 		`Max times to attempt to download, zero means there's no retry action'`)
-	flags.BoolVarP(&opt.NoProxy, "no-proxy", "", false, "Indicate no HTTP proxy taken")
-	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.Int64VarP(&opt.ContinueAt, "continue-at", "", -1, "ContinueAt")
-	flags.IntVarP(&opt.Thread, "thread", "t", viper.GetInt("thread"),
-		`Download file with multi-threads. It only works when its value is bigger than 1`)
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
 	flags.BoolVarP(&opt.PrintSchema, "print-schema", "", false,
@@ -77,10 +73,7 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 	flags.IntVarP(&opt.PrintVersionCount, "print-version-count", "", 20,
 		"The number of the version list")
 	flags.BoolVarP(&opt.Magnet, "magnet", "", false, "Fetch magnet list from a website")
-
-	_ = cmd.RegisterFlagCompletionFunc("proxy-github", ArrayCompletion("gh.api.99988866.xyz",
-		"ghproxy.com", "mirror.ghproxy.com"))
-	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, ProviderGitee))
+	flags.StringVarP(&opt.Format, "format", "", "", "Specific the file format, for instance: tar, zip, msi")
 	return
 }
 
@@ -111,6 +104,7 @@ type downloadOption struct {
 	Force            bool
 	Mod              int
 	SkipTLS          bool
+	Format           string
 
 	ContinueAt int64
 
@@ -145,6 +139,10 @@ const (
 func (o *downloadOption) addDownloadFlags(flags *pflag.FlagSet) {
 	flags.IntVarP(&o.Mod, "mod", "", -1, "The file permission, -1 means using the system default")
 	flags.BoolVarP(&o.SkipTLS, "skip-tls", "k", false, "Skip the TLS")
+	flags.BoolVarP(&o.ShowProgress, "show-progress", "", true, "If show the progress of download")
+	flags.IntVarP(&o.Thread, "thread", "t", viper.GetInt("thread"),
+		`Download file with multi-threads. It only works when its value is bigger than 1`)
+	flags.BoolVarP(&o.NoProxy, "no-proxy", "", viper.GetBool("no-proxy"), "Indicate no HTTP proxy taken")
 }
 
 func (o *downloadOption) fetch() (err error) {
@@ -195,7 +193,11 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 	}
 
 	targetURL := args[0]
-	o.Package = &installer.HDConfig{}
+	o.Package = &installer.HDConfig{
+		FormatOverrides: installer.PackagingFormat{
+			Format: o.Format,
+		},
+	}
 	if o.Magnet || strings.HasPrefix(targetURL, "magnet:?") {
 		// download via external tool
 		o.URL = targetURL
@@ -206,6 +208,7 @@ func (o *downloadOption) preRunE(cmd *cobra.Command, args []string) (err error) 
 			OS:       o.OS,
 			Arch:     o.Arch,
 			Fetch:    o.Fetch,
+			Package:  o.Package,
 		}
 		if targetURL, err = ins.ProviderURLParse(targetURL, o.AcceptPreRelease); err != nil {
 			err = fmt.Errorf("only http:// or https:// supported, error: %v", err)
@@ -351,7 +354,6 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		}
 		var yes bool
 		if confirmErr := survey.AskOne(confirm, &yes); confirmErr == nil && yes {
-			fmt.Println("rename")
 			err = sysos.Rename(o.Output, suggested)
 		}
 	}

@@ -42,7 +42,6 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 	opt.addDownloadFlags(flags)
 	flags.StringVarP(&opt.Category, "category", "c", "",
 		"The category of the potentials packages")
-	flags.BoolVarP(&opt.ShowProgress, "show-progress", "", true, "If show the progress of download")
 	flags.BoolVarP(&opt.AcceptPreRelease, "accept-preRelease", "", false,
 		"If you accept preRelease as the binary asset from GitHub")
 	flags.BoolVarP(&opt.AcceptPreRelease, "pre", "", false,
@@ -61,13 +60,8 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 		"Indicate if force to download the package even it is exist")
 	flags.BoolVarP(&opt.CleanPackage, "clean-package", "", true,
 		"Clean the package if the installation is success")
-	flags.IntVarP(&opt.Thread, "thread", "t", viper.GetInt("thread"),
-		`Download file with multi-threads. It only works when its value is bigger than 1`)
-	flags.BoolVarP(&opt.NoProxy, "no-proxy", "", viper.GetBool("no-proxy"), "Indicate no HTTP proxy taken")
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
-
-	_ = cmd.RegisterFlagCompletionFunc("provider", ArrayCompletion(ProviderGitHub, ProviderGitee))
 	return
 }
 
