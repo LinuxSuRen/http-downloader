@@ -51,6 +51,7 @@ func GetLoggerFromContextOrDefault(aware ContextAware) (logger *LevelLog) {
 	if !ok {
 		logger = GetLogger()
 	}
+	logger.level = 3
 	return
 }
 

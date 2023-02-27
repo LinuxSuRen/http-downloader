@@ -507,3 +507,65 @@ func Test_getVersionOrDefault(t *testing.T) {
 		})
 	}
 }
+
+func TestGetPackagingFormat(t *testing.T) {
+	tests := []struct {
+		name      string
+		installer *Installer
+		expect    string
+	}{{
+		name: "have specific format",
+		installer: &Installer{
+			OS: "Darwin",
+			Package: &HDConfig{
+				FormatOverrides: PackagingFormat{
+					Format: "msi",
+				},
+			},
+		},
+		expect: "msi",
+	}, {
+		name: "windows with config",
+		installer: &Installer{
+			OS: "Windows",
+			Package: &HDConfig{
+				FormatOverrides: PackagingFormat{
+					Windows: "msi",
+				},
+			},
+		},
+		expect: "msi",
+	}, {
+		name: "windows without config",
+		installer: &Installer{
+			OS: "Windows",
+		},
+		expect: "zip",
+	}, {
+		name:      "darwin without config",
+		installer: &Installer{},
+		expect:    "tar.gz",
+	}, {
+		name: "linux, and package is not nil, but the override is empty",
+		installer: &Installer{
+			Package: &HDConfig{},
+		},
+		expect: "tar.gz",
+	}, {
+		name: "linux with override",
+		installer: &Installer{
+			Package: &HDConfig{
+				FormatOverrides: PackagingFormat{
+					Linux: "tar.gz",
+				},
+			},
+		},
+		expect: "tar.gz",
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getPackagingFormat(tt.installer)
+			assert.Equal(t, tt.expect, result)
+		})
+	}
+}

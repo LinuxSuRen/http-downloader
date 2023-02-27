@@ -7,6 +7,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -52,7 +53,11 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	configDir := os.ExpandEnv("$HOME/.config")
+	var configDir string
+	fetcher := &installer.DefaultFetcher{}
+	if configDir, err = fetcher.GetConfigDir(); err != nil {
+		return
+	}
 	if err = os.MkdirAll(configDir, 0750); err != nil {
 		err = fmt.Errorf("failed to create directory: %s, error: %v", configDir, err)
 		return
