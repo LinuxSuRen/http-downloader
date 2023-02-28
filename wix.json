@@ -1,26 +1,34 @@
 {
-    "product": "HTTP downloader",
-    "company": "LinuxSuRen",
-    "license": "LICENSE",
-    "upgrade-code": "7c0a5736-5b8e-4176-b350-613fa2d8a1b3",
-    "files": {
-      "guid": "6e6dcb19-3cf6-46d1-ac56-c6fb39485c9d",
-      "items": [
-        "hd.exe"
-      ]
-    },
-    "env": {
-      "guid": "94faac3d-4478-431c-8497-fba55dcfb249",
-      "vars": [
-        {
-          "name": "PATH",
-          "value": "[INSTALLDIR]",
-          "permanent": "yes",
-          "system": "no",
-          "action": "set",
-          "part": "last"
-        }
-      ]
-    },
-    "shortcuts": {}
-  }
+  "product": "HTTP downloader",
+  "company": "LinuxSuRen",
+  "license": "LICENSE",
+  "upgrade-code": "7c0a5736-5b8e-4176-b350-613fa2d8a1b3",
+  "files": {
+    "guid": "6e6dcb19-3cf6-46d1-ac56-c6fb39485c9d",
+    "items": [
+      "hd.exe"
+    ]
+  },
+  "env": {
+    "guid": "94faac3d-4478-431c-8497-fba55dcfb249",
+    "vars": [
+      {
+        "name": "PATH",
+        "value": "[INSTALLDIR]",
+        "permanent": "yes",
+        "system": "no",
+        "action": "set",
+        "part": "last"
+      },
+      {
+        "name": "PATH",
+        "value": "C:\\Program Files (x86)\\Common Files",
+        "permanent": "yes",
+        "system": "no",
+        "action": "set",
+        "part": "last"
+      }
+    ]
+  },
+  "shortcuts": {}
+}

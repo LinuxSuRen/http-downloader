@@ -9,7 +9,6 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/log"
 
 	"github.com/AlecAivazis/survey/v2/terminal"
-	extpkg "github.com/linuxsuren/cobra-extension/pkg"
 	extver "github.com/linuxsuren/cobra-extension/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -45,8 +44,7 @@ func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 	cxt = context.WithValue(cxt, log.LoggerContextKey, log.GetLogger())
 	cmd.AddCommand(
 		newGetCmd(cxt), newInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt), newSetupCommand(v, stdio),
-		extver.NewVersionCmd("linuxsuren", "http-downloader", "hd", nil),
-		extpkg.NewCompletionCmd(cmd))
+		extver.NewVersionCmd("linuxsuren", "http-downloader", "hd", nil))
 
 	for _, c := range cmd.Commands() {
 		registerFlagCompletionFunc(c, "provider", ArrayCompletion(ProviderGitHub, ProviderGitee))

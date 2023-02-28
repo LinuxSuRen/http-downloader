@@ -434,8 +434,8 @@ func FindByKeyword(keyword, configDir string) (result []string) {
 	if files, err := filepath.Glob(path.Join(configDir, "config/**/*.yml")); err == nil {
 		for _, metaFile := range files {
 			ext := path.Ext(metaFile)
-			fileName := path.Base(metaFile)
-			org := path.Base(path.Dir(metaFile))
+			fileName := filepath.Base(metaFile)
+			org := filepath.Base(filepath.Dir(metaFile))
 			repo := strings.TrimSuffix(fileName, ext)
 
 			if !strings.Contains(repo, keyword) && !hasKeyword(metaFile, keyword) {

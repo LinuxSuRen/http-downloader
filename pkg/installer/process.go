@@ -2,18 +2,22 @@ package installer
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/common"
-	"github.com/linuxsuren/http-downloader/pkg/compress"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/linuxsuren/http-downloader/pkg/common"
+	"github.com/linuxsuren/http-downloader/pkg/compress"
+	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // Install installs a package
 func (o *Installer) Install() (err error) {
+	if o.Execer.OS() == "windows" {
+		o.Name = fmt.Sprintf("%s.exe", o.Name)
+	}
 	targetBinary := o.Name
 	if o.Package != nil && o.Package.TargetBinary != "" {
 		// this is the desired binary file
