@@ -50,7 +50,7 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 		"Indicate if install it via go install github.com/xxx/xxx")
 	flags.StringVarP(&opt.fromBranch, "from-branch", "", "master",
 		"Only works if the flag --from-source is true")
-	flags.StringVarP(&opt.target, "target", "", "/usr/local/bin", "The target installation directory")
+	flags.StringVarP(&opt.target, "target", "", opt.getDefaultInstallDir(), "The target installation directory")
 	flags.BoolVarP(&opt.goget, "goget", "", viper.GetBool("fetch"),
 		"Use command goget to download the binary, only works if the flag --from-source is true")
 
@@ -63,6 +63,16 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
 	return
+}
+
+func (o *installOption) getDefaultInstallDir() string {
+	switch o.execer.OS() {
+	case "linux", "darwin":
+		return "/usr/local/bin"
+	case "windows":
+		return `C:\Program Files (x86)\Common Files`
+	}
+	return ""
 }
 
 type installOption struct {

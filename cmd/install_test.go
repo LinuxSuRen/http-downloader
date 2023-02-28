@@ -191,3 +191,40 @@ func TestInstall(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDefaultInstallDir(t *testing.T) {
+	tests := []struct {
+		name   string
+		execer exec.Execer
+		expect string
+	}{{
+		name: "linux",
+		execer: exec.FakeExecer{
+			ExpectOS: "linux",
+		},
+		expect: "/usr/local/bin",
+	}, {
+		name: "darwin",
+		execer: exec.FakeExecer{
+			ExpectOS: "darwin",
+		},
+		expect: "/usr/local/bin",
+	}, {
+		name: "windows",
+		execer: exec.FakeExecer{
+			ExpectOS: "windows",
+		},
+		expect: `C:\Program Files (x86)\Common Files`,
+	}, {
+		name:   "unknown",
+		execer: exec.FakeExecer{},
+		expect: "",
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opt := &installOption{execer: tt.execer}
+			result := opt.getDefaultInstallDir()
+			assert.Equal(t, tt.expect, result)
+		})
+	}
+}
