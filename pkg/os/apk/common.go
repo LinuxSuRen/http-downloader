@@ -2,7 +2,13 @@ package apk
 
 import (
 	"fmt"
+
 	"github.com/linuxsuren/http-downloader/pkg/exec"
+)
+
+const (
+	// Tool is the tool name of apk
+	Tool = "apk"
 )
 
 // CommonInstaller is the installer of a common apk
@@ -13,8 +19,8 @@ type CommonInstaller struct {
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if d.Execer.OS() == "linux" {
-		_, err := d.Execer.LookPath("apk")
+	if d.Execer.OS() == exec.OSLinux {
+		_, err := d.Execer.LookPath(Tool)
 		ok = err == nil
 	}
 	return
@@ -22,13 +28,13 @@ func (d *CommonInstaller) Available() (ok bool) {
 
 // Install installs the target package
 func (d *CommonInstaller) Install() (err error) {
-	err = d.Execer.RunCommand("apk", "add", d.Name)
+	err = d.Execer.RunCommand(Tool, "add", d.Name)
 	return
 }
 
 // Uninstall uninstalls the target package
 func (d *CommonInstaller) Uninstall() (err error) {
-	err = d.Execer.RunCommand("apk", "del", d.Name)
+	err = d.Execer.RunCommand(Tool, "del", d.Name)
 	return
 }
 

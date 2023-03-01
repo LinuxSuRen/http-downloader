@@ -17,7 +17,9 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/os/apk"
 	"github.com/linuxsuren/http-downloader/pkg/os/dnf"
 	"github.com/linuxsuren/http-downloader/pkg/os/npm"
+	"github.com/linuxsuren/http-downloader/pkg/os/scoop"
 	"github.com/linuxsuren/http-downloader/pkg/os/snap"
+	"github.com/linuxsuren/http-downloader/pkg/os/winget"
 
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
@@ -157,22 +159,22 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 		genericPackage.execer = defaultExecer
 
 		switch genericPackage.PackageManager {
-		case "apt-get":
+		case apt.Tool:
 			genericPackage.CommonInstaller = &apt.CommonInstaller{
 				Name:   genericPackage.Name,
 				Execer: defaultExecer,
 			}
-		case "yum":
+		case yum.Tool:
 			genericPackage.CommonInstaller = &yum.CommonInstaller{
 				Name:   genericPackage.Name,
 				Execer: defaultExecer,
 			}
-		case "brew":
+		case brew.Tool:
 			genericPackage.CommonInstaller = &brew.CommonInstaller{
 				Name:   genericPackage.Name,
 				Execer: defaultExecer,
 			}
-		case "apk":
+		case apk.Tool:
 			genericPackage.CommonInstaller = &apk.CommonInstaller{
 				Name:   genericPackage.Name,
 				Execer: defaultExecer,
@@ -190,6 +192,16 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 			}
 		case npm.NPMName:
 			genericPackage.CommonInstaller = &npm.CommonInstaller{
+				Name:   genericPackage.Name,
+				Execer: defaultExecer,
+			}
+		case winget.Tool:
+			genericPackage.CommonInstaller = &winget.CommonInstaller{
+				Name:   genericPackage.Name,
+				Execer: defaultExecer,
+			}
+		case scoop.Tool:
+			genericPackage.CommonInstaller = &scoop.CommonInstaller{
 				Name:   genericPackage.Name,
 				Execer: defaultExecer,
 			}

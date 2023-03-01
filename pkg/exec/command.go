@@ -30,6 +30,8 @@ const (
 	OSLinux = "linux"
 	// OSDarwin is the alias of Darwin
 	OSDarwin = "darwin"
+	// OSWindows is the alias of Windows
+	OSWindows = "windows"
 )
 
 // DefaultExecer is a wrapper for the OS exec

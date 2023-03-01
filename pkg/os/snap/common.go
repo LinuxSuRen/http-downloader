@@ -2,6 +2,7 @@ package snap
 
 import (
 	"fmt"
+
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
@@ -17,7 +18,7 @@ type CommonInstaller struct {
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if d.Execer.OS() == "linux" {
+	if d.Execer.OS() == exec.OSLinux {
 		_, err := d.Execer.LookPath(SnapName)
 		ok = err == nil
 	}

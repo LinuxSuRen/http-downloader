@@ -17,20 +17,20 @@ type CommonInstaller struct {
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	_, err := d.Execer.LookPath("npm")
+	_, err := d.Execer.LookPath(NPMName)
 	ok = err == nil
 	return
 }
 
 // Install installs the target package
 func (d *CommonInstaller) Install() (err error) {
-	err = d.Execer.RunCommand("npm", "i", "-g", d.Name)
+	err = d.Execer.RunCommand(NPMName, "i", "-g", d.Name)
 	return
 }
 
 // Uninstall uninstalls the target package
 func (d *CommonInstaller) Uninstall() (err error) {
-	err = d.Execer.RunCommand("npm", "uninstall", "-g", d.Name)
+	err = d.Execer.RunCommand(NPMName, "uninstall", "-g", d.Name)
 	return
 }
 
