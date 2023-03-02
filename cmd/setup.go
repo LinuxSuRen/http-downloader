@@ -3,11 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/linuxsuren/http-downloader/pkg/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -37,10 +38,10 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 		provider    string
 	)
 
+	logger := log.GetLoggerFromContextOrDefault(cmd)
 	if proxyGitHub, err = selectFromList([]string{"", "ghproxy.com", "gh.api.99988866.xyz", "mirror.ghproxy.com"},
 		o.v.GetString("proxy-github"),
 		"Select proxy-github", o.stdio); err == nil {
-		fmt.Println(proxyGitHub)
 		o.v.Set("proxy-github", proxyGitHub)
 	} else {
 		return
@@ -55,7 +56,7 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 
 	var configDir string
 	fetcher := &installer.DefaultFetcher{}
-	if configDir, err = fetcher.GetConfigDir(); err != nil {
+	if configDir, err = fetcher.GetHomeDir(); err != nil {
 		return
 	}
 	if err = os.MkdirAll(configDir, 0750); err != nil {
@@ -63,8 +64,9 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	fmt.Println(o.v.GetString("proxy-github"))
-	err = o.v.WriteConfigAs(path.Join(configDir, "hd.yaml"))
+	configPath := filepath.Join(configDir, ".config", "hd.yaml")
+	logger.Info("write config into:", configPath)
+	err = o.v.WriteConfigAs(configPath)
 	return
 }
 

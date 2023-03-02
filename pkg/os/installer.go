@@ -2,7 +2,6 @@ package os
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -35,7 +34,7 @@ func init() {
 	var userHome string
 	var err error
 	if userHome, err = homedir.Dir(); err == nil {
-		configDir := path.Join(userHome, "/.config/hd-home")
+		configDir := filepath.Join(userHome, "/.config/hd-home")
 		if err = GenericInstallerRegistry(filepath.Join(configDir, "config/generic.yaml"), defaultInstallerRegistry); err != nil {
 			fmt.Println(err)
 		}

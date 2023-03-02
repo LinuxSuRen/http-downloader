@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -32,6 +32,7 @@ var configRepos = map[string]string{
 // Fetcher is the interface of a fetcher which responses to fetch config files
 type Fetcher interface {
 	GetConfigDir() (configDir string, err error)
+	GetHomeDir() (homeDir string, err error)
 	FetchLatestRepo(provider string, branch string,
 		progress io.Writer) (err error)
 	SetContext(ctx context.Context)
@@ -45,9 +46,15 @@ type DefaultFetcher struct {
 // GetConfigDir returns the directory of the config
 func (f *DefaultFetcher) GetConfigDir() (configDir string, err error) {
 	var userHome string
-	if userHome, err = homedir.Dir(); err == nil {
-		configDir = path.Join(userHome, fmt.Sprintf(".config%shd-home", string(os.PathSeparator)))
+	if userHome, err = f.GetHomeDir(); err == nil {
+		configDir = filepath.Join(userHome, fmt.Sprintf(".config%shd-home", string(os.PathSeparator)))
 	}
+	return
+}
+
+// GetHomeDir returns the user home directory
+func (f *DefaultFetcher) GetHomeDir() (homeDir string, err error) {
+	homeDir, err = homedir.Dir()
 	return
 }
 
@@ -125,6 +132,7 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 					RemoteName: remoteName,
 					Progress:   progress,
 					Force:      true,
+					Depth:      1,
 				}); err != nil && err != git.NoErrAlreadyUpToDate {
 					err = fmt.Errorf("failed to fetch '%s', error: %v", remoteName, err)
 					return
@@ -184,9 +192,10 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 		_, _ = fmt.Fprintf(progress, "no local config exist, try to clone it\n")
 
 		if _, err = git.PlainCloneContext(f.ctx, configDir, false, &git.CloneOptions{
-			RemoteName: remoteName,
-			URL:        repoAddr,
-			Progress:   progress,
+			RemoteName:   remoteName,
+			URL:          repoAddr,
+			Progress:     progress,
+			SingleBranch: true,
 		}); err != nil {
 			err = fmt.Errorf("failed to clone git repository '%s' into '%s', error: %v", repoAddr, configDir, err)
 		}
@@ -213,6 +222,7 @@ func makeSureRemote(name, repoAddr string, repo *git.Repository) (err error) {
 // FakeFetcher is a fake fetch. We expect to use it for unit test cases.
 type FakeFetcher struct {
 	ConfigDir          string
+	HomeDir            string
 	GetConfigDirErr    error
 	FetchLatestRepoErr error
 }
@@ -220,6 +230,13 @@ type FakeFetcher struct {
 // GetConfigDir is a fake method
 func (f *FakeFetcher) GetConfigDir() (configDir string, err error) {
 	configDir = f.ConfigDir
+	err = f.GetConfigDirErr
+	return
+}
+
+// GetHomeDir is a fake method
+func (f *FakeFetcher) GetHomeDir() (HomeDir string, err error) {
+	HomeDir = f.HomeDir
 	err = f.GetConfigDirErr
 	return
 }

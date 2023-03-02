@@ -2,6 +2,7 @@ package log
 
 import (
 	"context"
+	"fmt"
 	syslog "log"
 )
 
@@ -14,13 +15,14 @@ type LevelLog struct {
 // Info prints the info level message.
 // Info level means the level >= 3
 func (l *LevelLog) Info(v ...any) {
+	fmt.Println(l.level)
 	if l.level >= 3 {
 		l.Println(v...)
 	}
 }
 
 // Debug prints the debug level message.
-// Debug level means the level >= 3
+// Debug level means the level >= 7
 func (l *LevelLog) Debug(v ...any) {
 	if l.level >= 7 {
 		l.Println(v...)
