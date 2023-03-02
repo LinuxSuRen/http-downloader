@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newFetchCmd(context.Context) (cmd *cobra.Command) {
+func newFetchCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &fetchOption{
 		fetcher: &installer.DefaultFetcher{},
 	}
@@ -33,7 +33,7 @@ func newFetchCmd(context.Context) (cmd *cobra.Command) {
 	flags.BoolVarP(&opt.reset, "reset", "", false,
 		"If you want to reset the hd-config which means delete and clone it again")
 	flags.IntVarP(&opt.retry, "retry", "", 6, "Retry times due to timeout error")
-	flags.DurationVarP(&opt.timeout, "timeout", "", time.Second*10, "Timeout of fetching")
+	flags.DurationVarP(&opt.timeout, "timeout", "", time.Second*60, "Timeout of fetching")
 	return
 }
 
@@ -70,7 +70,7 @@ func (o *fetchOption) runE(c *cobra.Command, _ []string) (err error) {
 			break
 		}
 		o.setTimeout(c)
-		logger.Print(".")
+		c.Print(".")
 	}
 	if i >= 1 {
 		logger.Println()

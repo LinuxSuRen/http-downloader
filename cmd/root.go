@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/linuxsuren/http-downloader/pkg/log"
+	"github.com/mitchellh/go-homedir"
 
 	"github.com/AlecAivazis/survey/v2/terminal"
 	extver "github.com/linuxsuren/cobra-extension/version"
@@ -30,11 +32,11 @@ func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 	}
 	cmd.AddGroup(coreGroup, configGroup)
 
-	if err := loadConfig(); err != nil {
+	v := viper.GetViper()
+	if err := loadConfig(v); err != nil {
 		panic(err)
 	}
 
-	v := viper.GetViper()
 	stdio := terminal.Stdio{
 		Out: os.Stdout,
 		In:  os.Stdin,
@@ -65,11 +67,17 @@ func registerFlagCompletionFunc(cmd *cobra.Command, flag string, completionFunc 
 	}
 }
 
-func loadConfig() (err error) {
-	viper.SetConfigName("hd")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("$HOME/.config")
-	if err = viper.ReadInConfig(); err != nil {
+func loadConfig(v *viper.Viper) (err error) {
+	var userHome string
+	if userHome, err = homedir.Dir(); err != nil {
+		return
+	}
+
+	configDir := filepath.Join(userHome, ".config")
+	v.SetConfigName("hd")
+	v.SetConfigType("yaml")
+	v.AddConfigPath(configDir)
+	if err = v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			// Config file not found; ignore error if desired
 			err = nil
@@ -77,15 +85,15 @@ func loadConfig() (err error) {
 			err = fmt.Errorf("failed to load config: %s, error: %v", os.ExpandEnv("$HOME/.config/hd.yaml"), err)
 		}
 	}
-	viper.SetDefault("provider", ProviderGitHub)
-	viper.SetDefault("fetch", false)
-	viper.SetDefault("goget", false)
-	viper.SetDefault("no-proxy", false)
+	v.SetDefault("provider", ProviderGitHub)
+	v.SetDefault("fetch", false)
+	v.SetDefault("goget", false)
+	v.SetDefault("no-proxy", false)
 
 	thread := runtime.NumCPU()
 	if thread > 4 {
 		thread = thread / 2
 	}
-	viper.SetDefault("thread", thread)
+	v.SetDefault("thread", thread)
 	return
 }

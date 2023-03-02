@@ -3,9 +3,10 @@ package installer
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"os/user"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetConfigDir(t *testing.T) {
@@ -27,4 +28,8 @@ func TestGetConfigDir(t *testing.T) {
 	err = fetcher.FetchLatestRepo("", "", nil)
 	assert.Nil(t, err)
 	fetcher.SetContext(context.TODO())
+
+	dir, err = fetcher.GetHomeDir()
+	assert.Equal(t, "", dir)
+	assert.Nil(t, err)
 }
