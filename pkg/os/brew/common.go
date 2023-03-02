@@ -2,7 +2,13 @@ package brew
 
 import (
 	"fmt"
+
 	"github.com/linuxsuren/http-downloader/pkg/exec"
+)
+
+const (
+	// Tool is the tool name of brew
+	Tool = "brew"
 )
 
 // CommonInstaller is the installer of a common brew
@@ -13,8 +19,8 @@ type CommonInstaller struct {
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if d.Execer.OS() == "darwin" {
-		_, err := d.Execer.LookPath("brew")
+	if d.Execer.OS() == exec.OSDarwin || d.Execer.OS() == exec.OSLinux {
+		_, err := d.Execer.LookPath(Tool)
 		ok = err == nil
 	}
 	return
@@ -22,7 +28,7 @@ func (d *CommonInstaller) Available() (ok bool) {
 
 // Install installs the target package
 func (d *CommonInstaller) Install() (err error) {
-	if err = d.Execer.RunCommand("brew", "install", d.Name); err != nil {
+	if err = d.Execer.RunCommand(Tool, "install", d.Name); err != nil {
 		return
 	}
 	return
@@ -30,7 +36,7 @@ func (d *CommonInstaller) Install() (err error) {
 
 // Uninstall uninstalls the Conntrack
 func (d *CommonInstaller) Uninstall() (err error) {
-	err = d.Execer.RunCommand("brew", "remove", d.Name)
+	err = d.Execer.RunCommand(Tool, "remove", d.Name)
 	return
 }
 

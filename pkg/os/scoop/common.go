@@ -1,4 +1,4 @@
-package yum
+package scoop
 
 import (
 	"fmt"
@@ -6,10 +6,8 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
-const (
-	// Tool is the tool name of yum
-	Tool = "yum"
-)
+// Tool is the tool name of this intergration
+const Tool = "scoop"
 
 // CommonInstaller is the installer of Conntrack in CentOS
 type CommonInstaller struct {
@@ -19,7 +17,7 @@ type CommonInstaller struct {
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if d.Execer.OS() == exec.OSLinux {
+	if d.Execer.OS() == exec.OSWindows {
 		_, err := d.Execer.LookPath(Tool)
 		ok = err == nil
 	}
@@ -28,18 +26,15 @@ func (d *CommonInstaller) Available() (ok bool) {
 
 // Install installs the Conntrack
 func (d *CommonInstaller) Install() (err error) {
-	if err = d.Execer.RunCommand(Tool, "update", "-y"); err != nil {
-		return
-	}
-	if err = d.Execer.RunCommand(Tool, "install", "-y", d.Name); err != nil {
-		return
+	if err = d.Execer.RunCommand(Tool, "bucket", "add", "extras"); err == nil {
+		err = d.Execer.RunCommand(Tool, "install", d.Name)
 	}
 	return
 }
 
 // Uninstall uninstalls the Conntrack
 func (d *CommonInstaller) Uninstall() (err error) {
-	err = d.Execer.RunCommand(Tool, "remove", "-y", d.Name)
+	err = d.Execer.RunCommand(Tool, "uninstall", d.Name)
 	return
 }
 

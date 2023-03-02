@@ -2,9 +2,10 @@ package brew
 
 import (
 	"errors"
+	"testing"
+
 	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCommon(t *testing.T) {
@@ -28,7 +29,7 @@ func TestCommon(t *testing.T) {
 	}, {
 		name: "not is darwin",
 		installer: CommonInstaller{
-			Execer: exec.FakeExecer{ExpectOS: "linux"},
+			Execer: exec.FakeExecer{ExpectOS: exec.OSWindows},
 		},
 		expectAvailable: false,
 		hasErr:          false,
