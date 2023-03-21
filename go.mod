@@ -22,7 +22,7 @@ require (
 )
 
 require (
-	github.com/antonmedv/expr v1.11.1
+	github.com/antonmedv/expr v1.12.5
 	github.com/creack/pty v1.1.17
 	github.com/k0kubun/go-ansi v0.0.0-20180517002512-3bf9e2903213
 	github.com/schollz/progressbar/v3 v3.13.0
@@ -31,7 +31,6 @@ require (
 require (
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
-	github.com/prometheus/client_golang v1.11.1 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 )
 
