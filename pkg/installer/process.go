@@ -8,9 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
+
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/compress"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 )
 
 // Install installs a package
@@ -118,7 +119,7 @@ func (o *Installer) Install() (err error) {
 func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 	fmt.Println("install", sourceFile, "to", targetPath)
 	switch o.Execer.OS() {
-	case exec.OSLinux, exec.OSDarwin:
+	case fakeruntime.OSLinux, fakeruntime.OSDarwin:
 		if err = o.Execer.RunCommand("chmod", "u+x", sourceFile); err != nil {
 			return
 		}

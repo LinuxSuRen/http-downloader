@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // dockerInstallerInUbuntu is the installer of Docker in Ubuntu
 type dockerInstallerInUbuntu struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 	count  int
 }
 

@@ -1,12 +1,12 @@
 package yum
 
 import (
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 )
 
 // SetInstallerRegistry sets the installer of registry
-func SetInstallerRegistry(registry core.InstallerRegistry, defaultExecer exec.Execer) {
+func SetInstallerRegistry(registry core.InstallerRegistry, defaultExecer fakeruntime.Execer) {
 	registry.Registry("docker", &dockerInstallerInCentOS{Execer: defaultExecer})
 	registry.Registry("conntrack", &conntrackInstallerInCentOS{Execer: defaultExecer})
 	registry.Registry("socat", &socatInstallerInCentOS{Execer: defaultExecer})

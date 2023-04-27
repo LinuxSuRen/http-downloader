@@ -2,12 +2,13 @@ package yum
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // socatInstallerInCentOS is the installer of socat in CentOS
 type socatInstallerInCentOS struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform

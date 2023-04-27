@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/h2non/gock"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -429,7 +429,7 @@ func Test_getDynamicVersion(t *testing.T) {
 
 func TestCheckDepAndInstall(t *testing.T) {
 	installer := &Installer{
-		Execer: &exec.FakeExecer{},
+		Execer: &fakeruntime.FakeExecer{},
 	}
 
 	err := installer.CheckDepAndInstall(map[string]string{})

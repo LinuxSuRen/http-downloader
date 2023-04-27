@@ -3,7 +3,7 @@ package npm
 import (
 	"fmt"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // NPMName is the name of npm
@@ -12,7 +12,7 @@ const NPMName = "npm"
 // CommonInstaller is the installer of a common npm
 type CommonInstaller struct {
 	Name   string
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform

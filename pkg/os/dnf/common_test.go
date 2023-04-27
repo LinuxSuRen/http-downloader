@@ -2,9 +2,10 @@ package dnf
 
 import (
 	"errors"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCommon(t *testing.T) {
@@ -16,7 +17,7 @@ func TestCommon(t *testing.T) {
 	}{{
 		name: "normal",
 		installer: CommonInstaller{
-			Execer: exec.FakeExecer{
+			Execer: fakeruntime.FakeExecer{
 				ExpectError:  nil,
 				ExpectOutput: "",
 				ExpectOS:     "linux",
@@ -28,14 +29,14 @@ func TestCommon(t *testing.T) {
 	}, {
 		name: "not is linux",
 		installer: CommonInstaller{
-			Execer: exec.FakeExecer{ExpectOS: "darwin"},
+			Execer: fakeruntime.FakeExecer{ExpectOS: "darwin"},
 		},
 		expectAvailable: false,
 		hasErr:          false,
 	}, {
 		name: "command not found",
 		installer: CommonInstaller{
-			Execer: exec.FakeExecer{ExpectError: errors.New("error")},
+			Execer: fakeruntime.FakeExecer{ExpectError: errors.New("error")},
 		},
 		expectAvailable: false,
 		hasErr:          true,

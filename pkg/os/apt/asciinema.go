@@ -2,12 +2,13 @@ package apt
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // asciinemaInstallerInUbuntu is the installer of asciinema in CentOS
 type asciinemaInstallerInUbuntu struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform

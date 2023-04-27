@@ -2,12 +2,13 @@ package apt
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // gitInstallerInUbuntu is the installer of git in CentOS
 type gitInstallerInUbuntu struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform

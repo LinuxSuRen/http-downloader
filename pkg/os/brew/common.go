@@ -3,7 +3,7 @@ package brew
 import (
 	"fmt"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 const (
@@ -14,12 +14,12 @@ const (
 // CommonInstaller is the installer of a common brew
 type CommonInstaller struct {
 	Name   string
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if d.Execer.OS() == exec.OSDarwin || d.Execer.OS() == exec.OSLinux {
+	if d.Execer.OS() == fakeruntime.OSDarwin || d.Execer.OS() == fakeruntime.OSLinux {
 		_, err := d.Execer.LookPath(Tool)
 		ok = err == nil
 	}

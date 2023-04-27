@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg/common"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/linuxsuren/http-downloader/pkg/version"
@@ -22,7 +22,7 @@ import (
 func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &installOption{
 		downloadOption: newDownloadOption(ctx),
-		execer:         &exec.DefaultExecer{},
+		execer:         &fakeruntime.DefaultExecer{},
 	}
 	cmd = &cobra.Command{
 		Use:     "install",
@@ -88,7 +88,7 @@ type installOption struct {
 	// inner fields
 	nativePackage bool
 	tool          string
-	execer        exec.Execer
+	execer        fakeruntime.Execer
 }
 
 func (o *installOption) shouldInstall() (should, exist bool) {

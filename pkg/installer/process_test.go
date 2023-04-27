@@ -1,11 +1,11 @@
 package installer
 
 import (
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"os"
 	"path"
 	"testing"
 
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +18,7 @@ func TestInstallerExtractFiles(t *testing.T) {
 
 func TestOverwriteBinary(t *testing.T) {
 	installer := &Installer{
-		Execer: &exec.FakeExecer{},
+		Execer: &fakeruntime.FakeExecer{},
 	}
 
 	sourceFile := path.Join(os.TempDir(), "fake-1")
@@ -44,14 +44,14 @@ func TestInstall(t *testing.T) {
 	}{{
 		name: "empty",
 		installer: &Installer{
-			Execer: exec.FakeExecer{},
+			Execer: fakeruntime.FakeExecer{},
 		},
 		hasErr: true,
 	}, {
 		name: "fake linux",
 		installer: &Installer{
-			Execer: exec.FakeExecer{
-				ExpectOS: exec.OSLinux,
+			Execer: fakeruntime.FakeExecer{
+				ExpectOS: fakeruntime.OSLinux,
 			},
 		},
 		hasErr: false,

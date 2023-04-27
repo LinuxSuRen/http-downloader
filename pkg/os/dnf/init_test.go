@@ -4,14 +4,14 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCommonCase(t *testing.T) {
 	registry := &core.FakeRegistry{}
-	SetInstallerRegistry(registry, exec.FakeExecer{
+	SetInstallerRegistry(registry, fakeruntime.FakeExecer{
 		ExpectOS: "linux",
 	})
 
@@ -26,7 +26,7 @@ func TestCommonCase(t *testing.T) {
 	})
 
 	errRegistry := &core.FakeRegistry{}
-	SetInstallerRegistry(errRegistry, exec.FakeExecer{
+	SetInstallerRegistry(errRegistry, fakeruntime.FakeExecer{
 		ExpectLookPathError: errors.New("error"),
 		ExpectError:         errors.New("error"),
 		ExpectOS:            "linux",
