@@ -3,7 +3,7 @@ package installer
 import (
 	"fmt"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // PackagingFormat is used for containing config depending on machine
@@ -89,5 +89,5 @@ type Installer struct {
 	Repo        string
 	ProxyGitHub string
 
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }

@@ -1,9 +1,9 @@
 package generic
 
 import (
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"testing"
 
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,7 +28,7 @@ func TestSliceReplace(t *testing.T) {
 
 func TestCommonInstaller(t *testing.T) {
 	installer := &CommonInstaller{
-		Execer: exec.FakeExecer{},
+		Execer: fakeruntime.FakeExecer{},
 	}
 	assert.Nil(t, installer.Install())
 	assert.Nil(t, installer.Uninstall())

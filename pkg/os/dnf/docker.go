@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // dockerInstallerInFedora is the installer of Docker in Fedora
 type dockerInstallerInFedora struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 	count  int
 }
 

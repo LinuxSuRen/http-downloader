@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	cotesting "github.com/linuxsuren/cobra-extension/pkg/testing"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -118,7 +118,7 @@ func TestInstallPreRunE(t *testing.T) {
 func TestShouldInstall(t *testing.T) {
 	opt := &installOption{
 		downloadOption: &downloadOption{},
-		execer: &exec.FakeExecer{
+		execer: &fakeruntime.FakeExecer{
 			ExpectOutput: "v1.2.3",
 		},
 		tool: "fake",
@@ -129,7 +129,7 @@ func TestShouldInstall(t *testing.T) {
 
 	{
 		optGreater := &installOption{
-			execer: &exec.FakeExecer{
+			execer: &fakeruntime.FakeExecer{
 				ExpectOutput: "v1.2.3",
 			},
 			downloadOption: &downloadOption{
@@ -152,7 +152,7 @@ func TestShouldInstall(t *testing.T) {
 	assert.True(t, exist)
 
 	// not exist
-	opt.execer = &exec.FakeExecer{
+	opt.execer = &fakeruntime.FakeExecer{
 		ExpectError:         errors.New("fake"),
 		ExpectLookPathError: errors.New("error"),
 	}
@@ -176,7 +176,7 @@ func TestInstall(t *testing.T) {
 		opt: &installOption{
 			downloadOption: &downloadOption{},
 			nativePackage:  true,
-			execer:         exec.FakeExecer{},
+			execer:         fakeruntime.FakeExecer{},
 		},
 		args:      args{cmd: &cobra.Command{}},
 		expectErr: false,
@@ -195,29 +195,29 @@ func TestInstall(t *testing.T) {
 func TestGetDefaultInstallDir(t *testing.T) {
 	tests := []struct {
 		name   string
-		execer exec.Execer
+		execer fakeruntime.Execer
 		expect string
 	}{{
 		name: "linux",
-		execer: exec.FakeExecer{
+		execer: fakeruntime.FakeExecer{
 			ExpectOS: "linux",
 		},
 		expect: "/usr/local/bin",
 	}, {
 		name: "darwin",
-		execer: exec.FakeExecer{
+		execer: fakeruntime.FakeExecer{
 			ExpectOS: "darwin",
 		},
 		expect: "/usr/local/bin",
 	}, {
 		name: "windows",
-		execer: exec.FakeExecer{
+		execer: fakeruntime.FakeExecer{
 			ExpectOS: "windows",
 		},
 		expect: `C:\Program Files (x86)\Common Files`,
 	}, {
 		name:   "unknown",
-		execer: exec.FakeExecer{},
+		execer: fakeruntime.FakeExecer{},
 		expect: "",
 	}}
 	for _, tt := range tests {

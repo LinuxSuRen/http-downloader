@@ -2,12 +2,13 @@ package apt
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // conntrackInstallerInUbuntu is the installer of Conntrack in CentOS
 type conntrackInstallerInUbuntu struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform

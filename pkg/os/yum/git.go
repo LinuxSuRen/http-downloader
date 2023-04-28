@@ -2,12 +2,13 @@ package yum
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // gitInstallerInCentOS is the installer of git in CentOS
 type gitInstallerInCentOS struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform

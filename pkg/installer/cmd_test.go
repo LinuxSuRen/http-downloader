@@ -2,14 +2,15 @@ package installer
 
 import (
 	"errors"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRunCommandList(t *testing.T) {
 	i := &Installer{
-		Execer: &exec.FakeExecer{},
+		Execer: &fakeruntime.FakeExecer{},
 	}
 	assert.Nil(t, i.runCommandList(nil))
 	assert.Nil(t, i.runCommandList([]CmdWithArgs{{
@@ -17,7 +18,7 @@ func TestRunCommandList(t *testing.T) {
 	}}))
 
 	errInstaller := &Installer{
-		Execer: exec.FakeExecer{
+		Execer: fakeruntime.FakeExecer{
 			ExpectError: errors.New("error"),
 		},
 	}

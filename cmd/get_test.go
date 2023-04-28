@@ -15,8 +15,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/h2non/gock"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/mock/mhttp"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -226,18 +226,18 @@ func TestDownloadMagnetFile(t *testing.T) {
 		proxyGitHub string
 		target      string
 		prepare     func()
-		execer      exec.Execer
+		execer      fakeruntime.Execer
 		expectErr   bool
 	}{{
 		name:        "proxyGitHub and target is empty",
 		proxyGitHub: "",
 		target:      "",
-		execer:      exec.FakeExecer{},
+		execer:      fakeruntime.FakeExecer{},
 	}, {
 		name:        "failed to download",
 		proxyGitHub: "",
 		target:      "fake",
-		execer:      exec.FakeExecer{ExpectError: errors.New("error")},
+		execer:      fakeruntime.FakeExecer{ExpectError: errors.New("error")},
 		expectErr:   true,
 	}, {
 		name:        "one target item",
@@ -249,7 +249,7 @@ func TestDownloadMagnetFile(t *testing.T) {
 				Reply(http.StatusOK).
 				File("testdata/magnet.html")
 		},
-		execer:    exec.FakeExecer{},
+		execer:    fakeruntime.FakeExecer{},
 		expectErr: false,
 	}, {
 		name:        "HTTP server error response",
@@ -260,7 +260,7 @@ func TestDownloadMagnetFile(t *testing.T) {
 				Get("/").
 				ReplyError(errors.New("error"))
 		},
-		execer:    exec.FakeExecer{},
+		execer:    fakeruntime.FakeExecer{},
 		expectErr: true,
 	}}
 	for _, tt := range tests {

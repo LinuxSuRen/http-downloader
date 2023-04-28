@@ -2,9 +2,10 @@ package generic
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"os"
 	"strings"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // CommonInstaller is the installer of a common bash
@@ -13,7 +14,7 @@ type CommonInstaller struct {
 	OS           string
 	InstallCmd   CmdWithArgs
 	UninstallCmd CmdWithArgs
-	Execer       exec.Execer
+	Execer       fakeruntime.Execer
 
 	// inner fields
 	proxyMap map[string]string
@@ -24,7 +25,7 @@ type CmdWithArgs struct {
 	Cmd        string   `yaml:"cmd"`
 	Args       []string `yaml:"args"`
 	SystemCall bool     `yaml:"systemCall"`
-	Execer     exec.Execer
+	Execer     fakeruntime.Execer
 }
 
 // Run runs the current command

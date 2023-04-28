@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 	"github.com/linuxsuren/http-downloader/pkg/os/dnf"
@@ -22,7 +22,7 @@ type DefaultInstallerRegistry struct {
 var defaultInstallerRegistry *DefaultInstallerRegistry
 
 func init() {
-	defaultExecer := exec.DefaultExecer{}
+	defaultExecer := fakeruntime.DefaultExecer{}
 	defaultInstallerRegistry = &DefaultInstallerRegistry{
 		installerMap: map[string][]core.Installer{},
 	}

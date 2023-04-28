@@ -4,8 +4,9 @@ import (
 	// Enable go embed
 	_ "embed"
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"os"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 //go:embed resource/go-repo.repo
@@ -13,7 +14,7 @@ var goRepo string
 
 // golangInstallerInCentOS is the installer of golang in CentOS
 type golangInstallerInCentOS struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform

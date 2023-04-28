@@ -3,14 +3,14 @@ package docker
 import (
 	"testing"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCommonCase(t *testing.T) {
 	registry := &core.FakeRegistry{}
-	SetInstallerRegistry(registry, exec.FakeExecer{
+	SetInstallerRegistry(registry, fakeruntime.FakeExecer{
 		ExpectOS: "linux",
 	})
 

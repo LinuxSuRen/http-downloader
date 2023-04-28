@@ -21,7 +21,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/os/snap"
 	"github.com/linuxsuren/http-downloader/pkg/os/winget"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg/os/apt"
 	"github.com/linuxsuren/http-downloader/pkg/os/brew"
 	"github.com/linuxsuren/http-downloader/pkg/os/core"
@@ -58,7 +58,7 @@ type genericPackage struct {
 	// inner fields
 	proxyMap map[string]string
 	env      map[string]string
-	execer   exec.Execer
+	execer   fakeruntime.Execer
 }
 
 // CmdWithArgs is a command with arguments
@@ -147,7 +147,7 @@ func parseGenericPackages(configFile string, genericPackages *genericPackages) (
 
 // GenericInstallerRegistry registries a generic installer
 func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry) (err error) {
-	defaultExecer := exec.DefaultExecer{}
+	defaultExecer := fakeruntime.DefaultExecer{}
 	genericPackages := &genericPackages{}
 	if err = parseGenericPackages(configFile, genericPackages); err != nil {
 		return
@@ -240,7 +240,7 @@ func (i *genericPackage) Install() (err error) {
 		preInstall := i.PreInstall[index]
 
 		needInstall := false
-		if preInstall.IssuePrefix != "" && i.execer.OS() == exec.OSLinux {
+		if preInstall.IssuePrefix != "" && i.execer.OS() == fakeruntime.OSLinux {
 			var data []byte
 			if data, err = os.ReadFile("/etc/issue"); err != nil {
 				return
@@ -336,7 +336,7 @@ func (i *genericPackage) loadEnv() {
 	if i.env == nil {
 		i.env = map[string]string{}
 	}
-	if i.execer.OS() == exec.OSLinux {
+	if i.execer.OS() == fakeruntime.OSLinux {
 		if data, readErr := os.ReadFile("/etc/os-release"); readErr == nil {
 			for _, line := range strings.Split(string(data), "\n") {
 				if pair := strings.Split(line, "="); len(pair) == 2 {

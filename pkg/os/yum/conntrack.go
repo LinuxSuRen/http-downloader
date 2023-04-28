@@ -2,12 +2,13 @@ package yum
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // conntrackInstallerInCentOS is the installer of Docker in CentOS
 type conntrackInstallerInCentOS struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform

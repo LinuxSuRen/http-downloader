@@ -3,7 +3,7 @@ package snap
 import (
 	"fmt"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // SnapName is the name of the snap
@@ -13,12 +13,12 @@ const SnapName = "snap"
 type CommonInstaller struct {
 	Name   string
 	Args   []string `yaml:"args"`
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if d.Execer.OS() == exec.OSLinux {
+	if d.Execer.OS() == fakeruntime.OSLinux {
 		_, err := d.Execer.LookPath(SnapName)
 		ok = err == nil
 	}

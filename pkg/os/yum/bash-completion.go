@@ -2,12 +2,13 @@ package yum
 
 import (
 	"fmt"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // bashCompletionInstallerInCentOS is the installer of bashCompletion in CentOS
 type bashCompletionInstallerInCentOS struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform

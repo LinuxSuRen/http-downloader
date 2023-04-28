@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // dockerInstallerInCentOS is the installer of Docker in CentOS
 type dockerInstallerInCentOS struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 	count  int
 }
 

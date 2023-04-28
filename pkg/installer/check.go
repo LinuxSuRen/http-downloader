@@ -19,11 +19,12 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/compress"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"github.com/linuxsuren/http-downloader/pkg/net"
 	"github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
+
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 const (
@@ -34,7 +35,7 @@ const (
 // CheckDepAndInstall checks the desired tools, install the missing packages
 func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 	if o.Execer == nil {
-		o.Execer = &exec.DefaultExecer{}
+		o.Execer = &fakeruntime.DefaultExecer{}
 	}
 	if o.OS == "" {
 		o.OS = o.Execer.OS()

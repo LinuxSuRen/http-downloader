@@ -3,7 +3,7 @@ package dnf
 import (
 	"fmt"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 )
 
 // DNFName is the tool name
@@ -12,12 +12,12 @@ const DNFName = "dnf"
 // CommonInstaller is the installer of a common dnf
 type CommonInstaller struct {
 	Name   string
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform
 func (d *CommonInstaller) Available() (ok bool) {
-	if d.Execer.OS() == exec.OSLinux {
+	if d.Execer.OS() == fakeruntime.OSLinux {
 		_, err := d.Execer.LookPath(DNFName)
 		ok = err == nil
 	}

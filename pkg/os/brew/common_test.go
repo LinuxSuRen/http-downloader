@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/linuxsuren/http-downloader/pkg/exec"
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +17,7 @@ func TestCommon(t *testing.T) {
 	}{{
 		name: "normal",
 		installer: CommonInstaller{
-			Execer: exec.FakeExecer{
+			Execer: fakeruntime.FakeExecer{
 				ExpectError:  nil,
 				ExpectOutput: "",
 				ExpectOS:     "darwin",
@@ -29,14 +29,14 @@ func TestCommon(t *testing.T) {
 	}, {
 		name: "not is darwin",
 		installer: CommonInstaller{
-			Execer: exec.FakeExecer{ExpectOS: exec.OSWindows},
+			Execer: fakeruntime.FakeExecer{ExpectOS: fakeruntime.OSWindows},
 		},
 		expectAvailable: false,
 		hasErr:          false,
 	}, {
 		name: "command not found",
 		installer: CommonInstaller{
-			Execer: exec.FakeExecer{ExpectError: errors.New("error")},
+			Execer: fakeruntime.FakeExecer{ExpectError: errors.New("error")},
 		},
 		expectAvailable: false,
 		hasErr:          true,

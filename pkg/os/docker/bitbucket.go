@@ -1,12 +1,10 @@
 package docker
 
-import (
-	"github.com/linuxsuren/http-downloader/pkg/exec"
-)
+import fakeruntime "github.com/linuxsuren/go-fake-runtime"
 
 // bitbucket is the installer of bitbucket in CentOS
 type bitbucket struct {
-	Execer exec.Execer
+	Execer fakeruntime.Execer
 }
 
 // Available check if support current platform

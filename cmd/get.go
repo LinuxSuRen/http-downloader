@@ -19,10 +19,10 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/log"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/linuxsuren/http-downloader/pkg/exec"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"
 
+	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/net"
@@ -82,7 +82,7 @@ func newDownloadOption(ctx context.Context) *downloadOption {
 		RoundTripper: getRoundTripper(ctx),
 		fetcher:      &installer.DefaultFetcher{},
 		wait:         &sync.WaitGroup{},
-		execer:       exec.DefaultExecer{},
+		execer:       fakeruntime.DefaultExecer{},
 	}
 }
 
@@ -125,7 +125,7 @@ type downloadOption struct {
 	org           string
 	repo          string
 	fetcher       installer.Fetcher
-	execer        exec.Execer
+	execer        fakeruntime.Execer
 	ExpectVersion string // should be like >v1.1.0
 }
 
@@ -360,7 +360,7 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	return
 }
 
-func downloadMagnetFile(proxyGitHub, target string, execer exec.Execer) (err error) {
+func downloadMagnetFile(proxyGitHub, target string, execer fakeruntime.Execer) (err error) {
 	targetCmd := "gotorrent"
 	is := installer.Installer{
 		Provider:    "github",
