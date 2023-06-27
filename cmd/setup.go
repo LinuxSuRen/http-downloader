@@ -24,49 +24,52 @@ func newSetupCommand(v *viper.Viper, stdio terminal.Stdio) (cmd *cobra.Command) 
 		RunE:    opt.runE,
 		GroupID: configGroup.ID,
 	}
+	flags := cmd.Flags()
+	flags.StringVarP(&opt.proxy, "proxy", "p", "", "The proxy of GitHub")
+	flags.StringVarP(&opt.provider, "provider", "", "", "The provider of hd configuration")
 	return
 }
 
 type setupOption struct {
 	stdio terminal.Stdio
 	v     *viper.Viper
+
+	proxy    string
+	provider string
 }
 
 func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
-	var (
-		proxyGitHub string
-		provider    string
-	)
-
 	logger := log.GetLoggerFromContextOrDefault(cmd)
-	if proxyGitHub, err = selectFromList([]string{"", "ghproxy.com", "gh.api.99988866.xyz", "mirror.ghproxy.com"},
-		o.v.GetString("proxy-github"),
-		"Select proxy-github", o.stdio); err == nil {
-		o.v.Set("proxy-github", proxyGitHub)
-	} else {
-		return
-	}
 
-	if provider, err = selectFromList([]string{"github", "gitee"}, o.v.GetString("provider"),
-		"Select provider", o.stdio); err == nil {
-		o.v.Set("provider", provider)
-	} else {
-		return
+	if o.proxy == "" {
+		if o.proxy, err = selectFromList([]string{"", "ghproxy.com", "gh.api.99988866.xyz", "mirror.ghproxy.com"},
+			o.v.GetString("proxy-github"),
+			"Select proxy-github", o.stdio); err != nil {
+			return
+		}
 	}
+	o.v.Set("proxy-github", o.proxy)
+
+	if o.provider == "" {
+		if o.provider, err = selectFromList([]string{"github", "gitee"}, o.v.GetString("provider"),
+			"Select provider", o.stdio); err != nil {
+			return
+		}
+	}
+	o.v.Set("provider", o.provider)
 
 	var configDir string
 	fetcher := &installer.DefaultFetcher{}
-	if configDir, err = fetcher.GetHomeDir(); err != nil {
-		return
-	}
-	if err = os.MkdirAll(configDir, 0750); err != nil {
-		err = fmt.Errorf("failed to create directory: %s, error: %v", configDir, err)
-		return
-	}
+	if configDir, err = fetcher.GetHomeDir(); err == nil {
+		if err = os.MkdirAll(configDir, 0750); err != nil {
+			err = fmt.Errorf("failed to create directory: %s, error: %v", configDir, err)
+			return
+		}
 
-	configPath := filepath.Join(configDir, ".config", "hd.yaml")
-	logger.Info("write config into:", configPath)
-	err = o.v.WriteConfigAs(configPath)
+		configPath := filepath.Join(configDir, ".config", "hd.yaml")
+		logger.Info("write config into:", configPath)
+		err = o.v.WriteConfigAs(configPath)
+	}
 	return
 }
 

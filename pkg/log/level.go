@@ -2,6 +2,7 @@ package log
 
 import (
 	"context"
+	"io"
 	syslog "log"
 )
 
@@ -25,6 +26,23 @@ func (l *LevelLog) Debug(v ...any) {
 	if l.level >= 7 {
 		l.Println(v...)
 	}
+}
+
+// SetLevel sets the level of logger
+func (l *LevelLog) SetLevel(level int) *LevelLog {
+	l.level = level
+	return l
+}
+
+// GetLevel returns the level of logger
+func (l *LevelLog) GetLevel() int {
+	return l.level
+}
+
+// SetOutput sets the output destination for the logger.
+func (l *LevelLog) SetOutput(writer io.Writer) *LevelLog {
+	l.Logger.SetOutput(writer)
+	return l
 }
 
 // LoggerContext used to get and set context value
@@ -51,7 +69,6 @@ func GetLoggerFromContextOrDefault(aware ContextAware) (logger *LevelLog) {
 	if !ok {
 		logger = GetLogger()
 	}
-	logger.level = 3
 	return
 }
 
@@ -59,5 +76,12 @@ func GetLoggerFromContextOrDefault(aware ContextAware) (logger *LevelLog) {
 func GetLogger() *LevelLog {
 	return &LevelLog{
 		Logger: syslog.Default(),
+		level:  3,
 	}
+}
+
+// NewContextWithLogger returns a new context with given logger level
+func NewContextWithLogger(ctx context.Context, level int) context.Context {
+	logger := GetLogger().SetLevel(level)
+	return context.WithValue(ctx, LoggerContextKey, logger)
 }
