@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"testing"
 
 	"github.com/AlecAivazis/survey/v2/terminal"
 	expect "github.com/Netflix/go-expect"
 	pseudotty "github.com/creack/pty"
 	"github.com/hinshun/vt10x"
+	"github.com/linuxsuren/http-downloader/pkg/log"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -62,6 +64,28 @@ func Test_newSetupCommand(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, "gh.api.99988866.xyz", v.GetString("proxy-github"))
 			assert.Equal(t, "gitee", v.GetString("provider"))
+			return err
+		})
+	})
+
+	t.Run("setup with given flags", func(t *testing.T) {
+		RunTest(t, func(c expectConsole) {
+		}, func(tr terminal.Stdio) error {
+			fs := afero.NewMemMapFs()
+			v := viper.New()
+			v.SetFs(fs)
+			v.Set("provider", "gitee")
+			v.Set("proxy-github", "gh.api.99988866.xyz")
+
+			cmd := newSetupCommand(v, tr)
+			assert.Equal(t, "setup", cmd.Name())
+			cmd.SetArgs([]string{"--proxy", "fake.com", "--provider", "fake"})
+			cmd.SetContext(log.NewContextWithLogger(context.Background(), 0))
+
+			err := cmd.Execute()
+			assert.Nil(t, err)
+			assert.Equal(t, "fake.com", v.GetString("proxy-github"))
+			assert.Equal(t, "fake", v.GetString("provider"))
 			return err
 		})
 	})
