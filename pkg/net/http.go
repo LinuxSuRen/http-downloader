@@ -331,11 +331,12 @@ func DetectSizeWithRoundTripper(targetURL, output string, showProgress, noProxy,
 	return
 }
 
-// ParseSuggestedFilename parse the filename from resp header
+// ParseSuggestedFilename parse the filename from resp header,More details from  https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Disposition
 func ParseSuggestedFilename(header http.Header, filepath string) (filename string) {
 	if disposition, ok := header["Content-Disposition"]; ok && len(disposition) >= 1 {
-		if index := strings.LastIndex(disposition[0], `filename="`); index != -1 {
-			filename = disposition[0][index+len(`filename="`):]
+		if index := strings.LastIndex(disposition[0], `filename=`); index != -1 {
+			filename = disposition[0][index+len(`filename=`):]
+			filename = strings.TrimPrefix(filename, `"`)
 			filename = strings.TrimSuffix(filename, `"`)
 			if filename == filepath {
 				filename = ""
