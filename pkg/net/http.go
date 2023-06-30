@@ -156,13 +156,7 @@ func (h *HTTPDownloader) DownloadFile() error {
 		}
 	}
 
-	if disposition, ok := resp.Header["Content-Disposition"]; ok && len(disposition) >= 1 {
-		h.suggestedFilename = strings.TrimPrefix(disposition[0], `filename="`)
-		h.suggestedFilename = strings.TrimSuffix(h.suggestedFilename, `"`)
-		if h.suggestedFilename == filepath {
-			h.suggestedFilename = ""
-		}
-	}
+	h.suggestedFilename = ParseSuggestedFilename(resp.Header, filepath)
 
 	// pre-hook before get started to download file
 	if h.PreStart != nil && !h.PreStart(resp) {
@@ -333,6 +327,20 @@ func DetectSizeWithRoundTripper(targetURL, output string, showProgress, noProxy,
 
 	if err = downloader.DownloadFile(); err != nil || lenErr != nil {
 		err = fmt.Errorf("cannot download from %s, response error: %v, content length error: %v", targetURL, err, lenErr)
+	}
+	return
+}
+
+// ParseSuggestedFilename parse the filename from resp header
+func ParseSuggestedFilename(header http.Header, filepath string) (filename string) {
+	if disposition, ok := header["Content-Disposition"]; ok && len(disposition) >= 1 {
+		if index := strings.LastIndex(disposition[0], `filename="`); index != -1 {
+			filename = disposition[0][index+len(`filename="`):]
+			filename = strings.TrimSuffix(filename, `"`)
+			if filename == filepath {
+				filename = ""
+			}
+		}
 	}
 	return
 }

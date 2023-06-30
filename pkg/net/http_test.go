@@ -402,3 +402,55 @@ func TestMultiThreadDownloader(t *testing.T) {
 		})
 	}
 }
+
+func Test_getSuggestedFilename(t *testing.T) {
+	type args struct {
+		header   http.Header
+		filepath string
+	}
+	tests := []struct {
+		name         string
+		args         args
+		wantFilename string
+	}{
+		{
+			name: "test1",
+			args: args{
+				header:   http.Header{"Content-Disposition": []string{`attachment; filename="harbor-helm-1.3.18.tar.gz"`}},
+				filepath: "harbor.tar.gz",
+			},
+			wantFilename: "harbor-helm-1.3.18.tar.gz",
+		},
+		{
+			name: "test2",
+			args: args{
+				header:   http.Header{"Content-Disposition": []string{`attachment; filename="harbor-helm-1.3.18.tar.gz"`}},
+				filepath: "harbor-helm-1.3.18.tar.gz",
+			},
+			wantFilename: "",
+		},
+		{
+			name: "test3",
+			args: args{
+				header:   http.Header{"Content-Disposition": []string{`filename="harbor-helm-1.3.18.tar.gz"`}},
+				filepath: "harbor.tar.gz",
+			},
+			wantFilename: "harbor-helm-1.3.18.tar.gz",
+		},
+		{
+			name: "test4",
+			args: args{
+				header:   http.Header{"Content-Disposition": []string{`filename="harbor-helm-1.3.18.tar.gz"`}},
+				filepath: "harbor-helm-1.3.18.tar.gz",
+			},
+			wantFilename: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotFilename := net.ParseSuggestedFilename(tt.args.header, tt.args.filepath); gotFilename != tt.wantFilename {
+				t.Errorf("getSuggestedFilename() = %v, want %v", gotFilename, tt.wantFilename)
+			}
+		})
+	}
+}
