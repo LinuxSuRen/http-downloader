@@ -16,13 +16,12 @@ Install it via: `brew install linuxsuren/linuxsuren/hd`
 
 Or download it directly (for Linux):
 ```
-curl https://linuxsuren.github.io/tools/install.sh|sh
+curl https://linuxsuren.github.io/tools/install.sh|bash
 ```
 
 Or download it via proxy:
 ```
-curl -L https://ghproxy.com/https://github.com/linuxsuren/http-downloader/releases/latest/download/hd-linux-amd64.tar.gz | tar xzv hd
-mv hd /usr/bin/hd
+curl https://gitee.com/linuxsuren/tools/raw/master/install-zh.sh|bash
 ```
 
 for Windows users (you might need to add this program into the Windows Defence exclude list):
