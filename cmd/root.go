@@ -51,7 +51,7 @@ func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 	for _, c := range cmd.Commands() {
 		registerFlagCompletionFunc(c, "provider", ArrayCompletion(ProviderGitHub, ProviderGitee))
 		registerFlagCompletionFunc(c, "proxy-github", ArrayCompletion("gh.api.99988866.xyz",
-			"ghproxy.com"))
+			"gh-proxy.com"))
 		registerFlagCompletionFunc(c, "os", ArrayCompletion("window", "linux", "darwin"))
 		registerFlagCompletionFunc(c, "arch", ArrayCompletion("amd64", "arm64"))
 		registerFlagCompletionFunc(c, "format", ArrayCompletion("tar.gz", "zip", "msi"))

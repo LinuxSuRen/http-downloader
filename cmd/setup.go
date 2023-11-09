@@ -42,7 +42,7 @@ func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 	logger := log.GetLoggerFromContextOrDefault(cmd)
 
 	if o.proxy == "" {
-		if o.proxy, err = selectFromList([]string{"", "ghproxy.com", "gh.api.99988866.xyz"},
+		if o.proxy, err = selectFromList([]string{"", "gh-proxy.com", "gh.api.99988866.xyz"},
 			o.v.GetString("proxy-github"),
 			"Select proxy-github", o.stdio); err != nil {
 			return
