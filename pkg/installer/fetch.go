@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,15 +140,17 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 				}
 
 				if head, err = repo.Reference(plumbing.NewRemoteReferenceName(remoteName, branch), true); err != nil {
-					return
-				}
-				// avoid force push from remote
-				if err = wd.Reset(&git.ResetOptions{
-					Commit: head.Hash(),
-					Mode:   git.HardReset,
-				}); err != nil {
-					err = fmt.Errorf("unable to reset to '%s'", head.Hash().String())
-					return
+					// err = fmt.Errorf("unknown ref: %v", err)
+					log.Println("unknown ref", err)
+				} else {
+					// avoid force push from remote
+					if err = wd.Reset(&git.ResetOptions{
+						Commit: head.Hash(),
+						Mode:   git.HardReset,
+					}); err != nil {
+						err = fmt.Errorf("unable to reset to '%s'", head.Hash().String())
+						return
+					}
 				}
 
 				if err = wd.Checkout(&git.CheckoutOptions{
@@ -166,7 +169,7 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 					Progress:      progress,
 					Force:         true,
 				}); err != nil && err != git.NoErrAlreadyUpToDate {
-					err = fmt.Errorf("failed to pull git repository '%s', error: %v", repo, err)
+					err = fmt.Errorf("failed to pull git repository %q, error: %v", repoAddr, err)
 					return
 				}
 				err = nil

@@ -561,3 +561,26 @@ func FindPackagesByCategory(category string) (result []HDConfig) {
 	})
 	return
 }
+
+type proxyServer struct {
+	Servers []string `yaml:"servers"`
+}
+
+// GetProxyServers returns the proxy servers
+func GetProxyServers() []string {
+	configFile := sysos.ExpandEnv("$HOME/.config/hd-home/proxy.yaml")
+	data, err := sysos.ReadFile(configFile)
+	if err == nil {
+		proxyServer := &proxyServer{}
+
+		if err = yaml.Unmarshal(data, proxyServer); err == nil {
+			return proxyServer.Servers
+		} else {
+			log.Println("failed to parse config file", err)
+		}
+	} else {
+		log.Println("failed to read config file", err)
+	}
+
+	return nil
+}

@@ -40,9 +40,11 @@ type setupOption struct {
 
 func (o *setupOption) runE(cmd *cobra.Command, args []string) (err error) {
 	logger := log.GetLoggerFromContextOrDefault(cmd)
+	proxyServers := []string{""}
+	proxyServers = append(proxyServers, installer.GetProxyServers()...)
 
 	if o.proxy == "" {
-		if o.proxy, err = selectFromList([]string{"", "gh-proxy.com", "gh.api.99988866.xyz"},
+		if o.proxy, err = selectFromList(proxyServers,
 			o.v.GetString("proxy-github"),
 			"Select proxy-github", o.stdio); err != nil {
 			return
