@@ -42,8 +42,7 @@ func (s *searchOption) addFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&s.Provider, "provider", "", viper.GetString("provider"), "The file provider")
 	flags.StringVarP(&s.ProxyGitHub, "proxy-github", "", viper.GetString("proxy-github"),
 		`The proxy address of github.com, the proxy address will be the prefix of the final address.
-Available proxy: gh.api.99988866.xyz, gh-proxy.com
-Thanks to https://github.com/hunshcn/gh-proxy`)
+Submit the new proxy server in https://github.com/LinuxSuRen/hd-home`)
 }
 
 func (s *searchOption) runE(c *cobra.Command, args []string) (err error) {
