@@ -103,7 +103,7 @@ dockers:
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--label=org.opencontainers.image.source=https://github.com/LinuxSuRen/http-downloader"
-      - "--platform=linux/arm64"
+      - "--platform=linux/arm64/v8"
 docker_manifests:
   - name_template: ghcr.io/linuxsuren/hd:{{.Tag}}
     image_templates:
