@@ -575,9 +575,9 @@ func GetProxyServers() []string {
 
 		if err = yaml.Unmarshal(data, proxyServer); err == nil {
 			return proxyServer.Servers
-		} else {
-			log.Println("failed to parse config file", err)
 		}
+
+		log.Println("failed to parse config file", err)
 	} else {
 		log.Println("failed to read config file", err)
 	}
