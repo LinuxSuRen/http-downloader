@@ -72,13 +72,14 @@ brews:
 
       prefix.install_metafiles
 dockers:
-  - goos: linux
+  - use: buildx
+    goos: linux
     goarch: amd64
     image_templates:
-      - "surenpi/hd:latest"
-      - "surenpi/hd:{{.Tag}}"
-      - "ghcr.io/linuxsuren/hd:latest"
-      - "ghcr.io/linuxsuren/hd:{{.Tag}}"
+      - "surenpi/hd:latest-amd64"
+      - "surenpi/hd:{{.Tag}}-amd64"
+      - "ghcr.io/linuxsuren/hd:latest-amd64"
+      - "ghcr.io/linuxsuren/hd:{{.Tag}}-amd64"
     build_flag_templates:
       - "--pull"
       - "--label=org.opencontainers.image.created={{.Date}}"
@@ -87,3 +88,36 @@ dockers:
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--label=org.opencontainers.image.source=https://github.com/LinuxSuRen/http-downloader"
       - "--platform=linux/amd64"
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    image_templates:
+      - "surenpi/hd:latest-arm64"
+      - "surenpi/hd:{{.Tag}}-arm64"
+      - "ghcr.io/linuxsuren/hd:latest-arm64"
+      - "ghcr.io/linuxsuren/hd:{{.Tag}}-arm64"
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/LinuxSuRen/http-downloader"
+      - "--platform=linux/arm64"
+docker_manifests:
+  - name_template: ghcr.io/linuxsuren/hd:{{.Tag}}
+    image_templates:
+      - ghcr.io/linuxsuren/hd:{{.Tag}}-amd64
+      - ghcr.io/linuxsuren/hd:{{.Tag}}-arm64
+  - name_template: ghcr.io/linuxsuren/hd:latest
+    image_templates:
+      - ghcr.io/linuxsuren/hd:latest-amd64
+      - ghcr.io/linuxsuren/hd:latest-arm64
+  - name_template: surenpi/hd:latest
+    image_templates:
+      - surenpi/hd:latest-amd64
+      - surenpi/hd:latest-arm64
+  - name_template: surenpi/hd:{{.Tag}}
+    image_templates:
+      - surenpi/hd:{{.Tag}}-amd64
+      - surenpi/hd:{{.Tag}}-arm64
