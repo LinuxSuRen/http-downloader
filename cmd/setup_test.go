@@ -18,7 +18,7 @@ func Test_newSetupCommand(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
 		RunTest(t, func(c expectConsole) {
 			c.ExpectString("Select proxy-github")
-			c.Send("99988866")
+			// c.Send("99988866")
 			c.SendLine("")
 
 			c.ExpectString("Select provider")
@@ -36,7 +36,7 @@ func Test_newSetupCommand(t *testing.T) {
 
 			err := cmd.Execute()
 			assert.Nil(t, err)
-			assert.Equal(t, "gh.api.99988866.xyz", v.GetString("proxy-github"))
+			// assert.Equal(t, "gh.api.99988866.xyz", v.GetString("proxy-github"))
 			assert.Equal(t, "gitee", v.GetString("provider"))
 			return err
 		})

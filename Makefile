@@ -1,13 +1,13 @@
 build: fmt test
 	export GOPROXY=https://goproxy.io
-	CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/hd
+	CGO_ENABLED=0 go build -ldflags "-w -s" -o bin/hd
 
 build-windows:
-	GOOS=windows CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/windows/hd.exe
+	GOOS=windows CGO_ENABLED=0 go build -ldflags "-w -s" -o bin/windows/hd.exe
 build-linux: fmt lint build-linux-no-check
 build-linux-no-check:
 	export GOPROXY=https://goproxy.io
-	CGO_ENABLE=0 GOOS=linux go build -ldflags "-w -s" -o bin/linux/hd
+	CGO_ENABLED=0 GOOS=linux go build -ldflags "-w -s" -o bin/linux/hd
 	upx bin/linux/hd
 
 test: fmt
