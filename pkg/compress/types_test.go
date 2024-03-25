@@ -86,6 +86,36 @@ func TestIsSupport(t *testing.T) {
 		},
 		want: true,
 	}, {
+		name: "supported extension: .xz",
+		args: args{
+			extension: path.Ext("test.xz"),
+		},
+		want: true,
+	}, {
+		name: "supported extension: .zip",
+		args: args{
+			extension: path.Ext("test.zip"),
+		},
+		want: true,
+	}, {
+		name: "supported extension: .gz",
+		args: args{
+			extension: path.Ext("test.gz"),
+		},
+		want: true,
+	}, {
+		name: "supported extension: .tgz",
+		args: args{
+			extension: path.Ext("test.tgz"),
+		},
+		want: true,
+	}, {
+		name: "supported extension: .bz2",
+		args: args{
+			extension: path.Ext("test.bz2"),
+		},
+		want: true,
+	}, {
 		name: "not supported extension: .ab",
 		args: args{
 			extension: path.Ext("test.ab"),
@@ -148,9 +178,6 @@ func Test_extraFile(t *testing.T) {
 				file, err = os.CreateTemp(os.TempDir(), tt.args.tarFile)
 				assert.Nil(t, err)
 				assert.NotNil(t, file)
-				tt.args.tarFile = file.Name()
-				tt.args.targetName = path.Base(file.Name())
-				tt.args.name = tt.args.targetName
 			}
 
 			if err != nil || file == nil {
@@ -160,7 +187,31 @@ func Test_extraFile(t *testing.T) {
 			defer func() {
 				_ = os.RemoveAll(tt.args.tarFile)
 			}()
-			tt.wantErr(t, extraFile(tt.args.name, tt.args.targetName, tt.args.tarFile, tt.args.header, tt.args.tarReader), fmt.Sprintf("extraFile(%v, %v, %v, %v, %v)", tt.args.name, tt.args.targetName, tt.args.tarFile, tt.args.header, tt.args.tarReader))
+			err = extraFile(tt.args.name, tt.args.targetName, tt.args.tarFile, tt.args.header, tt.args.tarReader)
+			tt.wantErr(t, err, fmt.Sprintf("extraFile(%v, %v, %v, %v, %v)", tt.args.name, tt.args.targetName, tt.args.tarFile, tt.args.header, tt.args.tarReader))
 		})
+	}
+}
+
+func TestExtractFiles(t *testing.T) {
+	compressor := GetCompressor(".tar.gz", []string{"bb", "cc"})
+	assert.NotNil(t, compressor)
+
+	err := compressor.ExtractFiles("testdata/simple.tar.gz", "aa")
+	assert.NoError(t, err)
+
+	assertFileContentEqual(t, "testdata/aa", "aa\n")
+	assertFileContentEqual(t, "testdata/bb", "bb\n")
+	assertFileContentEqual(t, "testdata/cc", "cc\n")
+}
+
+func assertFileContentEqual(t *testing.T, filePath string, expectedContent string) {
+	defer func() {
+		_ = os.RemoveAll(filePath)
+	}()
+	if data, err := os.ReadFile(filePath); err == nil {
+		assert.Equal(t, expectedContent, string(data))
+	} else {
+		t.Fatalf("not found %q: %v", filePath, err)
 	}
 }

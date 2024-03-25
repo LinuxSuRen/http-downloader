@@ -2,8 +2,8 @@ package installer
 
 import (
 	"context"
-	"fmt"
 	"os/user"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,7 @@ func TestGetConfigDir(t *testing.T) {
 	fetcher = &DefaultFetcher{}
 	dir, err := fetcher.GetConfigDir()
 	assert.Nil(t, err)
-	assert.Equal(t, fmt.Sprintf("%s/.config/hd-home", u.HomeDir), dir)
+	assert.Equal(t, filepath.Join(u.HomeDir, ".config", "hd-home"), dir)
 	fetcher.SetContext(context.TODO())
 
 	// test the fake fetcher
