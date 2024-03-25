@@ -2,7 +2,6 @@ package compress
 
 import (
 	"archive/tar"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -19,7 +18,7 @@ func extraFile(name, targetName, tarFile string, header *tar.Header, tarReader *
 		return
 	}
 	var targetFile *os.File
-	if targetFile, err = os.OpenFile(fmt.Sprintf("%s/%s", filepath.Dir(tarFile), targetName),
+	if targetFile, err = os.OpenFile(filepath.Join(filepath.Dir(tarFile), targetName),
 		os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)); err != nil {
 		return
 	}

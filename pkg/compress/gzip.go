@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 )
 
 // GZip implements a compress which based is based on gzip
@@ -43,7 +44,11 @@ func (c *GZip) ExtractFiles(sourceFile, targetName string) (err error) {
 		return
 	}
 
-	tarReader := tar.NewReader(gzf)
+	err = zipProcess(tar.NewReader(gzf), targetName, sourceFile, c.additionBinaries)
+	return
+}
+
+func zipProcess(tarReader *tar.Reader, targetName, sourceFile string, additionBinaries []string) (err error) {
 	var header *tar.Header
 	var found bool
 	for {
@@ -53,20 +58,26 @@ func (c *GZip) ExtractFiles(sourceFile, targetName string) (err error) {
 		} else if err != nil {
 			break
 		}
-		name := header.Name
+		name := path.Base(header.Name)
 
 		switch header.Typeflag {
 		case tar.TypeReg:
-			if err = extraFile(name, targetName, sourceFile, header, tarReader); err == nil {
-				found = true
+			if name == targetName {
+				if err = extraFile(name, targetName, sourceFile, header, tarReader); err == nil {
+					found = true
+				} else {
+					break
+				}
 			} else {
-				break
-			}
+				for i := range additionBinaries {
+					addition := additionBinaries[i]
+					if name != addition {
+						continue
+					}
 
-			for i := range c.additionBinaries {
-				addition := c.additionBinaries[i]
-				if err = extraFile(addition, addition, sourceFile, header, tarReader); err != nil {
-					return
+					if err = extraFile(addition, addition, sourceFile, header, tarReader); err != nil {
+						return
+					}
 				}
 			}
 		}
