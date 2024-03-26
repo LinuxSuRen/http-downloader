@@ -3,11 +3,9 @@ package compress
 import (
 	"archive/zip"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // Zip implements a compress which is base on zip file
@@ -38,14 +36,19 @@ func (z *Zip) ExtractFiles(sourceFile, targetName string) (err error) {
 		_ = archive.Close()
 	}()
 
+	z.additionBinaries = append(z.additionBinaries, targetName)
 	for _, f := range archive.File {
 		if f.FileInfo().IsDir() {
 			continue
 		}
 
-		if strings.HasPrefix(f.Name, targetName) {
+		for _, ff := range z.additionBinaries {
+			if filepath.Base(f.Name) != ff {
+				continue
+			}
+
 			var targetFile *os.File
-			if targetFile, err = os.OpenFile(fmt.Sprintf("%s/%s", filepath.Dir(sourceFile), targetName),
+			if targetFile, err = os.OpenFile(filepath.Join(filepath.Dir(sourceFile), ff),
 				os.O_CREATE|os.O_RDWR, f.Mode()); err != nil {
 				return
 			}
@@ -59,7 +62,7 @@ func (z *Zip) ExtractFiles(sourceFile, targetName string) (err error) {
 				return
 			}
 			_ = targetFile.Close()
-			return
+			break
 		}
 	}
 	return
