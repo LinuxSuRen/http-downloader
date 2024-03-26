@@ -194,15 +194,33 @@ func Test_extraFile(t *testing.T) {
 }
 
 func TestExtractFiles(t *testing.T) {
-	compressor := GetCompressor(".tar.gz", []string{"bb", "cc"})
-	assert.NotNil(t, compressor)
+	t.Run("test .tar.gz", func(t *testing.T) {
+		compressor := GetCompressor(".tar.gz", []string{"bb", "cc"})
+		assert.NotNil(t, compressor)
 
-	err := compressor.ExtractFiles("testdata/simple.tar.gz", "aa")
-	assert.NoError(t, err)
+		err := compressor.ExtractFiles("testdata/simple.tar.gz", "aa")
+		assert.NoError(t, err)
 
-	assertFileContentEqual(t, "testdata/aa", "aa\n")
-	assertFileContentEqual(t, "testdata/bb", "bb\n")
-	assertFileContentEqual(t, "testdata/cc", "cc\n")
+		assertFileContentEqual(t, "testdata/aa", "aa\n")
+		assertFileContentEqual(t, "testdata/bb", "bb\n")
+		assertFileContentEqual(t, "testdata/cc", "cc\n")
+	})
+
+	t.Run("test .zip", func(t *testing.T) {
+		compressor := GetCompressor(".zip", []string{"bb", "cc"})
+		assert.NotNil(t, compressor)
+
+		err := compressor.ExtractFiles("testdata/simple.zip", "aa")
+		assert.NoError(t, err)
+
+		assertFileContentEqual(t, "testdata/aa", "aa\n")
+		assertFileContentEqual(t, "testdata/bb", "bb\n")
+		assertFileContentEqual(t, "testdata/cc", "cc\n")
+
+		// invalid parameters
+		err = compressor.ExtractFiles("", "")
+		assert.Error(t, err)
+	})
 }
 
 func assertFileContentEqual(t *testing.T, filePath string, expectedContent string) {
