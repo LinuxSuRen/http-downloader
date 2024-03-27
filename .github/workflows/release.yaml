@@ -40,7 +40,7 @@ jobs:
       - name: Upload via oras
         run: |
           oras push docker.io/linuxsuren/hd:$GITHUB_OUTPUT release
-          oras push ${{ env.REGISTRY }/linuxsuren/hd:$GITHUB_OUTPUT release
+          oras push ${{ env.REGISTRY }}/linuxsuren/hd:$GITHUB_OUTPUT release
 
   image:
     runs-on: ubuntu-20.04
