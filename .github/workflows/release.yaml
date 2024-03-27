@@ -13,6 +13,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3.6.0
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+      - name: Set output
+        id: vars
+        run: echo "tag=$(git describe --tags)" >> $GITHUB_OUTPUT
       - name: Unshallow
         run: git fetch --prune --unshallow
       - name: Set up Go
@@ -22,7 +28,7 @@ jobs:
       - name: Image Registry Login
         run: |
           docker login --username ${{ secrets.DOCKER_HUB_USER }} --password ${{secrets.DOCKER_HUB_TOKEN}}
-          docker login ghcr.io/linuxsuren --username linuxsuren --password ${{secrets.GH_PUBLISH_SECRETS}}
+          docker login ${{ env.REGISTRY }/linuxsuren --username linuxsuren --password ${{secrets.GH_PUBLISH_SECRETS}}
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v4.4.0
         with:
@@ -31,6 +37,10 @@ jobs:
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PUBLISH_SECRETS }}
+      - name: Upload via oras
+        run: |
+          oras push docker.io/linuxsuren/hd:$GITHUB_OUTPUT release
+          oras push ${{ env.REGISTRY }/linuxsuren/hd:$GITHUB_OUTPUT release
 
   image:
     runs-on: ubuntu-20.04
@@ -66,51 +76,3 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: VERSION=${{ steps.vars.outputs.tag }}
-
-  msi:
-    needs: goreleaser
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3.6.0
-      - name: Download hd.exe
-        id: download_exe
-        shell: bash
-        run: |
-          hub release download "${GITHUB_REF#refs/tags/}" -i '*windows-amd64*.zip'
-          printf "::set-output name=zip::%s\n" *.zip
-          unzip -o *.zip && rm -v *.zip
-        env:
-          GITHUB_TOKEN: ${{secrets.GH_PUBLISH_SECRETS}}
-      - name: Install go-msi
-        run: choco install -y "go-msi"
-      - name: Prepare PATH
-        shell: bash
-        run: |
-          echo "$WIX\\bin" >> $GITHUB_PATH
-          echo "C:\\Program Files\\go-msi" >> $GITHUB_PATH
-      - name: Build MSI
-        id: buildmsi
-        shell: bash
-        env:
-          ZIP_FILE: ${{ steps.download_exe.outputs.zip }}
-        run: |
-          mkdir -p build
-          msi="$(basename "$ZIP_FILE" ".zip").msi"
-          printf "::set-output name=msi::%s\n" "$msi"
-          go-msi make --msi "$PWD/$msi" --out "$PWD/build" --version "${GITHUB_REF#refs/tags/}"
-      - name: Upload MSI
-        shell: bash
-        run: |
-          tag_name="${GITHUB_REF#refs/tags/}"
-          hub release edit "$tag_name" -m "" -a "$MSI_FILE"
-          release_url="$(gh api repos/:owner/:repo/releases -q ".[]|select(.tag_name==\"${tag_name}\")|.url")"
-          publish_args=( -F draft=false )
-          if [[ $GITHUB_REF != *-* ]]; then
-            publish_args+=( -f discussion_category_name="$DISCUSSION_CATEGORY" )
-          fi
-          gh api -X PATCH "$release_url" "${publish_args[@]}"
-        env:
-          MSI_FILE: ${{ steps.buildmsi.outputs.msi }}
-          DISCUSSION_CATEGORY: General
-          GITHUB_TOKEN: ${{secrets.GH_PUBLISH_SECRETS}}
