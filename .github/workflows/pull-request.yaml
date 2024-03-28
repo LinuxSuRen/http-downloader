@@ -61,7 +61,7 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3.6.0
       - name: Go-linter-1
-        uses: Jerome1337/golint-action@v1.0.2
+        uses: Jerome1337/golint-action@v1.0.3
         with:
           golint-path: ./...
   Security:
