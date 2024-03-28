@@ -37,8 +37,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_PUBLISH_SECRETS }}
       - name: Upload via oras
         run: |
-          oras push docker.io/linuxsuren/hd:${{ steps.vars.outputs.tag }} release
-          oras push ${{ env.REGISTRY }}/linuxsuren/hd:${{ steps.vars.outputs.tag }} release
+          export TAG=${{ steps.vars.outputs.tag }}
+          TAG=${TAG#v}
+          oras push docker.io/linuxsuren/hd:$TAG release
+          oras push ${{ env.REGISTRY }}/linuxsuren/hd:$TAG release
 
   image:
     runs-on: ubuntu-20.04
