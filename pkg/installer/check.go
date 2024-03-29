@@ -568,7 +568,8 @@ type proxyServer struct {
 
 // GetProxyServers returns the proxy servers
 func GetProxyServers() []string {
-	configFile := sysos.ExpandEnv("$HOME/.config/hd-home/proxy.yaml")
+	home, _ := homedir.Dir()
+	configFile := filepath.Join(home, ".config/hd-home/proxy.yaml")
 	data, err := sysos.ReadFile(configFile)
 	if err == nil {
 		proxyServer := &proxyServer{}
