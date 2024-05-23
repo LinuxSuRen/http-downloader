@@ -39,7 +39,7 @@ jobs:
           # test with specific version
           sudo hd i mde@v0.0.4 -f
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.2.1
+        uses: aquasecurity/trivy-action@0.21.0
         if: github.event_name == 'pull_request'
         with:
           scan-type: 'fs'
