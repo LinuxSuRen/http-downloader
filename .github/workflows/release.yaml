@@ -28,7 +28,7 @@ jobs:
           docker login --username ${{ secrets.DOCKER_HUB_USER }} --password ${{secrets.DOCKER_HUB_TOKEN}}
           docker login ${{ env.REGISTRY }}/linuxsuren --username linuxsuren --password ${{secrets.GH_PUBLISH_SECRETS}}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v4.4.0
+        uses: goreleaser/goreleaser-action@v6.0.0
         with:
           github_token: ${{ secrets.GH_PUBLISH_SECRETS }}
           version: v1.14.0
