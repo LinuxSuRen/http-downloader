@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
@@ -32,6 +33,45 @@ func Test_newFetchCmd(t *testing.T) {
 			assert.NotNil(t, flag)
 			assert.NotEmpty(t, flag.Usage)
 			assert.Equal(t, tt.shorthand, flag.Shorthand)
+		})
+	}
+}
+
+func TestSetTimeoutWithContext(t *testing.T) {
+	tests := []struct {
+		name     string
+		context  context.Context
+		timeout  time.Duration
+		expected bool
+	}{
+		{
+			name:     "context with timeout",
+			context:  context.Background(),
+			timeout:  time.Second * 10,
+			expected: true,
+		},
+		{
+			name:     "context without timeout",
+			context:  nil,
+			timeout:  time.Second * 10,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{}
+			cmd.SetContext(tt.context)
+			opt := &fetchOption{
+				timeout: tt.timeout,
+				fetcher: &installer.FakeFetcher{},
+			}
+			opt.setTimeout(cmd)
+			if tt.expected {
+				assert.NotNil(t, opt.cancel)
+			} else {
+				assert.Nil(t, opt.cancel)
+			}
 		})
 	}
 }
@@ -82,13 +122,36 @@ func TestFetchRunE(t *testing.T) {
 		name   string
 		opt    *fetchOption
 		hasErr bool
-	}{{
-		name: "normal",
-		opt: &fetchOption{
-			fetcher: &installer.FakeFetcher{},
+	}{
+		{
+			name: "normal",
+			opt: &fetchOption{
+				fetcher: &installer.FakeFetcher{},
+			},
+			hasErr: false,
 		},
-		hasErr: false,
-	}}
+		{
+			name: "fetch with retry",
+			opt: &fetchOption{
+				fetcher: &installer.FakeFetcher{
+					FetchLatestRepoErr: errors.New("context deadline exceeded"),
+				},
+				retry: 3,
+			},
+			hasErr: true,
+		},
+		{
+			name: "fetch with non-retryable error",
+			opt: &fetchOption{
+				fetcher: &installer.FakeFetcher{
+					FetchLatestRepoErr: errors.New("some other error"),
+				},
+				retry: 3,
+			},
+			hasErr: true,
+		},
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &cobra.Command{}
