@@ -17,7 +17,7 @@ func TestCommon(t *testing.T) {
 	}{{
 		name: "normal",
 		installer: CommonInstaller{
-			Execer: fakeruntime.FakeExecer{
+			Execer: &fakeruntime.FakeExecer{
 				ExpectError:  nil,
 				ExpectOutput: "",
 				ExpectOS:     "darwin",
@@ -29,14 +29,14 @@ func TestCommon(t *testing.T) {
 	}, {
 		name: "not is darwin",
 		installer: CommonInstaller{
-			Execer: fakeruntime.FakeExecer{ExpectOS: fakeruntime.OSWindows},
+			Execer: &fakeruntime.FakeExecer{ExpectOS: fakeruntime.OSWindows},
 		},
 		expectAvailable: false,
 		hasErr:          false,
 	}, {
 		name: "command not found",
 		installer: CommonInstaller{
-			Execer: fakeruntime.FakeExecer{ExpectError: errors.New("error")},
+			Execer: &fakeruntime.FakeExecer{ExpectError: errors.New("error")},
 		},
 		expectAvailable: false,
 		hasErr:          true,

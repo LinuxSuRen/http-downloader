@@ -44,13 +44,13 @@ func TestInstall(t *testing.T) {
 	}{{
 		name: "empty",
 		installer: &Installer{
-			Execer: fakeruntime.FakeExecer{},
+			Execer: &fakeruntime.FakeExecer{},
 		},
 		hasErr: true,
 	}, {
 		name: "fake linux",
 		installer: &Installer{
-			Execer: fakeruntime.FakeExecer{
+			Execer: &fakeruntime.FakeExecer{
 				ExpectOS: fakeruntime.OSLinux,
 			},
 		},

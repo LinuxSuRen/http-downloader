@@ -25,7 +25,7 @@ require (
 	github.com/antonmedv/expr v1.11.1
 	github.com/creack/pty v1.1.17
 	github.com/k0kubun/go-ansi v0.0.0-20180517002512-3bf9e2903213
-	github.com/linuxsuren/go-fake-runtime v0.0.0-20230426144714-1a7a0d160d3f
+	github.com/linuxsuren/go-fake-runtime v0.0.5
 	github.com/schollz/progressbar/v3 v3.13.0
 )
 

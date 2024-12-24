@@ -13,7 +13,7 @@ import (
 
 func newRemoveCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &removeOption{
-		execer: &fakeruntime.DefaultExecer{},
+		execer: fakeruntime.NewDefaultExecer(),
 	}
 	cmd = &cobra.Command{
 		Use:     "remove",

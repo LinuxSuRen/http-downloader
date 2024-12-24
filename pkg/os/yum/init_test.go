@@ -10,7 +10,7 @@ import (
 
 func TestCommonCase(t *testing.T) {
 	registry := &core.FakeRegistry{}
-	SetInstallerRegistry(registry, fakeruntime.FakeExecer{
+	SetInstallerRegistry(registry, &fakeruntime.FakeExecer{
 		ExpectOutput: "Active: active",
 		ExpectOS:     "linux",
 	})

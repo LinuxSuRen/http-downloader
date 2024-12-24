@@ -82,7 +82,7 @@ func newDownloadOption(ctx context.Context) *downloadOption {
 		RoundTripper: getRoundTripper(ctx),
 		fetcher:      &installer.DefaultFetcher{},
 		wait:         &sync.WaitGroup{},
-		execer:       fakeruntime.DefaultExecer{},
+		execer:       fakeruntime.NewDefaultExecer(),
 	}
 }
 

@@ -16,7 +16,7 @@ func TestCommon(t *testing.T) {
 	}{{
 		name: "normal",
 		installer: CommonInstaller{
-			Execer: fakeruntime.FakeExecer{
+			Execer: &fakeruntime.FakeExecer{
 				ExpectError:  nil,
 				ExpectOutput: "",
 				ExpectOS:     "linux",

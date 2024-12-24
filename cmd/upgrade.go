@@ -13,7 +13,7 @@ func newUpgradeCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &upgradeOption{
 		installOption: &installOption{
 			downloadOption: newDownloadOption(ctx),
-			execer:         &fakeruntime.DefaultExecer{},
+			execer:         fakeruntime.NewDefaultExecer(),
 		},
 	}
 	cmd = &cobra.Command{

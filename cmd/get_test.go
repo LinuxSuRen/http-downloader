@@ -232,12 +232,12 @@ func TestDownloadMagnetFile(t *testing.T) {
 		name:        "proxyGitHub and target is empty",
 		proxyGitHub: "",
 		target:      "",
-		execer:      fakeruntime.FakeExecer{},
+		execer:      &fakeruntime.FakeExecer{},
 	}, {
 		name:        "failed to download",
 		proxyGitHub: "",
 		target:      "fake",
-		execer:      fakeruntime.FakeExecer{ExpectError: errors.New("error")},
+		execer:      &fakeruntime.FakeExecer{ExpectError: errors.New("error")},
 		expectErr:   true,
 	}, {
 		name:        "one target item",
@@ -249,7 +249,7 @@ func TestDownloadMagnetFile(t *testing.T) {
 				Reply(http.StatusOK).
 				File("testdata/magnet.html")
 		},
-		execer:    fakeruntime.FakeExecer{},
+		execer:    &fakeruntime.FakeExecer{},
 		expectErr: false,
 	}, {
 		name:        "HTTP server error response",
@@ -260,7 +260,7 @@ func TestDownloadMagnetFile(t *testing.T) {
 				Get("/").
 				ReplyError(errors.New("error"))
 		},
-		execer:    fakeruntime.FakeExecer{},
+		execer:    &fakeruntime.FakeExecer{},
 		expectErr: true,
 	}}
 	for _, tt := range tests {

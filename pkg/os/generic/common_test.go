@@ -28,7 +28,7 @@ func TestSliceReplace(t *testing.T) {
 
 func TestCommonInstaller(t *testing.T) {
 	installer := &CommonInstaller{
-		Execer: fakeruntime.FakeExecer{},
+		Execer: &fakeruntime.FakeExecer{},
 	}
 	assert.Nil(t, installer.Install())
 	assert.Nil(t, installer.Uninstall())
