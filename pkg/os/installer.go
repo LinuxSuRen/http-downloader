@@ -22,7 +22,7 @@ type DefaultInstallerRegistry struct {
 var defaultInstallerRegistry *DefaultInstallerRegistry
 
 func init() {
-	defaultExecer := fakeruntime.DefaultExecer{}
+	defaultExecer := fakeruntime.NewDefaultExecer()
 	defaultInstallerRegistry = &DefaultInstallerRegistry{
 		installerMap: map[string][]core.Installer{},
 	}

@@ -22,7 +22,7 @@ import (
 func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &installOption{
 		downloadOption: newDownloadOption(ctx),
-		execer:         &fakeruntime.DefaultExecer{},
+		execer:         fakeruntime.NewDefaultExecer(),
 	}
 	cmd = &cobra.Command{
 		Use:     "install",
@@ -70,6 +70,9 @@ func (o *installOption) getDefaultInstallDir() string {
 	case "linux", "darwin":
 		return "/usr/local/bin"
 	case "windows":
+		if o.execer.Getenv("SHELL") == "/usr/bin/bash" {
+			return "/usr/bin"
+		}
 		return `C:\Program Files (x86)\Common Files`
 	}
 	return ""
