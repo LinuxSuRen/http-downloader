@@ -16,9 +16,10 @@ type MultiThreadDownloader struct {
 	keepParts, showProgress bool
 	insecureSkipVerify      bool
 
-	roundTripper      http.RoundTripper
-	suggestedFilename string
-	timeout           time.Duration
+	username, password string
+	roundTripper       http.RoundTripper
+	suggestedFilename  string
+	timeout            time.Duration
 }
 
 // GetSuggestedFilename returns the suggested filename
@@ -62,13 +63,20 @@ func (d *MultiThreadDownloader) WithRoundTripper(roundTripper http.RoundTripper)
 	return d
 }
 
+// WithBasicAuth sets the basic auth
+func (d *MultiThreadDownloader) WithBasicAuth(username, password string) *MultiThreadDownloader {
+	d.username = username
+	d.password = password
+	return d
+}
+
 // Download starts to download the target URL
 func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, thread int) (err error) {
 	// get the total size of the target file
 	var total int64
 	var rangeSupport bool
-	if total, rangeSupport, err = DetectSizeWithRoundTripper(targetURL, targetFilePath, d.showProgress,
-		d.noProxy, d.insecureSkipVerify, d.roundTripper, d.timeout); rangeSupport && err != nil {
+	if total, rangeSupport, err = DetectSizeWithRoundTripperAndAuth(targetURL, targetFilePath, d.showProgress,
+		d.noProxy, d.insecureSkipVerify, d.roundTripper, d.username, d.password, d.timeout); rangeSupport && err != nil {
 		return
 	}
 
@@ -120,6 +128,7 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 				downloader.WithoutProxy(d.noProxy).
 					WithRoundTripper(d.roundTripper).
 					WithInsecureSkipVerify(d.insecureSkipVerify).
+					WithBasicAuth(d.username, d.password).
 					WithContext(ctx).WithTimeout(d.timeout)
 				if downloadErr := downloader.DownloadWithContinue(targetURL, output,
 					int64(index), start, end, d.showProgress); downloadErr != nil {
@@ -173,6 +182,7 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 		downloader.WithRoundTripper(d.roundTripper)
 		downloader.WithInsecureSkipVerify(d.insecureSkipVerify)
 		downloader.WithTimeout(d.timeout)
+		downloader.WithBasicAuth(d.username, d.password)
 		err = downloader.DownloadWithContinue(targetURL, targetFilePath, -1, 0, 0, true)
 		d.suggestedFilename = downloader.GetSuggestedFilename()
 	}

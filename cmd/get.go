@@ -100,6 +100,8 @@ type downloadOption struct {
 	MaxAttempts      int
 	AcceptPreRelease bool
 	RoundTripper     http.RoundTripper
+	Username string
+	Password string
 	Magnet           bool
 	Force            bool
 	Mod              int
@@ -143,6 +145,8 @@ func (o *downloadOption) addDownloadFlags(flags *pflag.FlagSet) {
 	flags.IntVarP(&o.Thread, "thread", "t", viper.GetInt("thread"),
 		`Download file with multi-threads. It only works when its value is bigger than 1`)
 	flags.BoolVarP(&o.NoProxy, "no-proxy", "", viper.GetBool("no-proxy"), "Indicate no HTTP proxy taken")
+	flags.StringVarP(&o.Username, "username", "u", "", "The username for the HTTP basic auth")
+	flags.StringVarP(&o.Password, "password", "p", "", "The password for the HTTP basic auth")
 }
 
 func (o *downloadOption) fetch() (err error) {
@@ -322,6 +326,7 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		downloader.WithoutProxy(o.NoProxy).
 			WithRoundTripper(o.RoundTripper).
 			WithInsecureSkipVerify(o.SkipTLS).
+			WithBasicAuth(o.Username, o.Password).
 			WithTimeout(o.Timeout)
 		err = downloader.DownloadWithContinue(targetURL, o.Output, o.ContinueAt, -1, 0, o.ShowProgress)
 	} else {
@@ -332,6 +337,7 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 			WithoutProxy(o.NoProxy).
 			WithRoundTripper(o.RoundTripper).
 			WithInsecureSkipVerify(o.SkipTLS).
+			WithBasicAuth(o.Username, o.Password).
 			WithTimeout(o.Timeout)
 		err = downloader.Download(targetURL, o.Output, o.Thread)
 	}

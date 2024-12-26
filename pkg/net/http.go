@@ -219,6 +219,7 @@ func DownloadFileWithMultipleThreadKeepParts(targetURL, targetFilePath string, t
 type ContinueDownloader struct {
 	downloader *HTTPDownloader
 
+	UserName, Password string
 	Timeout            time.Duration
 	Context            context.Context
 	roundTripper       http.RoundTripper
@@ -261,6 +262,13 @@ func (c *ContinueDownloader) WithTimeout(timeout time.Duration) *ContinueDownloa
 	return c
 }
 
+// WithBasicAuth sets the basic auth
+func (c *ContinueDownloader) WithBasicAuth(username, password string) *ContinueDownloader {
+	c.UserName = username
+	c.Password = password
+	return c
+}
+
 // DownloadWithContinue downloads the files continuously
 func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, index, continueAt, end int64, showProgress bool) (err error) {
 	c.downloader = &HTTPDownloader{
@@ -270,6 +278,8 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 		NoProxy:            c.noProxy,
 		RoundTripper:       c.roundTripper,
 		InsecureSkipVerify: c.insecureSkipVerify,
+		UserName:           c.UserName,
+		Password:           c.Password,
 		Context:            c.Context,
 		Timeout:            c.Timeout,
 	}
@@ -293,9 +303,9 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 	return
 }
 
-// DetectSizeWithRoundTripper returns the size of target resource
-func DetectSizeWithRoundTripper(targetURL, output string, showProgress, noProxy, insecureSkipVerify bool,
-	roundTripper http.RoundTripper, timeout time.Duration) (total int64, rangeSupport bool, err error) {
+// DetectSizeWithRoundTripperAndAuth returns the size of target resource
+func DetectSizeWithRoundTripperAndAuth(targetURL, output string, showProgress, noProxy, insecureSkipVerify bool,
+	roundTripper http.RoundTripper, username, password string, timeout time.Duration) (total int64, rangeSupport bool, err error) {
 	downloader := HTTPDownloader{
 		TargetFilePath:     output,
 		URL:                targetURL,
@@ -303,6 +313,8 @@ func DetectSizeWithRoundTripper(targetURL, output string, showProgress, noProxy,
 		RoundTripper:       roundTripper,
 		NoProxy:            false, // below HTTP request does not need proxy
 		InsecureSkipVerify: insecureSkipVerify,
+		UserName:           username,
+		Password:           password,
 		Timeout:            timeout,
 	}
 
@@ -329,6 +341,13 @@ func DetectSizeWithRoundTripper(targetURL, output string, showProgress, noProxy,
 		err = fmt.Errorf("cannot download from %s, response error: %v, content length error: %v", targetURL, err, lenErr)
 	}
 	return
+}
+
+// DetectSizeWithRoundTripper returns the size of target resource
+// Deprecated, use DetectSizeWithRoundTripperAndAuth instead
+func DetectSizeWithRoundTripper(targetURL, output string, showProgress, noProxy, insecureSkipVerify bool,
+	roundTripper http.RoundTripper, timeout time.Duration) (total int64, rangeSupport bool, err error) {
+	return DetectSizeWithRoundTripperAndAuth(targetURL, output, showProgress, noProxy, insecureSkipVerify, roundTripper, "", "", timeout)
 }
 
 // ParseSuggestedFilename parse the filename from resp header,More details from  https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Disposition
