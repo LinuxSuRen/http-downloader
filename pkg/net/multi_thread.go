@@ -70,6 +70,11 @@ func (d *MultiThreadDownloader) WithBasicAuth(username, password string) *MultiT
 	return d
 }
 
+func (d *MultiThreadDownloader) WithBearerToken(bearerToken string) *MultiThreadDownloader {
+	d.password = bearerToken
+	return d
+}
+
 // Download starts to download the target URL
 func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, thread int) (err error) {
 	// get the total size of the target file

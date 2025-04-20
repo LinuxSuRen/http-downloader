@@ -115,7 +115,10 @@ func (h *HTTPDownloader) DownloadFile() error {
 
 	if h.UserName != "" && h.Password != "" {
 		req.SetBasicAuth(h.UserName, h.Password)
+	} else if h.Password != "" {
+		req.Header.Set("Authorization", "Bearer "+h.Password)
 	}
+
 	var tr http.RoundTripper
 	if h.RoundTripper != nil {
 		tr = h.RoundTripper
