@@ -97,8 +97,7 @@ func (h *HTTPDownloader) fetchProxyFromEnv(scheme string) {
 	}
 }
 
-// DownloadFile download a file with the progress
-func (h *HTTPDownloader) DownloadFile() error {
+func (h *HTTPDownloader) DownloadAsStream(writer io.Writer) (err error) {
 	filepath, downloadURL, showProgress := h.TargetFilePath, h.URL, h.ShowProgress
 	// Get the data
 	if h.Context == nil {
@@ -181,22 +180,32 @@ func (h *HTTPDownloader) DownloadFile() error {
 		}
 	}
 
-	if err := os.MkdirAll(path.Dir(filepath), os.FileMode(0755)); err != nil {
-		return err
-	}
-
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		_ = out.Close()
-		return err
-	}
-
-	h.progressIndicator.Writer = out
+	h.progressIndicator.Writer = writer
 	h.progressIndicator.Init()
 
 	// Write the body to file
 	_, err = io.Copy(h.progressIndicator, resp.Body)
+	return
+}
+
+// DownloadFile download a file with the progress
+func (h *HTTPDownloader) DownloadFile() (err error) {
+	filepath := h.TargetFilePath
+	if err = os.MkdirAll(path.Dir(filepath), os.FileMode(0755)); err != nil {
+		return
+	}
+
+	// Create the file
+	var out io.WriteCloser
+	out, err = os.Create(filepath)
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = out.Close()
+	}()
+
+	err = h.DownloadAsStream(out)
 	return err
 }
 
@@ -272,6 +281,38 @@ func (c *ContinueDownloader) WithBasicAuth(username, password string) *ContinueD
 	return c
 }
 
+func (c *ContinueDownloader) DownloadWithContinueAsStream(targetURL string, output io.Writer, index, continueAt, end int64, showProgress bool) (err error) {
+	c.downloader = &HTTPDownloader{
+		URL:                targetURL,
+		ShowProgress:       showProgress,
+		NoProxy:            c.noProxy,
+		RoundTripper:       c.roundTripper,
+		InsecureSkipVerify: c.insecureSkipVerify,
+		UserName:           c.UserName,
+		Password:           c.Password,
+		Context:            c.Context,
+		Timeout:            c.Timeout,
+	}
+	if index >= 0 {
+		c.downloader.Title = fmt.Sprintf("Downloading part %d", index)
+	}
+
+	if continueAt >= 0 {
+		c.downloader.Header = make(map[string]string, 1)
+
+		if end > continueAt {
+			c.downloader.Header["Range"] = fmt.Sprintf("bytes=%d-%d", continueAt, end)
+		} else {
+			c.downloader.Header["Range"] = fmt.Sprintf("bytes=%d-", continueAt)
+		}
+	}
+
+	if err = c.downloader.DownloadAsStream(output); err != nil {
+		err = fmt.Errorf("cannot download from %s, error: %v", targetURL, err)
+	}
+	return
+}
+
 // DownloadWithContinue downloads the files continuously
 func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, index, continueAt, end int64, showProgress bool) (err error) {
 	c.downloader = &HTTPDownloader{
@@ -302,6 +343,44 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 
 	if err = c.downloader.DownloadFile(); err != nil {
 		err = fmt.Errorf("cannot download from %s, error: %v", targetURL, err)
+	}
+	return
+}
+
+func DetectSizeWithRoundTripperAndAuthStream(targetURL string, output io.Writer, showProgress, noProxy, insecureSkipVerify bool,
+	roundTripper http.RoundTripper, username, password string, timeout time.Duration) (total int64, rangeSupport bool, err error) {
+	downloader := HTTPDownloader{
+		URL:                targetURL,
+		ShowProgress:       showProgress,
+		RoundTripper:       roundTripper,
+		NoProxy:            false, // below HTTP request does not need proxy
+		InsecureSkipVerify: insecureSkipVerify,
+		UserName:           username,
+		Password:           password,
+		Timeout:            timeout,
+	}
+
+	var detectOffset int64
+	var lenErr error
+
+	detectOffset = 2
+	downloader.Header = make(map[string]string, 1)
+	downloader.Header["Range"] = fmt.Sprintf("bytes=%d-", detectOffset)
+
+	downloader.PreStart = func(resp *http.Response) bool {
+		rangeSupport = resp.StatusCode == http.StatusPartialContent
+		contentLen := resp.Header.Get("Content-Length")
+		if total, lenErr = strconv.ParseInt(contentLen, 10, 0); lenErr == nil {
+			total += detectOffset
+		} else {
+			rangeSupport = false
+		}
+		//  always return false because we just want to get the header from response
+		return false
+	}
+
+	if err = downloader.DownloadAsStream(output); err != nil || lenErr != nil {
+		err = fmt.Errorf("cannot download from %s, response error: %v, content length error: %v", targetURL, err, lenErr)
 	}
 	return
 }

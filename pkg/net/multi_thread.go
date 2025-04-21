@@ -3,6 +3,7 @@ package net
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -73,6 +74,120 @@ func (d *MultiThreadDownloader) WithBasicAuth(username, password string) *MultiT
 func (d *MultiThreadDownloader) WithBearerToken(bearerToken string) *MultiThreadDownloader {
 	d.password = bearerToken
 	return d
+}
+
+func (d *MultiThreadDownloader) DownloadWithContext(ctx context.Context, targetURL string, outputWriter io.Writer, thread int) (err error) {
+	// get the total size of the target file
+	var total int64
+	var rangeSupport bool
+	if total, rangeSupport, err = DetectSizeWithRoundTripperAndAuthStream(targetURL, outputWriter, d.showProgress,
+		d.noProxy, d.insecureSkipVerify, d.roundTripper, d.username, d.password, d.timeout); rangeSupport && err != nil {
+		return
+	}
+
+	if rangeSupport {
+		unit := total / int64(thread)
+		offset := total - unit*int64(thread)
+		var wg sync.WaitGroup
+		var partItems map[int]string
+		var m sync.Mutex
+
+		defer func() {
+			// remove all partial files
+			for _, part := range partItems {
+				_ = os.RemoveAll(part)
+			}
+		}()
+
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		ctx, cancel := context.WithCancel(context.Background())
+		var canceled bool
+
+		go func() {
+			<-c
+			canceled = true
+			cancel()
+		}()
+
+		fmt.Printf("start to download with %d threads, size: %d, unit: %d", thread, total, unit)
+		for i := 0; i < thread; i++ {
+			fmt.Println() // TODO take position, should take over by progerss bars
+			wg.Add(1)
+			go func(index int, wg *sync.WaitGroup, ctx context.Context) {
+				defer wg.Done()
+				outputFile, err := os.CreateTemp(os.TempDir(), fmt.Sprintf("part-%d", index))
+				if err != nil {
+					fmt.Println("failed to create template file", err)
+				}
+				outputFile.Close()
+
+				m.Lock()
+				partItems[index] = outputFile.Name()
+				m.Unlock()
+
+				end := unit*int64(index+1) - 1
+				if index == thread-1 {
+					// this is the last part
+					end += offset
+				}
+				start := unit * int64(index)
+
+				downloader := &ContinueDownloader{}
+				downloader.WithoutProxy(d.noProxy).
+					WithRoundTripper(d.roundTripper).
+					WithInsecureSkipVerify(d.insecureSkipVerify).
+					WithBasicAuth(d.username, d.password).
+					WithContext(ctx).WithTimeout(d.timeout)
+				if downloadErr := downloader.DownloadWithContinue(targetURL, outputFile.Name(),
+					int64(index), start, end, d.showProgress); downloadErr != nil {
+					fmt.Println(downloadErr)
+				}
+			}(i, &wg, ctx)
+		}
+
+		wg.Wait()
+		// ProgressIndicator{}.Close()
+		if canceled {
+			err = fmt.Errorf("download process canceled")
+			return
+		}
+
+		// make the cursor right
+		// TODO the progress component should take over it
+		if thread > 1 {
+			// line := GetCurrentLine()
+			time.Sleep(time.Second)
+			fmt.Printf("\033[%dE\n", thread) // move to the target line
+			time.Sleep(time.Second * 5)
+		}
+
+		for i := 0; i < thread; i++ {
+			partFile := partItems[i]
+			if data, ferr := os.ReadFile(partFile); ferr == nil {
+				if _, err = outputWriter.Write(data); err != nil {
+					err = fmt.Errorf("failed to write file: '%s'", partFile)
+					break
+				} else if !d.keepParts {
+					_ = os.RemoveAll(partFile)
+				}
+			} else {
+				err = fmt.Errorf("failed to read file: '%s'", partFile)
+				break
+			}
+		}
+	} else {
+		fmt.Println("cannot download it using multiple threads, failed to one")
+		downloader := &ContinueDownloader{}
+		downloader.WithoutProxy(d.noProxy)
+		downloader.WithRoundTripper(d.roundTripper)
+		downloader.WithInsecureSkipVerify(d.insecureSkipVerify)
+		downloader.WithTimeout(d.timeout)
+		downloader.WithBasicAuth(d.username, d.password)
+		err = downloader.DownloadWithContinueAsStream(targetURL, outputWriter, -1, 0, 0, true)
+		d.suggestedFilename = downloader.GetSuggestedFilename()
+	}
+	return
 }
 
 // Download starts to download the target URL
