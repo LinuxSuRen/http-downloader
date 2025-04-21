@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/linuxsuren/http-downloader/mock/mhttp"
 	"github.com/linuxsuren/http-downloader/pkg/net"
@@ -139,6 +140,9 @@ var _ = Describe("http test", func() {
 				Debug:          true,
 				TargetFilePath: debugFile,
 			}
+			defer func() {
+				_ = os.RemoveAll(debugFile)
+			}()
 
 			request, _ := http.NewRequest(http.MethodGet, "", nil)
 			response := &http.Response{
@@ -153,7 +157,7 @@ var _ = Describe("http test", func() {
 			Expect(err).To(HaveOccurred())
 
 			_, err = os.Stat(debugFile)
-			Expect(err).NotTo(BeNil())
+			Expect(err).To(BeNil())
 		})
 
 		It("showProgress", func() {
@@ -251,7 +255,8 @@ func TestDetectSize(t *testing.T) {
 	roundTripper.EXPECT().
 		RoundTrip(mockRequest).Return(mockResponse, nil)
 
-	total, rangeSupport, err := net.DetectSizeWithRoundTripper(targetURL, os.TempDir(), false, false, false, roundTripper, 0)
+	fileName := fmt.Sprintf("%s-%d", os.TempDir(), time.Now().Second())
+	total, rangeSupport, err := net.DetectSizeWithRoundTripper(targetURL, fileName, false, false, false, roundTripper, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, int64(102), total)
 	assert.True(t, rangeSupport)
