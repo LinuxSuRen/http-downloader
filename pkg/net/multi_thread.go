@@ -89,8 +89,8 @@ func (d *MultiThreadDownloader) DownloadWithContext(ctx context.Context, targetU
 		unit := total / int64(thread)
 		offset := total - unit*int64(thread)
 		var wg sync.WaitGroup
-		var partItems map[int]string
 		var m sync.Mutex
+		partItems := make(map[int]string)
 
 		defer func() {
 			// remove all partial files
