@@ -97,6 +97,7 @@ func (h *HTTPDownloader) fetchProxyFromEnv(scheme string) {
 	}
 }
 
+// DownloadAsStream downloads the file as stream
 func (h *HTTPDownloader) DownloadAsStream(writer io.Writer) (err error) {
 	filepath, downloadURL, showProgress := h.TargetFilePath, h.URL, h.ShowProgress
 	// Get the data
@@ -281,6 +282,7 @@ func (c *ContinueDownloader) WithBasicAuth(username, password string) *ContinueD
 	return c
 }
 
+// DownloadWithContinueAsStream downloads the files continuously
 func (c *ContinueDownloader) DownloadWithContinueAsStream(targetURL string, output io.Writer, index, continueAt, end int64, showProgress bool) (err error) {
 	c.downloader = &HTTPDownloader{
 		URL:                targetURL,
@@ -347,6 +349,7 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 	return
 }
 
+// DetectSizeWithRoundTripperAndAuthStream returns the size of target resource
 func DetectSizeWithRoundTripperAndAuthStream(targetURL string, output io.Writer, showProgress, noProxy, insecureSkipVerify bool,
 	roundTripper http.RoundTripper, username, password string, timeout time.Duration) (total int64, rangeSupport bool, err error) {
 	downloader := HTTPDownloader{

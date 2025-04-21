@@ -71,11 +71,13 @@ func (d *MultiThreadDownloader) WithBasicAuth(username, password string) *MultiT
 	return d
 }
 
+// WithBearerToken sets the bearer token
 func (d *MultiThreadDownloader) WithBearerToken(bearerToken string) *MultiThreadDownloader {
 	d.password = bearerToken
 	return d
 }
 
+// DownloadWithContext starts to download the target URL with context
 func (d *MultiThreadDownloader) DownloadWithContext(ctx context.Context, targetURL string, outputWriter io.Writer, thread int) (err error) {
 	// get the total size of the target file
 	var total int64
