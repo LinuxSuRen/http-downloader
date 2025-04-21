@@ -100,8 +100,8 @@ type downloadOption struct {
 	MaxAttempts      int
 	AcceptPreRelease bool
 	RoundTripper     http.RoundTripper
-	Username string
-	Password string
+	Username         string
+	Password         string
 	Magnet           bool
 	Force            bool
 	Mod              int
