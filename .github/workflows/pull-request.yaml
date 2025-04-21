@@ -10,7 +10,7 @@ env:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -51,7 +51,7 @@ jobs:
 
   GoLint:
     name: Lint
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -66,7 +66,7 @@ jobs:
           golint-path: ./...
   Security:
     name: Security
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       GO111MODULE: on
     steps:
@@ -78,7 +78,7 @@ jobs:
           args: '-exclude=G402,G204,G304,G110,G306,G107 ./...'
   CodeQL:
     name: CodeQL
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       GO111MODULE: on
     steps:
@@ -92,7 +92,7 @@ jobs:
         uses: github/codeql-action/analyze@v1
   MarkdownLinkCheck:
     name: MarkdownLinkCheck
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3.6.0
       - uses: gaurav-nelson/github-action-markdown-link-check@1.0.13
@@ -100,7 +100,7 @@ jobs:
           use-verbose-mode: 'yes'
 
   image:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
