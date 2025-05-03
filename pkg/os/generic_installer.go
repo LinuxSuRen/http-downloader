@@ -17,6 +17,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/os/apk"
 	"github.com/linuxsuren/http-downloader/pkg/os/dnf"
 	"github.com/linuxsuren/http-downloader/pkg/os/npm"
+	"github.com/linuxsuren/http-downloader/pkg/os/pip"
 	"github.com/linuxsuren/http-downloader/pkg/os/scoop"
 	"github.com/linuxsuren/http-downloader/pkg/os/snap"
 	"github.com/linuxsuren/http-downloader/pkg/os/winget"
@@ -202,6 +203,11 @@ func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry
 			}
 		case scoop.Tool:
 			genericPackage.CommonInstaller = &scoop.CommonInstaller{
+				Name:   genericPackage.Name,
+				Execer: defaultExecer,
+			}
+		case pip.Tool:
+			genericPackage.CommonInstaller = &pip.CommonInstaller{
 				Name:   genericPackage.Name,
 				Execer: defaultExecer,
 			}
