@@ -147,7 +147,7 @@ func parseGenericPackages(configFile string, genericPackages *genericPackages) (
 
 // GenericInstallerRegistry registries a generic installer
 func GenericInstallerRegistry(configFile string, registry core.InstallerRegistry) (err error) {
-	defaultExecer := fakeruntime.DefaultExecer{}
+	defaultExecer := fakeruntime.NewDefaultExecer()
 	genericPackages := &genericPackages{}
 	if err = parseGenericPackages(configFile, genericPackages); err != nil {
 		return

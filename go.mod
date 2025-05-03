@@ -1,6 +1,6 @@
 module github.com/linuxsuren/http-downloader
 
-go 1.19
+go 1.23
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.2
@@ -25,7 +25,7 @@ require (
 	github.com/antonmedv/expr v1.11.1
 	github.com/creack/pty v1.1.17
 	github.com/k0kubun/go-ansi v0.0.0-20180517002512-3bf9e2903213
-	github.com/linuxsuren/go-fake-runtime v0.0.0-20230426144714-1a7a0d160d3f
+	github.com/linuxsuren/go-fake-runtime v0.0.5
 	github.com/schollz/progressbar/v3 v3.13.0
 )
 
@@ -38,7 +38,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
-	github.com/prometheus/client_golang v1.11.1 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/skeema/knownhosts v1.2.1 // indirect
 	golang.org/x/mod v0.12.0 // indirect
