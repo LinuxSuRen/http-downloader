@@ -139,18 +139,25 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 					return
 				}
 
+				// legacy caches were cloned with SingleBranch but without ReferenceName,
+				// their only remote-tracking ref is refs/remotes/<remote>/HEAD instead
+				// of refs/remotes/<remote>/<branch>
 				if head, err = repo.Reference(plumbing.NewRemoteReferenceName(remoteName, branch), true); err != nil {
-					// err = fmt.Errorf("unknown ref: %v", err)
 					log.Println("unknown ref", err)
-				} else {
-					// avoid force push from remote
-					if err = wd.Reset(&git.ResetOptions{
-						Commit: head.Hash(),
-						Mode:   git.HardReset,
-					}); err != nil {
-						err = fmt.Errorf("unable to reset to '%s'", head.Hash().String())
+					err = nil
+					if head, err = repo.Reference(plumbing.NewRemoteHEADReferenceName(remoteName), true); err != nil {
+						err = fmt.Errorf("cannot find the remote tracking ref of '%s' and its HEAD, error: %v", remoteName, err)
 						return
 					}
+				}
+
+				// avoid force push from remote
+				if err = wd.Reset(&git.ResetOptions{
+					Commit: head.Hash(),
+					Mode:   git.HardReset,
+				}); err != nil {
+					err = fmt.Errorf("unable to reset to '%s'", head.Hash().String())
+					return
 				}
 
 				if err = wd.Checkout(&git.CheckoutOptions{
@@ -199,6 +206,10 @@ func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 			URL:          repoAddr,
 			Progress:     progress,
 			SingleBranch: true,
+			// pin the tracked branch, otherwise the only remote-tracking ref
+			// will be refs/remotes/<remote>/HEAD which breaks the later
+			// branch based reference resolving
+			ReferenceName: plumbing.NewBranchReferenceName(branch),
 		}); err != nil {
 			err = fmt.Errorf("failed to clone git repository '%s' into '%s', error: %v", repoAddr, configDir, err)
 		}
