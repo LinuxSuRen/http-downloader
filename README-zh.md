@@ -49,6 +49,30 @@ hd get --pre ks
 * 断点续传 (TODO)
 * 对 GitHub release 文件下载（安装）友好
 
+## 管理已安装的工具
+通过 `hd install` 安装的每一个工具都会被记录到 `~/.config/hd-installed.yaml` 中，你可以用以下的命令来管理它们：
+
+查看已安装的工具（支持表格和 JSON 输出）：
+
+```shell
+hd list
+hd list -o json
+```
+
+删除已安装的工具（删除二进制文件和记录）：
+
+```shell
+hd remove jcli
+hd remove jcli --keep-record
+```
+
+升级已安装的工具到最新版本：
+
+```shell
+hd upgrade
+hd upgrade jcli
+```
+
 ## 使用多阶段构建
 你想要在 Docker 构建中下载工具吗？这个很容易的，请查看下面的例子：
 

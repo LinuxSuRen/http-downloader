@@ -46,6 +46,7 @@ func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 	cxt = context.WithValue(cxt, log.LoggerContextKey, log.GetLogger())
 	cmd.AddCommand(
 		newGetCmd(cxt), newInstallCmd(cxt), newFetchCmd(cxt), newSearchCmd(cxt), newSetupCommand(v, stdio),
+		newListCmd(cxt), newRemoveCmd(cxt), newUpgradeCmd(cxt),
 		extver.NewVersionCmd("linuxsuren", "http-downloader", "hd", nil))
 
 	for _, c := range cmd.Commands() {

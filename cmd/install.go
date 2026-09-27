@@ -6,7 +6,9 @@ import (
 	"log"
 	sysos "os"
 	"path"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	fakeruntime "github.com/linuxsuren/go-fake-runtime"
@@ -163,13 +165,17 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 				"https://github.com":                fmt.Sprintf("https://%s/https://github.com", o.ProxyGitHub),
 			}
 		}
-		err = os.InstallWithProxy(args[0], proxy)
+		if err = os.InstallWithProxy(args[0], proxy); err == nil {
+			err = o.recordInstall(true)
+		}
 		return
 	}
 
 	// aka go get github.com/xxx/xxx
 	if o.fromSource {
-		err = o.installFromSource()
+		if err = o.installFromSource(); err == nil {
+			err = o.recordInstall(false)
+		}
 		return
 	}
 
@@ -226,8 +232,52 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 			})
 		}
 	}
-	err = process.Install()
+	if err = process.Install(); err == nil {
+		err = o.recordInstall(false)
+	}
 	return
+}
+
+// recordInstall saves the installed tool into the record file
+func (o *installOption) recordInstall(native bool) (err error) {
+	targetDir := o.target
+	pkg := o.Package
+	if pkg == nil {
+		pkg = &installer.HDConfig{}
+	}
+	if targetDir == "" {
+		targetDir = pkg.TargetDirectory
+	}
+	if targetDir == "" {
+		targetDir = "/usr/local/bin"
+	}
+
+	targetBinary := o.tool
+	if pkg.TargetBinary != "" {
+		targetBinary = pkg.TargetBinary
+	}
+
+	binaries := []string{path.Join(targetDir, targetBinary)}
+	for _, addition := range pkg.AdditionBinaries {
+		binaries = append(binaries, path.Join(targetDir, filepath.Base(addition)))
+	}
+
+	installedVersion := pkg.LatestVersion
+	if installedVersion == "" {
+		installedVersion = pkg.Version
+	}
+
+	return installer.RecordInstalledPackage(installer.InstalledPackage{
+		Name:            o.tool,
+		Org:             o.org,
+		Repo:            o.repo,
+		Version:         installedVersion,
+		Binaries:        binaries,
+		TargetDirectory: targetDir,
+		InstalledAt:     time.Now().Format(time.RFC3339),
+		FromSource:      o.fromSource,
+		Native:          native,
+	})
 }
 
 func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {

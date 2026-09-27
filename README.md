@@ -72,6 +72,30 @@ When you first run it, please init via: `hd fetch`
 
 then you can search it by a keyword: `hd search jenkins`
 
+## Manage the installed tools
+Every tool installed via `hd install` is recorded into `~/.config/hd-installed.yaml`. You can manage them with the following commands:
+
+List the installed tools (support table and json output):
+
+```shell
+hd list
+hd list -o json
+```
+
+Remove the installed tools (delete the binaries and the record):
+
+```shell
+hd remove jcli
+hd remove jcli --keep-record
+```
+
+Upgrade the installed tools to the latest version:
+
+```shell
+hd upgrade
+hd upgrade jcli
+```
+
 ## Use multi-stage builds
 Do you want to download tools in the Docker builds? It's pretty easy. Please see the following example:
 
