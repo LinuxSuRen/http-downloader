@@ -77,6 +77,7 @@ func (s *webServer) routes() http.Handler {
 	mux.HandleFunc("/api/tools", s.handleTools)
 	mux.HandleFunc("/api/tools/", s.handleTool)
 	mux.HandleFunc("/api/search", s.handleSearch)
+	mux.HandleFunc("/api/fetch", s.handleFetch)
 	mux.HandleFunc("/api/jobs/", s.handleJob)
 	return mux
 }
@@ -128,6 +129,7 @@ func (s *webServer) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fetcher := &installer.DefaultFetcher{}
+	fetcher.SetContext(s.ctx)
 	configDir, err := fetcher.GetConfigDir()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "SEARCH_FAILED", "failed to search packages")
@@ -145,6 +147,35 @@ func (s *webServer) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 	result := installer.FindByKeyword(keyword, configDir)
 	writeJSON(w, http.StatusOK, map[string]interface{}{"data": result})
+}
+
+// POST /api/fetch updates the local hd-home config cache as a background job
+func (s *webServer) handleFetch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only POST is supported")
+		return
+	}
+	job := s.startJob("fetch", "hd-home", func(stub *cobra.Command) error {
+		fetcher := &installer.DefaultFetcher{}
+		fetcher.SetContext(s.ctx)
+		// the progress goes to the captured output so that it streams
+		// into the log panel
+		err := fetcher.FetchLatestRepo("", "", os.Stdout)
+		if err == nil {
+			return nil
+		}
+
+		// the local cache may be corrupt (e.g. a malformed shallow file),
+		// reset it and clone again, the same as 'hd fetch --reset'
+		log.Printf("fetch failed (%v), reset the local config and retry", err)
+		if configDir, dirErr := fetcher.GetConfigDir(); dirErr == nil {
+			if rmErr := os.RemoveAll(configDir); rmErr != nil {
+				return rmErr
+			}
+		}
+		return fetcher.FetchLatestRepo("", "", os.Stdout)
+	})
+	writeJSON(w, http.StatusAccepted, job)
 }
 
 // DELETE /api/tools/{name} removes a tool

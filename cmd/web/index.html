@@ -41,14 +41,15 @@
     <div class="install-form">
       <input id="search-keyword" placeholder="Search packages, e.g. jenkins" autofocus>
       <button class="btn primary" id="search-btn">Search</button>
+      <button class="btn" id="fetch-btn">Refresh data</button>
     </div>
-    <div class="hint">Search the installable packages, then install from the results. Run <code>hd fetch</code> if nothing is found.</div>
+    <div class="hint">Search the installable packages, then install from the results. If nothing is found, the package may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
     <div id="search-results" hidden>
       <table>
         <thead><tr><th>Package</th><th></th></tr></thead>
         <tbody id="search-body"></tbody>
       </table>
-      <div class="empty" id="search-empty" hidden>No package matches the keyword.</div>
+      <div class="empty" id="search-empty" hidden>No package matches the keyword. The data may be stale, try Refresh data.</div>
     </div>
   </div>
 
@@ -75,6 +76,7 @@
 const texts = {
   confirmRemove: 'Remove this tool from your system?',
   searchFailed: 'Could not search. Check the keyword and try again.',
+  fetchFailed: 'Could not refresh the package data. Try again later.',
   installFailed: 'Could not start the install. Check the tool name and try again.',
   upgradeFailed: 'Could not start the upgrade. Try again later.',
   removeFailed: 'Could not remove the tool. It may be protected or missing.',
@@ -171,6 +173,10 @@ document.getElementById('search-keyword').addEventListener('keydown', ev => {
   if (ev.key === 'Enter') searchPackages();
 });
 
+document.getElementById('fetch-btn').addEventListener('click', () => {
+  startJob('POST', '/api/fetch', null, texts.fetchFailed);
+});
+
 document.getElementById('search-body').addEventListener('click', ev => {
   const btn = ev.target.closest('button[data-install]');
   if (!btn) return;
@@ -202,6 +208,9 @@ async function startJob(method, url, body, fallback) {
       document.getElementById('log-status').textContent =
         msg.status === 'success' ? `${job.action} ${job.tool} finished` : texts.jobFailed;
       loadTools();
+      if (job.action === 'fetch' && document.getElementById('search-keyword').value.trim()) {
+        searchPackages();
+      }
     }
   };
   es.onerror = () => {
