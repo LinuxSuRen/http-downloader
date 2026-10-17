@@ -39,10 +39,17 @@
 <main>
   <div class="card">
     <div class="install-form">
-      <input id="tool-name" placeholder="Tool name, e.g. jcli or jenkins-zh/jenkins-cli" autofocus>
-      <button class="btn primary" id="install-btn">Install</button>
+      <input id="search-keyword" placeholder="Search packages, e.g. jenkins" autofocus>
+      <button class="btn primary" id="search-btn">Search</button>
     </div>
-    <div class="hint">Install runs in the background, open the log panel below to follow the progress.</div>
+    <div class="hint">Search the installable packages, then install from the results. Run <code>hd fetch</code> if nothing is found.</div>
+    <div id="search-results" hidden>
+      <table>
+        <thead><tr><th>Package</th><th></th></tr></thead>
+        <tbody id="search-body"></tbody>
+      </table>
+      <div class="empty" id="search-empty" hidden>No package matches the keyword.</div>
+    </div>
   </div>
 
   <div class="card">
@@ -56,7 +63,10 @@
   <div class="card">
     <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
       <strong>Logs</strong>
-      <span id="log-status" style="color:var(--muted); font-size:12px;"></span>
+      <span style="display:flex; gap:16px; align-items:center;">
+        <label style="font-size:12px; color:var(--muted);"><input type="checkbox" id="force-install"> force install</label>
+        <span id="log-status" style="color:var(--muted); font-size:12px;"></span>
+      </span>
     </div>
     <div id="logs">waiting for a job…</div>
   </div>
@@ -64,6 +74,7 @@
 <script>
 const texts = {
   confirmRemove: 'Remove this tool from your system?',
+  searchFailed: 'Could not search. Check the keyword and try again.',
   installFailed: 'Could not start the install. Check the tool name and try again.',
   upgradeFailed: 'Could not start the upgrade. Try again later.',
   removeFailed: 'Could not remove the tool. It may be protected or missing.',
@@ -134,14 +145,37 @@ document.getElementById('tools-body').addEventListener('click', async ev => {
   }
 });
 
-document.getElementById('install-btn').addEventListener('click', () => {
-  const input = document.getElementById('tool-name');
-  const name = input.value.trim();
-  if (!name) { input.focus(); return; }
-  startJob('POST', '/api/tools', {name}, texts.installFailed);
+async function searchPackages() {
+  const input = document.getElementById('search-keyword');
+  const keyword = input.value.trim();
+  if (!keyword) { input.focus(); return; }
+  let data;
+  try {
+    data = await api('GET', '/api/search?q=' + encodeURIComponent(keyword));
+  } catch (err) {
+    alert(friendly(err, texts.searchFailed));
+    return;
+  }
+  const results = data.data || [];
+  document.getElementById('search-results').hidden = false;
+  document.getElementById('search-empty').hidden = results.length > 0;
+  document.getElementById('search-body').innerHTML = results.map(name => `
+    <tr>
+      <td>${name}</td>
+      <td class="actions"><button class="btn primary" data-install="${name}">Install</button></td>
+    </tr>`).join('');
+}
+
+document.getElementById('search-btn').addEventListener('click', searchPackages);
+document.getElementById('search-keyword').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter') searchPackages();
 });
-document.getElementById('tool-name').addEventListener('keydown', ev => {
-  if (ev.key === 'Enter') document.getElementById('install-btn').click();
+
+document.getElementById('search-body').addEventListener('click', ev => {
+  const btn = ev.target.closest('button[data-install]');
+  if (!btn) return;
+  const force = document.getElementById('force-install').checked;
+  startJob('POST', '/api/tools', {name: btn.dataset.install, force}, texts.installFailed);
 });
 
 async function startJob(method, url, body, fallback) {

@@ -98,6 +98,31 @@ func TestWebAPI(t *testing.T) {
 	assert.Empty(t, tools)
 }
 
+func TestWebSearch(t *testing.T) {
+	httpServer := setupWebServer(t)
+	client := httpServer.Client()
+
+	// missing keyword
+	resp, err := client.Get(httpServer.URL + "/api/search")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	// search against a fake local config cache
+	cacheDir := filepath.Join(homedirHome(t), ".config", "hd-home", "config", "fake-org")
+	assert.NoError(t, os.MkdirAll(cacheDir, 0750))
+	assert.NoError(t, os.WriteFile(filepath.Join(cacheDir, "fake-cli.yml"),
+		[]byte("name: fake-cli\n"), 0644))
+
+	resp, err = client.Get(httpServer.URL + "/api/search?q=fake-cli")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	searchResult := struct {
+		Data []string `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&searchResult))
+	assert.Contains(t, searchResult.Data, "fake-org/fake-cli")
+}
+
 func TestWebJobLogsSSE(t *testing.T) {
 	httpServer := setupWebServer(t)
 	client := httpServer.Client()

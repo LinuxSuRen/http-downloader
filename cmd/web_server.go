@@ -15,6 +15,7 @@ import (
 	"time"
 
 	fakeruntime "github.com/linuxsuren/go-fake-runtime"
+	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
 )
@@ -75,6 +76,7 @@ func (s *webServer) routes() http.Handler {
 	mux.HandleFunc("/", s.handleIndex)
 	mux.HandleFunc("/api/tools", s.handleTools)
 	mux.HandleFunc("/api/tools/", s.handleTool)
+	mux.HandleFunc("/api/search", s.handleSearch)
 	mux.HandleFunc("/api/jobs/", s.handleJob)
 	return mux
 }
@@ -90,26 +92,59 @@ func (s *webServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/tools returns the installed tools
-// POST /api/tools {"name":"jcli"} starts an install job
+// POST /api/tools {"name":"jcli","force":true} starts an install job
 func (s *webServer) handleTools(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]interface{}{"data": s.loadTools()})
 	case http.MethodPost:
 		var req struct {
-			Name string `json:"name"`
+			Name  string `json:"name"`
+			Force bool   `json:"force"`
 		}
 		if err := decodeJSON(r, &req); err != nil || strings.TrimSpace(req.Name) == "" {
 			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "please provide the tool name")
 			return
 		}
 		job := s.startJob("install", req.Name, func(stub *cobra.Command) error {
-			return s.installTool(stub, req.Name)
+			return s.installTool(stub, req.Name, req.Force)
 		})
 		writeJSON(w, http.StatusAccepted, job)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET and POST are supported")
 	}
+}
+
+// GET /api/search?q=keyword searches the installable packages from hd-home
+func (s *webServer) handleSearch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
+		return
+	}
+	keyword := strings.TrimSpace(r.URL.Query().Get("q"))
+	if keyword == "" {
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "please provide the search keyword")
+		return
+	}
+
+	fetcher := &installer.DefaultFetcher{}
+	configDir, err := fetcher.GetConfigDir()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "SEARCH_FAILED", "failed to search packages")
+		return
+	}
+	if exists, _ := common.PathExists(configDir); !exists {
+		// no local cache yet, fetch it once so that the search works
+		if err = fetcher.FetchLatestRepo("", "", io.Discard); err != nil {
+			log.Printf("cannot fetch the hd-home config: %v", err)
+			writeError(w, http.StatusInternalServerError, "SEARCH_FAILED",
+				"failed to load the package index, please try again later")
+			return
+		}
+	}
+
+	result := installer.FindByKeyword(keyword, configDir)
+	writeJSON(w, http.StatusOK, map[string]interface{}{"data": result})
 }
 
 // DELETE /api/tools/{name} removes a tool
@@ -361,8 +396,9 @@ func (s *webServer) newInstallOption() *installOption {
 }
 
 // installTool installs a tool by its name, the same way as hd install
-func (s *webServer) installTool(stub *cobra.Command, name string) (err error) {
+func (s *webServer) installTool(stub *cobra.Command, name string, force bool) (err error) {
 	opt := s.newInstallOption()
+	opt.force = force
 	if err = opt.preRunE(stub, []string{name}); err != nil {
 		return
 	}
