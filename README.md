@@ -96,6 +96,17 @@ hd upgrade
 hd upgrade jcli
 ```
 
+## Web console
+Manage the installed tools in a browser instead of the terminal:
+
+```shell
+hd web
+```
+
+Then open http://127.0.0.1:8080, you can install, remove and upgrade tools there, with the install/upgrade logs streamed into the page.
+
+Use `--port` to change the port and `--listen` to change the binding address. The server binds to 127.0.0.1 by default; it has no authentication, please do not expose it to an untrusted network.
+
 ## Use multi-stage builds
 Do you want to download tools in the Docker builds? It's pretty easy. Please see the following example:
 

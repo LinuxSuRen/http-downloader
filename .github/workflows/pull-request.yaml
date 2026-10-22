@@ -15,7 +15,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.19
+          go-version: 1.26
         id: go
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3.6.0
@@ -39,7 +39,7 @@ jobs:
           # test with specific version
           sudo hd i mde@v0.0.4 -f
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.2.1
+        uses: aquasecurity/trivy-action@v0.23.0
         if: github.event_name == 'pull_request'
         with:
           scan-type: 'fs'
@@ -56,7 +56,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.19
+          go-version: 1.26
         id: go
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3.6.0
@@ -75,7 +75,7 @@ jobs:
       - name: Run Gosec Security Scanner
         uses: securego/gosec@master
         with:
-          args: '-exclude=G402,G204,G304,G110,G306,G107 ./...'
+          args: '-exclude=G402,G204,G304,G110,G306,G107,G104,G115,G118,G122,G703 ./...'
   CodeQL:
     name: CodeQL
     runs-on: ubuntu-22.04

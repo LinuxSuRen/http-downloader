@@ -273,18 +273,20 @@ func TestMultiThreadDownloader(t *testing.T) {
 			roundTripper := mhttp.NewMockRoundTripper(ctrl)
 
 			// for size detecting
-			mockRequest, _ := http.NewRequest(http.MethodGet, url, nil)
-			mockRequest.Header.Set("Range", "bytes=2-")
-			mockResponse := &http.Response{
-				StatusCode: http.StatusPartialContent,
-				Proto:      "HTTP/1.1",
-				Request:    mockRequest,
-				Header: map[string][]string{
-					"Content-Length": {"100"},
-				},
-				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
-			}
-			roundTripper.EXPECT().RoundTrip(gomock.Any()).Return(mockResponse, nil).AnyTimes()
+			// every round trip should return a fresh response, the response
+			// body can only be read once
+			roundTripper.EXPECT().RoundTrip(gomock.Any()).DoAndReturn(
+				func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusPartialContent,
+						Proto:      "HTTP/1.1",
+						Request:    req,
+						Header: map[string][]string{
+							"Content-Length": {"100"},
+						},
+						Body: io.NopCloser(bytes.NewBufferString("responseBody")),
+					}, nil
+				}).AnyTimes()
 
 			downloader.WithoutProxy(true).
 				WithShowProgress(false).

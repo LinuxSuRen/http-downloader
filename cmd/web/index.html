@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hd console</title>
+<style>
+  :root { --border: #ddd; --muted: #777; --accent: #2563eb; --danger: #dc2626; --ok: #16a34a; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f6f7f9; color: #222; }
+  header { background: #fff; border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 18px; margin: 0; }
+  main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+  .install-form { display: flex; gap: 8px; }
+  .install-form input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  td.actions { text-align: right; white-space: nowrap; }
+  .btn { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.danger { color: var(--danger); border-color: var(--danger); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  #logs { background: #0f172a; color: #d1e7ff; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; border-radius: 8px; padding: 12px; height: 260px; overflow-y: auto; white-space: pre-wrap; }
+  .status { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+  .status.running { background: #fef3c7; color: #92400e; }
+  .status.success { background: #dcfce7; color: #166534; }
+  .status.failed  { background: #fee2e2; color: #991b1b; }
+  .empty { color: var(--muted); text-align: center; padding: 20px 0; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>hd console</h1>
+  <span id="job-badge"></span>
+</header>
+<main>
+  <div class="card">
+    <div class="install-form">
+      <input id="search-keyword" placeholder="Search packages, e.g. jenkins" autofocus>
+      <button class="btn primary" id="search-btn">Search</button>
+      <button class="btn" id="fetch-btn">Refresh data</button>
+    </div>
+    <div class="hint">Search the installable packages, then install from the results. If nothing is found, the package may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
+    <div id="search-results" hidden>
+      <table>
+        <thead><tr><th>Package</th><th></th></tr></thead>
+        <tbody id="search-body"></tbody>
+      </table>
+      <div class="empty" id="search-empty" hidden>No package matches the keyword. The data may be stale, try Refresh data.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead><tr><th>Name</th><th>Version</th><th>Source</th><th>Installed at</th><th>Actions</th></tr></thead>
+      <tbody id="tools-body"></tbody>
+    </table>
+    <div class="empty" id="tools-empty" hidden>No tools installed yet.</div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <strong>Logs</strong>
+      <span style="display:flex; gap:16px; align-items:center;">
+        <label style="font-size:12px; color:var(--muted);"><input type="checkbox" id="force-install"> force install</label>
+        <span id="log-status" style="color:var(--muted); font-size:12px;"></span>
+      </span>
+    </div>
+    <div id="logs">waiting for a job…</div>
+  </div>
+</main>
+<script>
+const texts = {
+  confirmRemove: 'Remove this tool from your system?',
+  searchFailed: 'Could not search. Check the keyword and try again.',
+  fetchFailed: 'Could not refresh the package data. Try again later.',
+  installFailed: 'Could not start the install. Check the tool name and try again.',
+  upgradeFailed: 'Could not start the upgrade. Try again later.',
+  removeFailed: 'Could not remove the tool. It may be protected or missing.',
+  loadFailed: 'Could not load the installed tools. Refresh the page and try again.',
+  jobFailed: 'The job did not finish successfully. Check the logs above for details.',
+  streamFailed: 'Lost the connection to the log stream. Reconnecting is not available, refresh the page.',
+};
+
+async function api(method, url, body) {
+  const resp = await fetch(url, {
+    method,
+    headers: body ? {'Content-Type': 'application/json'} : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw Object.assign(new Error(data.message || resp.statusText), {code: data.code});
+  return data;
+}
+
+function friendly(err, fallback) {
+  return err && err.message ? err.message : fallback;
+}
+
+function badge(status) {
+  if (!status) return '';
+  return `<span class="status ${status}">${status}</span>`;
+}
+
+async function loadTools() {
+  try {
+    const data = await api('GET', '/api/tools');
+    renderTools(data.data || []);
+  } catch (err) {
+    alert(friendly(err, texts.loadFailed));
+  }
+}
+
+function renderTools(tools) {
+  const body = document.getElementById('tools-body');
+  document.getElementById('tools-empty').hidden = tools.length > 0;
+  body.innerHTML = tools.map(t => `
+    <tr>
+      <td>${t.name}</td>
+      <td>${t.version || '-'}</td>
+      <td>${t.org && t.repo ? t.org + '/' + t.repo : (t.native ? 'native' : '-')}</td>
+      <td>${t.installed_at || '-'}</td>
+      <td class="actions">
+        <button class="btn" data-action="upgrade" data-name="${t.name}" ${t.upgradable ? '' : 'disabled'}>Upgrade</button>
+        <button class="btn danger" data-action="remove" data-name="${t.name}">Remove</button>
+      </td>
+    </tr>`).join('');
+}
+
+document.getElementById('tools-body').addEventListener('click', async ev => {
+  const btn = ev.target.closest('button[data-action]');
+  if (!btn || btn.disabled) return;
+  const name = btn.dataset.name;
+  if (btn.dataset.action === 'remove') {
+    if (!confirm(texts.confirmRemove)) return;
+    try {
+      const data = await api('DELETE', '/api/tools/' + encodeURIComponent(name));
+      renderTools(data.data || []);
+    } catch (err) {
+      alert(friendly(err, texts.removeFailed));
+    }
+  } else {
+    startJob('POST', `/api/tools/${encodeURIComponent(name)}/upgrade`, null, texts.upgradeFailed);
+  }
+});
+
+async function searchPackages() {
+  const input = document.getElementById('search-keyword');
+  const keyword = input.value.trim();
+  if (!keyword) { input.focus(); return; }
+  let data;
+  try {
+    data = await api('GET', '/api/search?q=' + encodeURIComponent(keyword));
+  } catch (err) {
+    alert(friendly(err, texts.searchFailed));
+    return;
+  }
+  const results = data.data || [];
+  document.getElementById('search-results').hidden = false;
+  document.getElementById('search-empty').hidden = results.length > 0;
+  document.getElementById('search-body').innerHTML = results.map(name => `
+    <tr>
+      <td>${name}</td>
+      <td class="actions"><button class="btn primary" data-install="${name}">Install</button></td>
+    </tr>`).join('');
+}
+
+document.getElementById('search-btn').addEventListener('click', searchPackages);
+document.getElementById('search-keyword').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter') searchPackages();
+});
+
+document.getElementById('fetch-btn').addEventListener('click', () => {
+  startJob('POST', '/api/fetch', null, texts.fetchFailed);
+});
+
+document.getElementById('search-body').addEventListener('click', ev => {
+  const btn = ev.target.closest('button[data-install]');
+  if (!btn) return;
+  const force = document.getElementById('force-install').checked;
+  startJob('POST', '/api/tools', {name: btn.dataset.install, force}, texts.installFailed);
+});
+
+async function startJob(method, url, body, fallback) {
+  let job;
+  try {
+    job = await api(method, url, body);
+  } catch (err) {
+    alert(friendly(err, fallback));
+    return;
+  }
+  document.getElementById('logs').textContent = '';
+  document.getElementById('job-badge').innerHTML = badge(job.status);
+  document.getElementById('log-status').textContent = `${job.action} ${job.tool} …`;
+
+  const es = new EventSource(`/api/jobs/${job.id}/logs`);
+  es.onmessage = ev => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'log') {
+      document.getElementById('logs').textContent += msg.line + '\n';
+      document.getElementById('logs').scrollTop = document.getElementById('logs').scrollHeight;
+    } else if (msg.type === 'done') {
+      es.close();
+      document.getElementById('job-badge').innerHTML = badge(msg.status);
+      document.getElementById('log-status').textContent =
+        msg.status === 'success' ? `${job.action} ${job.tool} finished` : texts.jobFailed;
+      loadTools();
+      if (job.action === 'fetch' && document.getElementById('search-keyword').value.trim()) {
+        searchPackages();
+      }
+    }
+  };
+  es.onerror = () => {
+    es.close();
+    document.getElementById('log-status').textContent = texts.streamFailed;
+  };
+}
+
+loadTools();
+</script>
+</body>
+</html>
