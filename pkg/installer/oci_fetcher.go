@@ -105,7 +105,7 @@ func (f *DefaultFetcher) FetchOCIConfig(artifact, tag string, progress io.Writer
 		return
 	}
 
-	if err = os.MkdirAll(configDir, 0o755); err != nil {
+	if err = os.MkdirAll(configDir, 0o750); err != nil {
 		err = fmt.Errorf("failed to create config directory %s: %v", configDir, err)
 		return
 	}
@@ -328,11 +328,11 @@ func unpackConfigArchive(reader io.Reader, configDir string, progress io.Writer)
 		target := filepath.Join(configDir, name)
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err = os.MkdirAll(target, 0o755); err != nil {
+			if err = os.MkdirAll(target, 0o750); err != nil {
 				return
 			}
 		case tar.TypeReg:
-			if err = os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			if err = os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 				return
 			}
 			var file *os.File
