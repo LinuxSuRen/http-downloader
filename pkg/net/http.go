@@ -189,19 +189,36 @@ func (h *HTTPDownloader) DownloadAsStream(writer io.Writer) (err error) {
 	return
 }
 
+// lazyFileWriter creates the target file on the first write, so that nothing
+// is touched on the filesystem when the download does not really start
+// (e.g. the PreStart hook aborts the download)
+type lazyFileWriter struct {
+	path string
+	file io.WriteCloser
+}
+
+func (l *lazyFileWriter) Write(p []byte) (n int, err error) {
+	if l.file == nil {
+		if err = os.MkdirAll(path.Dir(l.path), os.FileMode(0755)); err != nil {
+			return
+		}
+		if l.file, err = os.Create(l.path); err != nil {
+			return
+		}
+	}
+	return l.file.Write(p)
+}
+
+func (l *lazyFileWriter) Close() error {
+	if l.file != nil {
+		return l.file.Close()
+	}
+	return nil
+}
+
 // DownloadFile download a file with the progress
 func (h *HTTPDownloader) DownloadFile() (err error) {
-	filepath := h.TargetFilePath
-	if err = os.MkdirAll(path.Dir(filepath), os.FileMode(0755)); err != nil {
-		return
-	}
-
-	// Create the file
-	var out io.WriteCloser
-	out, err = os.Create(filepath)
-	if err != nil {
-		return
-	}
+	out := &lazyFileWriter{path: h.TargetFilePath}
 	defer func() {
 		_ = out.Close()
 	}()

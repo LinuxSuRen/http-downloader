@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -40,7 +41,13 @@ type webOption struct {
 func (o *webOption) runE(cmd *cobra.Command, args []string) (err error) {
 	addr := fmt.Sprintf("%s:%d", o.Listen, o.Port)
 	cmd.Printf("web server is running at http://%s\n", addr)
-	err = http.ListenAndServe(addr, o.server.routes())
+	// use an explicit http.Server so that timeouts are always set
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           o.server.routes(),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	err = server.ListenAndServe()
 	return
 }
 
