@@ -1,4 +1,4 @@
-FROM docker.io/golang:1.19 AS builder
+FROM docker.io/golang:1.26 AS builder
 
 WORKDIR /workspace
 COPY cmd/ cmd/
