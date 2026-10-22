@@ -67,6 +67,12 @@ func (f *DefaultFetcher) SetContext(ctx context.Context) {
 // FetchLatestRepo fetches the hd-home as the config
 func (f *DefaultFetcher) FetchLatestRepo(provider string, branch string,
 	progress io.Writer) (err error) {
+	// pull the config as an OCI artifact instead of the git protocol,
+	// the branch parameter works as the artifact tag or reference
+	if provider == "oci" || strings.HasPrefix(provider, "oci:") {
+		return f.FetchOCIConfig(strings.TrimPrefix(provider, "oci:"), branch, progress)
+	}
+
 	repoAddr, ok := configRepos[provider]
 	if !ok {
 		if provider != "" {
