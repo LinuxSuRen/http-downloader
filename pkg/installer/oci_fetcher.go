@@ -37,11 +37,11 @@ var OCIArtifactRepo = "ghcr.io/linuxsuren/hd-home-config"
 // artifact from an OCI compatible registry. It only depends on the standard
 // library, neither docker nor oras is required.
 type ociFetcher struct {
-	ctx      context.Context
-	base     string // for example https://ghcr.io
-	repo     string // for example linuxsuren/hd-home-config
-	token    string
-	client   *http.Client
+	ctx    context.Context
+	base   string // for example https://ghcr.io
+	repo   string // for example linuxsuren/hd-home-config
+	token  string
+	client *http.Client
 }
 
 // FetchOCIConfig fetches the latest hd config from an OCI registry.
@@ -130,11 +130,11 @@ type ociLayer struct {
 }
 
 type ociManifest struct {
-	MediaType    string      `json:"mediaType"`
-	ArtifactType string      `json:"artifactType"`
-	Config       ociLayer    `json:"config"`
-	Layers       []ociLayer  `json:"layers"`
-	Manifests    []ociLayer  `json:"manifests"`
+	MediaType    string     `json:"mediaType"`
+	ArtifactType string     `json:"artifactType"`
+	Config       ociLayer   `json:"config"`
+	Layers       []ociLayer `json:"layers"`
+	Manifests    []ociLayer `json:"manifests"`
 }
 
 func (f *ociFetcher) auth() (err error) {
