@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	// _ "embed" is required by the go:embed directive below to serve the web console
 	_ "embed"
 	"encoding/json"
 	"fmt"
