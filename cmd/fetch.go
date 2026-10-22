@@ -29,7 +29,7 @@ func newFetchCmd(ctx context.Context) (cmd *cobra.Command) {
 	flags := cmd.Flags()
 	opt.addFlags(flags)
 	flags.StringVarP(&opt.branch, "branch", "b", installer.ConfigBranch,
-		"The branch of git repository (not support currently)")
+		"The branch of git repository, or the tag of the OCI artifact when --provider is oci")
 	flags.BoolVarP(&opt.reset, "reset", "", false,
 		"If you want to reset the hd-config which means delete and clone it again")
 	flags.IntVarP(&opt.retry, "retry", "", 6, "Retry times due to timeout error")
