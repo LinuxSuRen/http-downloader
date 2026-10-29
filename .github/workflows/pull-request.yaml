@@ -85,11 +85,11 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@v3.6.0
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v1
+        uses: github/codeql-action/init@v3
         with:
           languages: go
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v1
+        uses: github/codeql-action/analyze@v3
   MarkdownLinkCheck:
     name: MarkdownLinkCheck
     runs-on: ubuntu-22.04
