@@ -2,7 +2,9 @@ package net
 
 import (
 	"context"
+	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -196,4 +198,25 @@ func TestIsRetryable(t *testing.T) {
 	assert.True(t, isRetryable(&DownloadError{StatusCode: 500}))
 	assert.True(t, isRetryable(&DownloadError{StatusCode: 503}))
 	assert.True(t, isRetryable(&DownloadError{StatusCode: 429}))
+	// local filesystem errors cannot be fixed by a retry
+	assert.False(t, isRetryable(&fs.PathError{Op: "write", Path: "/dev/full", Err: errors.New("no space left on device")}))
+	assert.False(t, isRetryable(&fs.PathError{Op: "open", Path: "no-access", Err: fs.ErrPermission}))
+}
+
+func TestDownloadWithContinueUninitializedProgressDisablesBar(t *testing.T) {
+	// an injected indicator that was never initialized disables the
+	// progress entirely, it must not fall back to standalone bars
+	rt := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		return textResponse(req, http.StatusOK, "10", strings.NewReader("0123456789")), nil
+	})
+
+	target := filepath.Join(t.TempDir(), "out.bin")
+	c := &ContinueDownloader{
+		roundTripper: rt,
+		progress:     &ProgressIndicator{Title: "not initialized"},
+	}
+	err := c.DownloadWithContinue("http://fake/file", target, -1, -1, 0, true)
+	assert.NoError(t, err)
+	assert.Nil(t, c.downloader.progressIndicator)
+	assert.True(t, c.downloader.progressInjected)
 }

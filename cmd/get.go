@@ -55,7 +55,8 @@ func newGetCmd(ctx context.Context) (cmd *cobra.Command) {
 		"If you accept preRelease as the binary asset from GitHub")
 	flags.BoolVarP(&opt.AcceptPreRelease, "pre", "", false,
 		"Same with option --accept-preRelease")
-	flags.BoolVarP(&opt.Force, "force", "f", false, "Overwrite the exist file if this is true")
+	flags.BoolVarP(&opt.Force, "force", "f", false,
+		"Overwrite the exist file if this is true. An empty output file is always taken as a broken download and overwritten without this flag")
 
 	flags.DurationVarP(&opt.Timeout, "timeout", "", 15*time.Minute,
 		`The default timeout in seconds with the HTTP request`)
@@ -100,8 +101,8 @@ type downloadOption struct {
 	MaxAttempts      int
 	AcceptPreRelease bool
 	RoundTripper     http.RoundTripper
-	Username string
-	Password string
+	Username         string
+	Password         string
 	Magnet           bool
 	Force            bool
 	Mod              int
@@ -350,8 +351,9 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 		err = downloader.Download(targetURL, o.Output, o.Thread)
 	}
 
-	// set file permission
-	if o.Mod != -1 {
+	// set the file permission only after a successful download, do not
+	// overwrite the download error with a chmod error
+	if err == nil && o.Mod != -1 {
 		logger.Printf("Setting file permission to %d", o.Mod)
 		if err = sysos.Chmod(o.Output, fs.FileMode(o.Mod)); err != nil {
 			return

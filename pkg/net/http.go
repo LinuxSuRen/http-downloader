@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -54,6 +55,11 @@ type HTTPDownloader struct {
 	Debug             bool
 	RoundTripper      http.RoundTripper
 	progressIndicator *ProgressIndicator
+	// progressInjected marks that the progress rendering was explicitly
+	// taken over by the caller. Even when progressIndicator is nil then
+	// (the passed indicator was not initialized), no standalone bar is
+	// created for this download
+	progressInjected  bool
 	suggestedFilename string
 
 	// Append indicates to append the downloaded data to the target file
@@ -191,7 +197,7 @@ func (h *HTTPDownloader) DownloadAsStream(writer io.Writer) (err error) {
 		// adopt a shared progress bar, e.g. all the parts of a multi-thread
 		// download feed the same aggregated bar
 		h.progressIndicator.Writer = writer
-	} else if showProgress {
+	} else if showProgress && !h.progressInjected {
 		indicator := &ProgressIndicator{
 			Title:  h.Title,
 			Writer: writer,
@@ -233,7 +239,7 @@ type lazyFileWriter struct {
 
 func (l *lazyFileWriter) Write(p []byte) (n int, err error) {
 	if l.file == nil {
-		if err = os.MkdirAll(path.Dir(l.path), os.FileMode(0755)); err != nil {
+		if err = os.MkdirAll(path.Dir(l.path), os.FileMode(0750)); err != nil {
 			return
 		}
 		flags := os.O_WRONLY | os.O_CREATE
@@ -242,7 +248,7 @@ func (l *lazyFileWriter) Write(p []byte) (n int, err error) {
 		} else {
 			flags |= os.O_TRUNC
 		}
-		if l.file, err = os.OpenFile(l.path, flags, 0644); err != nil {
+		if l.file, err = os.OpenFile(l.path, flags, 0600); err != nil {
 			return
 		}
 	}
@@ -376,7 +382,10 @@ func (c *ContinueDownloader) DownloadWithContinueAsStream(targetURL string, outp
 		Context:            c.Context,
 		Timeout:            c.Timeout,
 	}
-	c.downloader.progressIndicator = c.progress.Share()
+	if c.progress != nil {
+		c.downloader.progressIndicator = c.progress.Share()
+		c.downloader.progressInjected = true
+	}
 	if index >= 0 {
 		c.downloader.Title = fmt.Sprintf("Downloading part %d", index)
 	}
@@ -442,7 +451,10 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 			Append:             downloaded > 0,
 			ProgressBase:       downloaded,
 		}
-		c.downloader.progressIndicator = c.progress.Share()
+		if c.progress != nil {
+			c.downloader.progressIndicator = c.progress.Share()
+			c.downloader.progressInjected = true
+		}
 		if index >= 0 {
 			c.downloader.Title = fmt.Sprintf("Downloading part %d", index)
 		}
@@ -494,6 +506,12 @@ func (c *ContinueDownloader) waitBeforeRetry() error {
 // fix the given download error
 func isRetryable(err error) bool {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		// local filesystem errors (e.g. no space left, permission denied)
+		// cannot be fixed by another download attempt
 		return false
 	}
 	var downloadErr *DownloadError
