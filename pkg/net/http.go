@@ -169,23 +169,32 @@ func (h *HTTPDownloader) DownloadAsStream(writer io.Writer) (err error) {
 	if h.Title == "" {
 		h.Title = "Downloading"
 	}
-	h.progressIndicator = &ProgressIndicator{
-		Title: h.Title,
-	}
-	if showProgress {
+
+	if h.progressIndicator != nil {
+		// adopt a shared progress bar, e.g. all the parts of a multi-thread
+		// download feed the same aggregated bar
+		h.progressIndicator.Writer = writer
+	} else if showProgress {
+		indicator := &ProgressIndicator{
+			Title:  h.Title,
+			Writer: writer,
+		}
 		if total, ok := resp.Header["Content-Length"]; ok && len(total) > 0 {
-			fileLength, err := strconv.ParseInt(total[0], 10, 64)
-			if err == nil {
-				h.progressIndicator.Total = float64(fileLength)
+			if fileLength, parseErr := strconv.ParseInt(total[0], 10, 64); parseErr == nil {
+				indicator.Total = float64(fileLength)
 			}
 		}
+		indicator.Init()
+		h.progressIndicator = indicator
 	}
 
-	h.progressIndicator.Writer = writer
-	h.progressIndicator.Init()
-
 	// Write the body to file
-	_, err = io.Copy(h.progressIndicator, resp.Body)
+	if h.progressIndicator != nil {
+		_, err = io.Copy(h.progressIndicator, resp.Body)
+		h.progressIndicator.Close()
+	} else {
+		_, err = io.Copy(writer, resp.Body)
+	}
 	return
 }
 
@@ -255,6 +264,18 @@ type ContinueDownloader struct {
 	roundTripper       http.RoundTripper
 	noProxy            bool
 	insecureSkipVerify bool
+
+	// progress is an optional shared progress indicator, all the download
+	// parts report their progress into the same bar
+	progress *ProgressIndicator
+}
+
+// WithProgressIndicator sets a shared progress indicator which aggregates
+// the progress of all the downloads that share it. Passing an indicator that
+// was not initialized (Init) disables the progress of the downloads
+func (c *ContinueDownloader) WithProgressIndicator(progress *ProgressIndicator) *ContinueDownloader {
+	c.progress = progress
+	return c
 }
 
 // GetSuggestedFilename returns the suggested filename
@@ -312,6 +333,7 @@ func (c *ContinueDownloader) DownloadWithContinueAsStream(targetURL string, outp
 		Context:            c.Context,
 		Timeout:            c.Timeout,
 	}
+	c.downloader.progressIndicator = c.progress.Share()
 	if index >= 0 {
 		c.downloader.Title = fmt.Sprintf("Downloading part %d", index)
 	}
@@ -346,6 +368,7 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 		Context:            c.Context,
 		Timeout:            c.Timeout,
 	}
+	c.downloader.progressIndicator = c.progress.Share()
 	if index >= 0 {
 		c.downloader.Title = fmt.Sprintf("Downloading part %d", index)
 	}

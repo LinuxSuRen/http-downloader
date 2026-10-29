@@ -93,6 +93,7 @@ func (d *MultiThreadDownloader) DownloadWithContext(ctx context.Context, targetU
 		var wg sync.WaitGroup
 		var m sync.Mutex
 		partItems := make(map[int]string)
+		var partErr error
 
 		defer func() {
 			// remove all partial files
@@ -103,7 +104,9 @@ func (d *MultiThreadDownloader) DownloadWithContext(ctx context.Context, targetU
 
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)
+		defer signal.Stop(c)
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		var canceled bool
 
 		go func() {
@@ -112,15 +115,31 @@ func (d *MultiThreadDownloader) DownloadWithContext(ctx context.Context, targetU
 			cancel()
 		}()
 
-		fmt.Printf("start to download with %d threads, size: %d, unit: %d", thread, total, unit)
+		// all the parts share a single aggregated progress bar, so the
+		// output keeps stable on every terminal (including the Windows
+		// classic console which has no relative cursor movement support)
+		progress := &ProgressIndicator{
+			Title: "Downloading",
+			Total: float64(total),
+		}
+		if d.showProgress {
+			progress.Init()
+		}
+		fmt.Printf("start to download with %d threads, size: %s\n", thread, humanBytes(total))
+
 		for i := 0; i < thread; i++ {
-			fmt.Println() // TODO take position, should take over by progerss bars
 			wg.Add(1)
 			go func(index int, wg *sync.WaitGroup, ctx context.Context) {
 				defer wg.Done()
-				outputFile, err := os.CreateTemp(os.TempDir(), fmt.Sprintf("part-%d", index))
-				if err != nil {
-					fmt.Println("failed to create template file", err)
+				outputFile, createErr := os.CreateTemp(os.TempDir(), fmt.Sprintf("part-%d", index))
+				if createErr != nil {
+					m.Lock()
+					if partErr == nil {
+						partErr = fmt.Errorf("failed to create temp file, error: %w", createErr)
+					}
+					m.Unlock()
+					cancel()
+					return
 				}
 				outputFile.Close()
 
@@ -140,28 +159,30 @@ func (d *MultiThreadDownloader) DownloadWithContext(ctx context.Context, targetU
 					WithRoundTripper(d.roundTripper).
 					WithInsecureSkipVerify(d.insecureSkipVerify).
 					WithBasicAuth(d.username, d.password).
-					WithContext(ctx).WithTimeout(d.timeout)
+					WithContext(ctx).WithTimeout(d.timeout).
+					WithProgressIndicator(progress)
 				if downloadErr := downloader.DownloadWithContinue(targetURL, outputFile.Name(),
 					int64(index), start, end, d.showProgress); downloadErr != nil {
-					fmt.Println(downloadErr)
+					m.Lock()
+					if partErr == nil {
+						partErr = downloadErr
+					}
+					m.Unlock()
+					cancel() // no need to continue with the other parts
 				}
 			}(i, &wg, ctx)
 		}
 
 		wg.Wait()
-		// ProgressIndicator{}.Close()
+		progress.Close()
+
 		if canceled {
 			err = fmt.Errorf("download process canceled")
 			return
 		}
-
-		// make the cursor right
-		// TODO the progress component should take over it
-		if thread > 1 {
-			// line := GetCurrentLine()
-			time.Sleep(time.Second)
-			fmt.Printf("\033[%dE\n", thread) // move to the target line
-			time.Sleep(time.Second * 5)
+		if partErr != nil {
+			err = fmt.Errorf("failed to download, error: %w", partErr)
+			return
 		}
 
 		for i := 0; i < thread; i++ {
@@ -179,14 +200,14 @@ func (d *MultiThreadDownloader) DownloadWithContext(ctx context.Context, targetU
 			}
 		}
 	} else {
-		fmt.Println("cannot download it using multiple threads, failed to one")
+		fmt.Println("cannot download it using multiple threads, fall back to a single thread")
 		downloader := &ContinueDownloader{}
 		downloader.WithoutProxy(d.noProxy)
 		downloader.WithRoundTripper(d.roundTripper)
 		downloader.WithInsecureSkipVerify(d.insecureSkipVerify)
 		downloader.WithTimeout(d.timeout)
 		downloader.WithBasicAuth(d.username, d.password)
-		err = downloader.DownloadWithContinueAsStream(targetURL, outputWriter, -1, 0, 0, true)
+		err = downloader.DownloadWithContinueAsStream(targetURL, outputWriter, -1, 0, 0, d.showProgress)
 		d.suggestedFilename = downloader.GetSuggestedFilename()
 	}
 	return
@@ -208,6 +229,7 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 		var wg sync.WaitGroup
 		var partItems []string
 		var m sync.Mutex
+		var partErr error
 
 		defer func() {
 			// remove all partial files
@@ -218,7 +240,9 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)
+		defer signal.Stop(c)
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		var canceled bool
 
 		go func() {
@@ -227,9 +251,19 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 			cancel()
 		}()
 
-		fmt.Printf("start to download with %d threads, size: %d, unit: %d", thread, total, unit)
+		// all the parts share a single aggregated progress bar, so the
+		// output keeps stable on every terminal (including the Windows
+		// classic console which has no relative cursor movement support)
+		progress := &ProgressIndicator{
+			Title: "Downloading",
+			Total: float64(total),
+		}
+		if d.showProgress {
+			progress.Init()
+		}
+		fmt.Printf("start to download with %d threads, size: %s\n", thread, humanBytes(total))
+
 		for i := 0; i < thread; i++ {
-			fmt.Println() // TODO take position, should take over by progerss bars
 			wg.Add(1)
 			go func(index int, wg *sync.WaitGroup, ctx context.Context) {
 				defer wg.Done()
@@ -251,28 +285,30 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 					WithRoundTripper(d.roundTripper).
 					WithInsecureSkipVerify(d.insecureSkipVerify).
 					WithBasicAuth(d.username, d.password).
-					WithContext(ctx).WithTimeout(d.timeout)
+					WithContext(ctx).WithTimeout(d.timeout).
+					WithProgressIndicator(progress)
 				if downloadErr := downloader.DownloadWithContinue(targetURL, output,
 					int64(index), start, end, d.showProgress); downloadErr != nil {
-					fmt.Println(downloadErr)
+					m.Lock()
+					if partErr == nil {
+						partErr = downloadErr
+					}
+					m.Unlock()
+					cancel() // no need to continue with the other parts
 				}
 			}(i, &wg, ctx)
 		}
 
 		wg.Wait()
-		// ProgressIndicator{}.Close()
+		progress.Close()
+
 		if canceled {
 			err = fmt.Errorf("download process canceled")
 			return
 		}
-
-		// make the cursor right
-		// TODO the progress component should take over it
-		if thread > 1 {
-			// line := GetCurrentLine()
-			time.Sleep(time.Second)
-			fmt.Printf("\033[%dE\n", thread) // move to the target line
-			time.Sleep(time.Second * 5)
+		if partErr != nil {
+			err = fmt.Errorf("failed to download, error: %w", partErr)
+			return
 		}
 
 		// concat all these partial files
@@ -298,15 +334,30 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 			}
 		}
 	} else {
-		fmt.Println("cannot download it using multiple threads, failed to one")
+		fmt.Println("cannot download it using multiple threads, fall back to a single thread")
 		downloader := &ContinueDownloader{}
 		downloader.WithoutProxy(d.noProxy)
 		downloader.WithRoundTripper(d.roundTripper)
 		downloader.WithInsecureSkipVerify(d.insecureSkipVerify)
 		downloader.WithTimeout(d.timeout)
 		downloader.WithBasicAuth(d.username, d.password)
-		err = downloader.DownloadWithContinue(targetURL, targetFilePath, -1, 0, 0, true)
+		err = downloader.DownloadWithContinue(targetURL, targetFilePath, -1, 0, 0, d.showProgress)
 		d.suggestedFilename = downloader.GetSuggestedFilename()
 	}
 	return
+}
+
+// humanBytes formats the given size in bytes into a human readable string
+func humanBytes(size int64) string {
+	const unit = 1024
+	if size < unit {
+		return fmt.Sprintf("%d B", size)
+	}
+
+	div, exp := int64(unit), 0
+	for n := size / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.2f %cB", float64(size)/float64(div), "KMGTPE"[exp])
 }
