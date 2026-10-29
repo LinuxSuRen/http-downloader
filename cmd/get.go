@@ -304,8 +304,14 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	// check if want to overwrite the exist file
 	logger.Println("output file is", o.Output)
 	if common.Exist(o.Output) && !o.Force {
-		logger.Printf("The output file: '%s' was exist, please use flag --force if you want to overwrite it.\n", o.Output)
-		return
+		if info, statErr := sysos.Stat(o.Output); statErr == nil && info.Size() == 0 {
+			// an empty file is almost always a broken download left by an
+			// interrupted run, just overwrite it instead of blocking
+			logger.Printf("The output file: '%s' is empty, take it as a broken download and overwrite it\n", o.Output)
+		} else {
+			logger.Printf("The output file: '%s' was exist, please use flag --force if you want to overwrite it.\n", o.Output)
+			return
+		}
 	}
 
 	if o.Magnet || strings.HasPrefix(o.URL, "magnet:?") {

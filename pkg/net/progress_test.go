@@ -13,6 +13,7 @@ import (
 // silence the progress bar output during the tests
 func init() {
 	barOutput = io.Discard
+	barThrottle = 0
 }
 
 func TestProgressIndicatorWithKnownSize(t *testing.T) {
@@ -138,6 +139,69 @@ func TestProgressIndicatorShareConcurrent(t *testing.T) {
 
 	assert.Equal(t, float64(partCount*chunkSize), root.shared.bar.State().CurrentBytes)
 	root.Close()
+}
+
+func TestMultiProgressIndicator(t *testing.T) {
+	origOutput := barOutput
+	buf := &bytes.Buffer{}
+	barOutput = buf
+	defer func() {
+		barOutput = origOutput
+	}()
+
+	multi := NewMultiProgressIndicator()
+	part1 := multi.Register("part 1/2", float64(100))
+	part2 := multi.Register("part 2/2", float64(100))
+	assert.Equal(t, 2, len(multi.bars))
+
+	// the second line is opened with a newline, the cursor starts on line 0
+	_, err := part1.Write(make([]byte, 50))
+	assert.NoError(t, err)
+	_, err = part2.Write(make([]byte, 30))
+	assert.NoError(t, err)
+
+	out := buf.String()
+	// rendering the second bar must move the cursor up to its own line,
+	// then the first bar rendering moves the cursor back down
+	assert.Contains(t, out, "\x1b[1A")
+	assert.Contains(t, out, "\x1b[1B")
+	// the per-part bars do not print a completion newline by themselves
+	assert.NotContains(t, out, "part 1/2\n")
+
+	// both parts feed their own bar
+	assert.Equal(t, float64(50), multi.bars[0].shared.bar.State().CurrentBytes)
+	assert.Equal(t, float64(30), multi.bars[1].shared.bar.State().CurrentBytes)
+
+	multi.Close()
+	// Close finishes all the bars and leaves the cursor below them
+	assert.True(t, strings.HasSuffix(buf.String(), "\n"))
+}
+
+func TestMultiProgressIndicatorSharedParts(t *testing.T) {
+	origOutput := barOutput
+	buf := &bytes.Buffer{}
+	barOutput = buf
+	defer func() {
+		barOutput = origOutput
+	}()
+
+	multi := NewMultiProgressIndicator()
+	part := multi.Register("part 1/1", float64(10))
+
+	// the download part adopts the bar via Share
+	partWriter := &bytes.Buffer{}
+	shared := part.Share()
+	shared.Writer = partWriter
+	_, err := shared.Write([]byte("12345"))
+	assert.NoError(t, err)
+	assert.Equal(t, "12345", partWriter.String())
+	assert.Equal(t, float64(5), multi.bars[0].shared.bar.State().CurrentBytes)
+
+	// closing the shared indicator must not finish the bar of the group
+	shared.Close()
+	assert.Equal(t, float64(5), multi.bars[0].shared.bar.State().CurrentBytes)
+
+	multi.Close()
 }
 
 func TestHumanBytes(t *testing.T) {
