@@ -11,7 +11,7 @@ import (
 
 func TestCommonCase(t *testing.T) {
 	registry := &core.FakeRegistry{}
-	SetInstallerRegistry(registry, fakeruntime.FakeExecer{
+	SetInstallerRegistry(registry, &fakeruntime.FakeExecer{
 		ExpectOS: "linux",
 	})
 
@@ -31,7 +31,7 @@ func TestCommonCase(t *testing.T) {
 	})
 
 	errRegistry := &core.FakeRegistry{}
-	SetInstallerRegistry(errRegistry, fakeruntime.FakeExecer{
+	SetInstallerRegistry(errRegistry, &fakeruntime.FakeExecer{
 		ExpectLookPathError: errors.New("error"),
 		ExpectError:         errors.New("error"),
 		ExpectOS:            "linux",

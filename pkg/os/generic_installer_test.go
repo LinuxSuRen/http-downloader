@@ -16,7 +16,7 @@ func TestURLReplace(t *testing.T) {
 		env: map[string]string{
 			"key": "value",
 		},
-		execer: fakeruntime.FakeExecer{ExpectOS: fakeruntime.OSLinux},
+		execer: &fakeruntime.FakeExecer{ExpectOS: fakeruntime.OSLinux},
 	}
 	genericPkg.SetURLReplace(map[string]string{
 		"github": "ghproxy",
@@ -27,7 +27,7 @@ func TestURLReplace(t *testing.T) {
 	assert.Equal(t, []string{"value"}, genericPkg.sliceReplace([]string{"{{.key}}"}))
 
 	emptyGenericPkg := &genericPackage{
-		execer: fakeruntime.FakeExecer{ExpectOS: fakeruntime.OSLinux},
+		execer: &fakeruntime.FakeExecer{ExpectOS: fakeruntime.OSLinux},
 	}
 	emptyGenericPkg.loadEnv()
 	assert.NotNil(t, emptyGenericPkg.env)
@@ -42,7 +42,7 @@ func TestURLReplace(t *testing.T) {
 	assert.Nil(t, err)
 
 	withPreInstall := &genericPackage{
-		execer: fakeruntime.FakeExecer{
+		execer: &fakeruntime.FakeExecer{
 			ExpectOS: fakeruntime.OSLinux,
 		},
 		PreInstall: []preInstall{{
@@ -65,7 +65,7 @@ func TestURLReplace(t *testing.T) {
 	assert.Nil(t, withPreInstall.Install())
 
 	withErrorPreInstall := &genericPackage{
-		execer: fakeruntime.FakeExecer{
+		execer: &fakeruntime.FakeExecer{
 			ExpectOS:    fakeruntime.OSLinux,
 			ExpectError: errors.New("error"),
 		},
@@ -86,7 +86,7 @@ func TestURLReplace(t *testing.T) {
 		os.Remove(tmpFile.Name())
 	}()
 	writeToFileInstall := &genericPackage{
-		execer: fakeruntime.FakeExecer{
+		execer: &fakeruntime.FakeExecer{
 			ExpectOS: fakeruntime.OSLinux,
 		},
 		PreInstall: []preInstall{{

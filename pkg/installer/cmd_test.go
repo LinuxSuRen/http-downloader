@@ -18,7 +18,7 @@ func TestRunCommandList(t *testing.T) {
 	}}))
 
 	errInstaller := &Installer{
-		Execer: fakeruntime.FakeExecer{
+		Execer: &fakeruntime.FakeExecer{
 			ExpectError: errors.New("error"),
 		},
 	}

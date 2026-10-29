@@ -65,7 +65,7 @@ type webServer struct {
 func newWebServer(ctx context.Context) *webServer {
 	return &webServer{
 		ctx:     ctx,
-		execer:  &fakeruntime.DefaultExecer{},
+		execer:  fakeruntime.NewDefaultExecer(),
 		jobs:    map[int]*webJob{},
 		jobLock: make(chan struct{}, 1),
 	}

@@ -176,7 +176,7 @@ func TestInstall(t *testing.T) {
 		opt: &installOption{
 			downloadOption: &downloadOption{},
 			nativePackage:  true,
-			execer:         fakeruntime.FakeExecer{},
+			execer:         &fakeruntime.FakeExecer{},
 		},
 		args:      args{cmd: &cobra.Command{}},
 		expectErr: false,
@@ -199,25 +199,25 @@ func TestGetDefaultInstallDir(t *testing.T) {
 		expect string
 	}{{
 		name: "linux",
-		execer: fakeruntime.FakeExecer{
+		execer: &fakeruntime.FakeExecer{
 			ExpectOS: "linux",
 		},
 		expect: "/usr/local/bin",
 	}, {
 		name: "darwin",
-		execer: fakeruntime.FakeExecer{
+		execer: &fakeruntime.FakeExecer{
 			ExpectOS: "darwin",
 		},
 		expect: "/usr/local/bin",
 	}, {
 		name: "windows",
-		execer: fakeruntime.FakeExecer{
+		execer: &fakeruntime.FakeExecer{
 			ExpectOS: "windows",
 		},
 		expect: `C:\Program Files (x86)\Common Files`,
 	}, {
 		name:   "unknown",
-		execer: fakeruntime.FakeExecer{},
+		execer: &fakeruntime.FakeExecer{},
 		expect: "",
 	}}
 	for _, tt := range tests {

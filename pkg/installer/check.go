@@ -35,7 +35,7 @@ const (
 // CheckDepAndInstall checks the desired tools, install the missing packages
 func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 	if o.Execer == nil {
-		o.Execer = &fakeruntime.DefaultExecer{}
+		o.Execer = fakeruntime.NewDefaultExecer()
 	}
 	if o.OS == "" {
 		o.OS = o.Execer.OS()

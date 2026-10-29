@@ -199,7 +199,7 @@ type lazyFileWriter struct {
 
 func (l *lazyFileWriter) Write(p []byte) (n int, err error) {
 	if l.file == nil {
-		if err = os.MkdirAll(path.Dir(l.path), os.FileMode(0755)); err != nil {
+		if err = os.MkdirAll(path.Dir(l.path), os.FileMode(0750)); err != nil {
 			return
 		}
 		if l.file, err = os.Create(l.path); err != nil {
