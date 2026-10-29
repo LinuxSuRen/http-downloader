@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -53,7 +55,19 @@ type HTTPDownloader struct {
 	Debug             bool
 	RoundTripper      http.RoundTripper
 	progressIndicator *ProgressIndicator
+	// progressInjected marks that the progress rendering was explicitly
+	// taken over by the caller. Even when progressIndicator is nil then
+	// (the passed indicator was not initialized), no standalone bar is
+	// created for this download
+	progressInjected  bool
 	suggestedFilename string
+
+	// Append indicates to append the downloaded data to the target file
+	// instead of truncating it, used by the resumed downloads
+	Append bool
+	// ProgressBase is the number of bytes that were already downloaded
+	// before this download started, used by the progress indicator
+	ProgressBase int64
 }
 
 // SetProxy set the proxy for a http
@@ -159,6 +173,15 @@ func (h *HTTPDownloader) DownloadAsStream(writer io.Writer) (err error) {
 		}
 	}
 
+	if resp.StatusCode == http.StatusOK && h.Append {
+		// the server ignored the range request, appending the full body
+		// to the partially downloaded file would corrupt it
+		return &DownloadError{
+			Message:    "the server does not support resuming the download (range request was ignored)",
+			StatusCode: resp.StatusCode,
+		}
+	}
+
 	h.suggestedFilename = ParseSuggestedFilename(resp.Header, filepath)
 
 	// pre-hook before get started to download file
@@ -169,23 +192,39 @@ func (h *HTTPDownloader) DownloadAsStream(writer io.Writer) (err error) {
 	if h.Title == "" {
 		h.Title = "Downloading"
 	}
-	h.progressIndicator = &ProgressIndicator{
-		Title: h.Title,
-	}
-	if showProgress {
+
+	if h.progressIndicator != nil {
+		// adopt a shared progress bar, e.g. all the parts of a multi-thread
+		// download feed the same aggregated bar
+		h.progressIndicator.Writer = writer
+	} else if showProgress && !h.progressInjected {
+		indicator := &ProgressIndicator{
+			Title:  h.Title,
+			Writer: writer,
+		}
 		if total, ok := resp.Header["Content-Length"]; ok && len(total) > 0 {
-			fileLength, err := strconv.ParseInt(total[0], 10, 64)
-			if err == nil {
-				h.progressIndicator.Total = float64(fileLength)
+			if fileLength, parseErr := strconv.ParseInt(total[0], 10, 64); parseErr == nil {
+				// count the bytes that were already on the disk when this
+				// is a resumed download, so the bar reflects the whole file
+				indicator.Total = float64(fileLength + h.ProgressBase)
 			}
 		}
+		indicator.Init()
+		indicator.report(int(h.ProgressBase))
+		h.progressIndicator = indicator
 	}
 
-	h.progressIndicator.Writer = writer
-	h.progressIndicator.Init()
-
 	// Write the body to file
-	_, err = io.Copy(h.progressIndicator, resp.Body)
+	if h.progressIndicator != nil {
+		_, err = io.Copy(h.progressIndicator, resp.Body)
+		// only finish the bar on success, a retried download re-uses the
+		// same terminal line instead of stacking a bogus completed bar
+		if err == nil {
+			h.progressIndicator.Close()
+		}
+	} else {
+		_, err = io.Copy(writer, resp.Body)
+	}
 	return
 }
 
@@ -193,8 +232,9 @@ func (h *HTTPDownloader) DownloadAsStream(writer io.Writer) (err error) {
 // is touched on the filesystem when the download does not really start
 // (e.g. the PreStart hook aborts the download)
 type lazyFileWriter struct {
-	path string
-	file io.WriteCloser
+	path   string
+	file   io.WriteCloser
+	append bool
 }
 
 func (l *lazyFileWriter) Write(p []byte) (n int, err error) {
@@ -202,7 +242,13 @@ func (l *lazyFileWriter) Write(p []byte) (n int, err error) {
 		if err = os.MkdirAll(path.Dir(l.path), os.FileMode(0750)); err != nil {
 			return
 		}
-		if l.file, err = os.Create(l.path); err != nil {
+		flags := os.O_WRONLY | os.O_CREATE
+		if l.append {
+			flags |= os.O_APPEND
+		} else {
+			flags |= os.O_TRUNC
+		}
+		if l.file, err = os.OpenFile(l.path, flags, 0600); err != nil {
 			return
 		}
 	}
@@ -218,7 +264,7 @@ func (l *lazyFileWriter) Close() error {
 
 // DownloadFile download a file with the progress
 func (h *HTTPDownloader) DownloadFile() (err error) {
-	out := &lazyFileWriter{path: h.TargetFilePath}
+	out := &lazyFileWriter{path: h.TargetFilePath, append: h.Append}
 	defer func() {
 		_ = out.Close()
 	}()
@@ -255,6 +301,30 @@ type ContinueDownloader struct {
 	roundTripper       http.RoundTripper
 	noProxy            bool
 	insecureSkipVerify bool
+
+	// progress is an optional shared progress indicator, all the download
+	// parts report their progress into the same bar
+	progress *ProgressIndicator
+
+	// maxAttempts is the max times a download is attempted (including the
+	// first one) when the transfer breaks in the middle, the follow-up
+	// attempts resume from the bytes that are already on the local disk
+	maxAttempts int
+}
+
+// WithProgressIndicator sets a shared progress indicator which aggregates
+// the progress of all the downloads that share it. Passing an indicator that
+// was not initialized (Init) disables the progress of the downloads
+func (c *ContinueDownloader) WithProgressIndicator(progress *ProgressIndicator) *ContinueDownloader {
+	c.progress = progress
+	return c
+}
+
+// WithMaxAttempts sets the max times a download is attempted when the
+// transfer breaks in the middle, zero or a negative value means no retry
+func (c *ContinueDownloader) WithMaxAttempts(maxAttempts int) *ContinueDownloader {
+	c.maxAttempts = maxAttempts
+	return c
 }
 
 // GetSuggestedFilename returns the suggested filename
@@ -312,6 +382,10 @@ func (c *ContinueDownloader) DownloadWithContinueAsStream(targetURL string, outp
 		Context:            c.Context,
 		Timeout:            c.Timeout,
 	}
+	if c.progress != nil {
+		c.downloader.progressIndicator = c.progress.Share()
+		c.downloader.progressInjected = true
+	}
 	if index >= 0 {
 		c.downloader.Title = fmt.Sprintf("Downloading part %d", index)
 	}
@@ -332,38 +406,122 @@ func (c *ContinueDownloader) DownloadWithContinueAsStream(targetURL string, outp
 	return
 }
 
-// DownloadWithContinue downloads the files continuously
+// DownloadWithContinue downloads the files continuously. When the transfer
+// breaks in the middle (e.g. an unexpected EOF) it automatically retries and
+// resumes from the bytes that are already on the local disk via range
+// requests, until the attempts are exhausted or the error is not retryable.
 func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, index, continueAt, end int64, showProgress bool) (err error) {
-	c.downloader = &HTTPDownloader{
-		TargetFilePath:     output,
-		URL:                targetURL,
-		ShowProgress:       showProgress,
-		NoProxy:            c.noProxy,
-		RoundTripper:       c.roundTripper,
-		InsecureSkipVerify: c.insecureSkipVerify,
-		UserName:           c.UserName,
-		Password:           c.Password,
-		Context:            c.Context,
-		Timeout:            c.Timeout,
-	}
-	if index >= 0 {
-		c.downloader.Title = fmt.Sprintf("Downloading part %d", index)
+	attempts := c.maxAttempts
+	if attempts <= 0 {
+		attempts = 1
 	}
 
-	if continueAt >= 0 {
-		c.downloader.Header = make(map[string]string, 1)
+	var lastErr error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		if attempt > 1 {
+			if err = c.waitBeforeRetry(); err != nil {
+				break // the whole download was canceled
+			}
+		}
 
-		if end > continueAt {
-			c.downloader.Header["Range"] = fmt.Sprintf("bytes=%d-%d", continueAt, end)
-		} else {
-			c.downloader.Header["Range"] = fmt.Sprintf("bytes=%d-", continueAt)
+		// the bytes that were already written to the disk by the
+		// previous attempts of this download
+		var downloaded int64
+		if attempt > 1 {
+			if info, statErr := os.Stat(output); statErr == nil && info.Size() > 0 {
+				downloaded = info.Size()
+				if end > 0 && continueAt+downloaded > end {
+					// the wanted range is already complete
+					return nil
+				}
+			}
+		}
+
+		c.downloader = &HTTPDownloader{
+			TargetFilePath:     output,
+			URL:                targetURL,
+			ShowProgress:       showProgress,
+			NoProxy:            c.noProxy,
+			RoundTripper:       c.roundTripper,
+			InsecureSkipVerify: c.insecureSkipVerify,
+			UserName:           c.UserName,
+			Password:           c.Password,
+			Context:            c.Context,
+			Timeout:            c.Timeout,
+			Append:             downloaded > 0,
+			ProgressBase:       downloaded,
+		}
+		if c.progress != nil {
+			c.downloader.progressIndicator = c.progress.Share()
+			c.downloader.progressInjected = true
+		}
+		if index >= 0 {
+			c.downloader.Title = fmt.Sprintf("Downloading part %d", index)
+		}
+
+		if continueAt >= 0 || downloaded > 0 {
+			start := continueAt + downloaded
+			if continueAt < 0 {
+				start = downloaded
+			}
+
+			c.downloader.Header = make(map[string]string, 1)
+			if end > start {
+				c.downloader.Header["Range"] = fmt.Sprintf("bytes=%d-%d", start, end)
+			} else {
+				c.downloader.Header["Range"] = fmt.Sprintf("bytes=%d-", start)
+			}
+		}
+
+		if err = c.downloader.DownloadFile(); err == nil {
+			return nil
+		}
+		lastErr = err
+		if !isRetryable(err) {
+			break
 		}
 	}
-
-	if err = c.downloader.DownloadFile(); err != nil {
-		err = fmt.Errorf("cannot download from %s, error: %v", targetURL, err)
-	}
+	err = fmt.Errorf("cannot download from %s, error: %v", targetURL, lastErr)
 	return
+}
+
+// waitBeforeRetry waits a moment before the next attempt, it returns an
+// error once the context was canceled
+func (c *ContinueDownloader) waitBeforeRetry() error {
+	const delay = 500 * time.Millisecond
+
+	if c.Context != nil {
+		select {
+		case <-c.Context.Done():
+			return c.Context.Err()
+		case <-time.After(delay):
+		}
+		return nil
+	}
+	time.Sleep(delay)
+	return nil
+}
+
+// isRetryable tells if another attempt (with a resumed range request) might
+// fix the given download error
+func isRetryable(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		// local filesystem errors (e.g. no space left, permission denied)
+		// cannot be fixed by another download attempt
+		return false
+	}
+	var downloadErr *DownloadError
+	if errors.As(err, &downloadErr) {
+		// client errors (e.g. 404, 403) will not be fixed by another
+		// attempt, server errors and rate limiting might
+		return downloadErr.StatusCode >= 500 || downloadErr.StatusCode == http.StatusTooManyRequests
+	}
+	// network errors such as the unexpected EOF of a broken transfer
+	return true
 }
 
 // DetectSizeWithRoundTripperAndAuthStream returns the size of target resource
