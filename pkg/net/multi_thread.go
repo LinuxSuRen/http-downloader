@@ -21,6 +21,7 @@ type MultiThreadDownloader struct {
 	roundTripper       http.RoundTripper
 	suggestedFilename  string
 	timeout            time.Duration
+	maxAttempts        int
 }
 
 // GetSuggestedFilename returns the suggested filename
@@ -37,6 +38,13 @@ func (d *MultiThreadDownloader) WithInsecureSkipVerify(insecureSkipVerify bool) 
 // WithTimeout sets the timeout
 func (d *MultiThreadDownloader) WithTimeout(timeout time.Duration) *MultiThreadDownloader {
 	d.timeout = timeout
+	return d
+}
+
+// WithMaxAttempts sets the max times a download part is attempted when the
+// transfer breaks in the middle, zero or a negative value means no retry
+func (d *MultiThreadDownloader) WithMaxAttempts(maxAttempts int) *MultiThreadDownloader {
+	d.maxAttempts = maxAttempts
 	return d
 }
 
@@ -177,6 +185,7 @@ func (d *MultiThreadDownloader) DownloadWithContext(ctx context.Context, targetU
 					WithInsecureSkipVerify(d.insecureSkipVerify).
 					WithBasicAuth(d.username, d.password).
 					WithContext(ctx).WithTimeout(d.timeout).
+					WithMaxAttempts(d.maxAttempts).
 					WithProgressIndicator(partProgress)
 				if downloadErr := downloader.DownloadWithContinue(targetURL, outputFile.Name(),
 					int64(index), start, end, d.showProgress); downloadErr != nil {
@@ -324,6 +333,7 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 					WithInsecureSkipVerify(d.insecureSkipVerify).
 					WithBasicAuth(d.username, d.password).
 					WithContext(ctx).WithTimeout(d.timeout).
+					WithMaxAttempts(d.maxAttempts).
 					WithProgressIndicator(partProgress)
 				if downloadErr := downloader.DownloadWithContinue(targetURL, output,
 					int64(index), start, end, d.showProgress); downloadErr != nil {

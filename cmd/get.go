@@ -333,7 +333,8 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 			WithRoundTripper(o.RoundTripper).
 			WithInsecureSkipVerify(o.SkipTLS).
 			WithBasicAuth(o.Username, o.Password).
-			WithTimeout(o.Timeout)
+			WithTimeout(o.Timeout).
+			WithMaxAttempts(o.MaxAttempts)
 		err = downloader.DownloadWithContinue(targetURL, o.Output, o.ContinueAt, -1, 0, o.ShowProgress)
 	} else {
 		downloader := &net.MultiThreadDownloader{}
@@ -344,7 +345,8 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 			WithRoundTripper(o.RoundTripper).
 			WithInsecureSkipVerify(o.SkipTLS).
 			WithBasicAuth(o.Username, o.Password).
-			WithTimeout(o.Timeout)
+			WithTimeout(o.Timeout).
+			WithMaxAttempts(o.MaxAttempts)
 		err = downloader.Download(targetURL, o.Output, o.Thread)
 	}
 
