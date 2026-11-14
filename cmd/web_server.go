@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -28,31 +29,104 @@ const (
 	jobRunning = "running"
 	jobSuccess = "success"
 	jobFailed  = "failed"
+
+	// jobHistory is the number of finished jobs kept for the task list
+	jobHistory = 20
 )
 
+// webJob is a background task of the console, its progress is reported as
+// numbers instead of log lines
 type webJob struct {
 	ID      int    `json:"id"`
-	Action  string `json:"action"` // install or upgrade
+	Action  string `json:"action"` // install, upgrade or fetch
 	Tool    string `json:"tool"`
 	Status  string `json:"status"`
 	Message string `json:"message,omitempty"`
+	// Phase tells what the job is doing, e.g. resolving or downloading
+	Phase string `json:"phase,omitempty"`
+	// Percent is 0 to 100, a negative value means the progress is unknown
+	// and the UI shows an indeterminate indicator
+	Percent int    `json:"percent"`
+	Detail  string `json:"detail,omitempty"`
 
 	mu       sync.Mutex
-	logs     []string
+	received int64
+	total    int64
 	finished bool
 }
 
-func (j *webJob) appendLog(line string) {
+// setPhase switches the phase of the job
+func (j *webJob) setPhase(phase string) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	j.logs = append(j.logs, line)
+	j.Phase = phase
 }
 
-// snapshot returns the current logs and whether the job is finished
-func (j *webJob) snapshot() (logs []string, finished bool) {
+// addBytes accumulates the transferred bytes and derives the percent,
+// a non positive total keeps the progress indeterminate
+func (j *webJob) addBytes(delta, total int64) {
+	if delta <= 0 {
+		return
+	}
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	return append([]string{}, j.logs...), j.finished
+	j.received += delta
+	if total > 0 {
+		j.total = total
+	}
+	if j.total > 0 {
+		j.Percent = int(j.received * 100 / j.total)
+		if j.Percent > 100 {
+			j.Percent = 100
+		}
+		j.Detail = fmt.Sprintf("%s / %s", humanBytes(float64(j.received)), humanBytes(float64(j.total)))
+	} else {
+		j.Percent = -1
+		j.Detail = humanBytes(float64(j.received))
+	}
+	if j.Phase == "" {
+		j.Phase = "downloading"
+	}
+}
+
+// setProgress sets an explicit percent, used by the fetch which parses the
+// progress of the underlying git transfer
+func (j *webJob) setProgress(percent int, detail string) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.Percent = percent
+	j.Detail = detail
+}
+
+// markDownloading switches the job into the downloading phase once
+func (j *webJob) markDownloading() {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.Phase != "downloading" {
+		j.Phase = "downloading"
+	}
+}
+
+// snapshot returns the current progress and whether the job is finished
+func (j *webJob) snapshot() (phase string, percent int, detail string, finished bool) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.Phase, j.Percent, j.Detail, j.finished
+}
+
+// humanBytes formats a byte count in a compact human readable form
+func humanBytes(bytes float64) string {
+	units := []string{"B", "KiB", "MiB", "GiB"}
+	for _, unit := range units {
+		if bytes < 1024 || unit == "GiB" {
+			if unit == "B" {
+				return fmt.Sprintf("%.0f %s", bytes, unit)
+			}
+			return fmt.Sprintf("%.1f %s", bytes, unit)
+		}
+		bytes /= 1024
+	}
+	return fmt.Sprintf("%.1f GiB", bytes)
 }
 
 type webServer struct {
@@ -62,13 +136,17 @@ type webServer struct {
 	mu     sync.Mutex
 	nextID int
 	jobs   map[int]*webJob
-	// only one job runs at a time: its output is captured globally
+	// only one job runs at a time, they share the target directories and
+	// the download working directory
 	jobLock chan struct{}
 
-	// overridable behaviors, they talk to GitHub or to the desktop, which
-	// is neither available nor desired in the unit tests
+	// procs manages the tools started as child processes of the server
+	procs *processManager
+
+	// overridable behaviors, they talk to GitHub or start desktop
+	// processes, which is neither available nor desired in the unit tests
 	listVersions func(org, repo string, count int) ([]versionTag, error)
-	launchTool   func(binPath string) error
+	startTool    func(name, binPath string) (*managedProcess, error)
 }
 
 func newWebServer(ctx context.Context) *webServer {
@@ -77,9 +155,10 @@ func newWebServer(ctx context.Context) *webServer {
 		execer:  fakeruntime.NewDefaultExecer(),
 		jobs:    map[int]*webJob{},
 		jobLock: make(chan struct{}, 1),
+		procs:   newProcessManager(),
 	}
 	server.listVersions = listGitHubVersions
-	server.launchTool = openInTerminal
+	server.startTool = server.procs.startTool
 	return server
 }
 
@@ -90,11 +169,14 @@ func (s *webServer) routes() http.Handler {
 	mux.HandleFunc("/api/tools/", s.handleTool)
 	mux.HandleFunc("/api/search", s.handleSearch)
 	mux.HandleFunc("/api/fetch", s.handleFetch)
+	mux.HandleFunc("/api/jobs", s.handleJobList)
 	mux.HandleFunc("/api/jobs/", s.handleJob)
 	mux.HandleFunc("/api/categories", s.handleCategories)
 	mux.HandleFunc("/api/packages", s.handlePackages)
 	mux.HandleFunc("/api/packages/", s.handlePackageVersions)
 	mux.HandleFunc("/api/proxy", s.handleProxy)
+	mux.HandleFunc("/api/processes", s.handleProcesses)
+	mux.HandleFunc("/api/processes/", s.handleProcess)
 	return mux
 }
 
@@ -134,8 +216,8 @@ func (s *webServer) handleTools(w http.ResponseWriter, r *http.Request) {
 		if version != "" && !strings.Contains(target, "@") {
 			target = fmt.Sprintf("%s@%s", target, version)
 		}
-		job := s.startJob("install", req.Name, func(stub *cobra.Command) error {
-			return s.installTool(stub, target, version, proxy, req.Force)
+		job := s.startJob("install", req.Name, func(stub *cobra.Command, job *webJob) error {
+			return s.installTool(stub, target, version, proxy, req.Force, job)
 		})
 		writeJSON(w, http.StatusAccepted, job)
 	default:
@@ -414,18 +496,45 @@ func installedIndex(records []installer.InstalledPackage) (index map[string]*ins
 	return
 }
 
+// fetchProgress parses the progress text of the underlying git transfer
+// and reports the percent to the job
+type fetchProgress struct {
+	job *webJob
+}
+
+// gitProgress matches lines like "Receiving objects:  45% (123/273)"
+var gitProgress = regexp.MustCompile(`(\d+)% \((\d+)/(\d+)\)`)
+
+// Write implements io.Writer, unknown text is dropped
+func (p fetchProgress) Write(chunk []byte) (n int, err error) {
+	for _, line := range strings.Split(string(chunk), "\n") {
+		matches := gitProgress.FindAllStringSubmatch(line, -1)
+		if len(matches) == 0 {
+			continue
+		}
+		// git sends the counting and the compressing phases first, the
+		// last match of the last line wins
+		m := matches[len(matches)-1]
+		if percent, err := strconv.Atoi(m[1]); err == nil {
+			p.job.setProgress(percent, fmt.Sprintf("%s / %s objects", m[2], m[3]))
+		}
+	}
+	return len(chunk), nil
+}
+
 // POST /api/fetch updates the local hd-home config cache as a background job
 func (s *webServer) handleFetch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only POST is supported")
 		return
 	}
-	job := s.startJob("fetch", "hd-home", func(stub *cobra.Command) error {
+	job := s.startJob("fetch", "hd-home", func(stub *cobra.Command, job *webJob) error {
+		job.setPhase("updating index")
 		fetcher := &installer.DefaultFetcher{}
 		fetcher.SetContext(s.ctx)
-		// the progress goes to the captured output so that it streams
-		// into the log panel
-		err := fetcher.FetchLatestRepo("", "", os.Stdout)
+		// the git transfer progress is parsed into the job percent
+		progress := fetchProgress{job: job}
+		err := fetcher.FetchLatestRepo("", "", progress)
 		if err == nil {
 			return nil
 		}
@@ -438,14 +547,15 @@ func (s *webServer) handleFetch(w http.ResponseWriter, r *http.Request) {
 				return rmErr
 			}
 		}
-		return fetcher.FetchLatestRepo("", "", os.Stdout)
+		return fetcher.FetchLatestRepo("", "", progress)
 	})
 	writeJSON(w, http.StatusAccepted, job)
 }
 
 // DELETE /api/tools/{name} removes a tool
 // POST /api/tools/{name}/upgrade starts an upgrade job
-// POST /api/tools/{name}/open launches the tool in a new terminal window
+// POST /api/tools/{name}/open starts the tool as a child process of the
+// server, its output is visible in the UI
 func (s *webServer) handleTool(w http.ResponseWriter, r *http.Request) {
 	rest := strings.TrimPrefix(r.URL.Path, "/api/tools/")
 	name, action := rest, ""
@@ -481,8 +591,8 @@ func (s *webServer) handleTool(w http.ResponseWriter, r *http.Request) {
 			_ = decodeJSON(r, &req)
 		}
 		proxy := strings.TrimSpace(req.Proxy)
-		job := s.startJob("upgrade", name, func(stub *cobra.Command) error {
-			return s.upgradeTool(stub, tool.Org, tool.Repo, proxy)
+		job := s.startJob("upgrade", name, func(stub *cobra.Command, job *webJob) error {
+			return s.upgradeTool(stub, tool.Org, tool.Repo, proxy, job)
 		})
 		writeJSON(w, http.StatusAccepted, job)
 	case r.Method == http.MethodPost && action == "open":
@@ -492,7 +602,8 @@ func (s *webServer) handleTool(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// openTool launches an installed tool in a new terminal window
+// openTool starts an installed tool as a child process of the server, the
+// output of the process is captured and can be followed in the UI
 func (s *webServer) openTool(w http.ResponseWriter, name string) {
 	tool, _ := installer.FindInstalledPackage(name)
 	if tool == nil {
@@ -507,17 +618,16 @@ func (s *webServer) openTool(w http.ResponseWriter, name string) {
 			fmt.Sprintf("cannot find the binary of %s, please reinstall it", name))
 		return
 	}
-	if err := s.launchTool(binPath); err != nil {
+	proc, err := s.startTool(name, binPath)
+	if err != nil {
 		// #nosec G706 -- the values come from the local install record, they
 		// only reach the server side log
 		log.Printf("cannot launch %s: %v", name, err)
 		writeError(w, http.StatusInternalServerError, "LAUNCH_FAILED",
-			fmt.Sprintf("failed to launch %s in a terminal window", name))
+			fmt.Sprintf("failed to launch %s", name))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"data": map[string]string{"name": name, "binary": binPath},
-	})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"data": proc.view()})
 }
 
 // findToolBinary returns an existing binary path of an installed tool
@@ -575,16 +685,40 @@ func (s *webServer) handleJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !sse {
-		logs, _ := job.snapshot()
-		writeJSON(w, http.StatusOK, map[string]interface{}{"data": job, "logs": logs})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"data": job})
 		return
 	}
-	s.streamJobLogs(w, r, job)
+	s.streamJobEvents(w, r, job)
 }
 
-// streamJobLogs replays the buffered logs first, then streams the new ones
-// until the job is done. The done event carries the final status.
-func (s *webServer) streamJobLogs(w http.ResponseWriter, r *http.Request, job *webJob) {
+// handleJobList returns the known jobs, newest first, so the task list
+// survives a page reload
+// GET /api/jobs
+func (s *webServer) handleJobList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
+		return
+	}
+
+	s.mu.Lock()
+	jobs := make([]*webJob, 0, len(s.jobs))
+	for _, job := range s.jobs {
+		jobs = append(jobs, job)
+	}
+	s.mu.Unlock()
+	for i := range jobs {
+		for j := i + 1; j < len(jobs); j++ {
+			if jobs[j].ID > jobs[i].ID {
+				jobs[i], jobs[j] = jobs[j], jobs[i]
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"data": jobs})
+}
+
+// streamJobEvents streams the progress of a job until it is done. The done
+// event carries the final status.
+func (s *webServer) streamJobEvents(w http.ResponseWriter, r *http.Request, job *webJob) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		writeError(w, http.StatusInternalServerError, "STREAM_UNSUPPORTED", "streaming is not supported")
@@ -606,16 +740,19 @@ func (s *webServer) streamJobLogs(w http.ResponseWriter, r *http.Request, job *w
 		return true
 	}
 
-	sent := 0
+	sentPhase, sentPercent, sentDetail := "", -2, ""
 	ticker := time.NewTicker(300 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
-		logs, finished := job.snapshot()
-		for ; sent < len(logs); sent++ {
-			if !send(map[string]string{"type": "log", "line": logs[sent]}) {
+		phase, percent, detail, finished := job.snapshot()
+		if phase != sentPhase || percent != sentPercent || detail != sentDetail {
+			if !send(map[string]interface{}{
+				"type": "progress", "phase": phase, "percent": percent, "detail": detail,
+			}) {
 				return
 			}
+			sentPhase, sentPercent, sentDetail = phase, percent, detail
 		}
 		if finished {
 			_ = send(map[string]string{"type": "done", "status": job.Status, "message": job.Message})
@@ -629,28 +766,27 @@ func (s *webServer) streamJobLogs(w http.ResponseWriter, r *http.Request, job *w
 	}
 }
 
-// startJob runs fn in the background with the process output captured into
-// the job logs. Only one job runs at a time.
-func (s *webServer) startJob(action, name string, fn func(stub *cobra.Command) error) *webJob {
+// startJob runs fn in the background and reports its progress through the
+// job. Only one job runs at a time, they share the download directory.
+func (s *webServer) startJob(action, name string, fn func(stub *cobra.Command, job *webJob) error) *webJob {
 	s.mu.Lock()
 	s.nextID++
-	job := &webJob{ID: s.nextID, Action: action, Tool: name, Status: jobRunning}
+	job := &webJob{ID: s.nextID, Action: action, Tool: name, Status: jobRunning, Percent: -1}
 	s.jobs[job.ID] = job
+	s.pruneJobsLocked()
 	s.mu.Unlock()
 
 	go func() {
 		s.jobLock <- struct{}{}
 		defer func() { <-s.jobLock }()
 
-		err := withCapturedOutput(job, func() error {
-			stub := &cobra.Command{Use: "hd"}
-			// the fetch flow reads the context from the command, a nil one
-			// makes go-git panic
-			stub.SetContext(context.Background())
-			stub.SetOut(log.Writer())
-			stub.SetErr(log.Writer())
-			return fn(stub)
-		})
+		stub := &cobra.Command{Use: "hd"}
+		// the fetch flow reads the context from the command, a nil one
+		// makes go-git panic
+		stub.SetContext(context.Background())
+		stub.SetOut(log.Writer())
+		stub.SetErr(log.Writer())
+		err := fn(stub, job)
 
 		job.mu.Lock()
 		if err != nil {
@@ -666,47 +802,30 @@ func (s *webServer) startJob(action, name string, fn func(stub *cobra.Command) e
 	return job
 }
 
-// withCapturedOutput redirects os.Stdout and the standard logger into the
-// job logs while fn is running, so that the install/upgrade progress can be
-// streamed to the web page.
-func withCapturedOutput(job *webJob, fn func() error) (err error) {
-	reader, writer, pipeErr := os.Pipe()
-	if pipeErr != nil {
-		return fn()
+// pruneJobsLocked drops the oldest finished jobs, the caller holds the lock
+func (s *webServer) pruneJobsLocked() {
+	finished := make([]int, 0, len(s.jobs))
+	for id, job := range s.jobs {
+		job.mu.Lock()
+		done := job.finished
+		job.mu.Unlock()
+		if done {
+			finished = append(finished, id)
+		}
 	}
-
-	originStdout := os.Stdout
-	originLogOut := log.Writer()
-	os.Stdout = writer
-	log.SetOutput(writer)
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		buf := make([]byte, 4096)
-		for {
-			n, readErr := reader.Read(buf)
-			if n > 0 {
-				for _, line := range strings.Split(strings.TrimRight(string(buf[:n]), "\n"), "\n") {
-					if line != "" {
-						job.appendLog(line)
-					}
-				}
-			}
-			if readErr != nil {
-				return
+	if len(finished) <= jobHistory {
+		return
+	}
+	for i := range finished {
+		for j := i + 1; j < len(finished); j++ {
+			if finished[j] < finished[i] {
+				finished[i], finished[j] = finished[j], finished[i]
 			}
 		}
-	}()
-
-	defer func() {
-		os.Stdout = originStdout
-		log.SetOutput(originLogOut)
-		_ = writer.Close()
-		<-done
-	}()
-	err = fn()
-	return
+	}
+	for _, id := range finished[:len(finished)-jobHistory] {
+		delete(s.jobs, id)
+	}
 }
 
 // loadTools returns the installed tools as the API view
@@ -756,11 +875,19 @@ func (s *webServer) newInstallOption() *installOption {
 // installTool installs a tool by its name, the same way as hd install.
 // The version is optional, when set it pins the release tag which covers
 // upgrades and downgrades. The proxy is optional, when set the release is
-// downloaded through the GitHub acceleration proxy.
-func (s *webServer) installTool(stub *cobra.Command, name, version, proxy string, force bool) (err error) {
+// downloaded through the GitHub acceleration proxy. The job receives the
+// download progress.
+func (s *webServer) installTool(stub *cobra.Command, name, version, proxy string, force bool, job *webJob) (err error) {
 	opt := s.newInstallOption()
 	opt.force = force
 	opt.ProxyGitHub = proxy
+	if job != nil {
+		job.setPhase("resolving")
+		opt.onDownloadProgress = func(delta, total int64) {
+			job.markDownloading()
+			job.addBytes(delta, total)
+		}
+	}
 	if err = opt.preRunE(stub, []string{name}); err != nil {
 		return
 	}
@@ -780,11 +907,18 @@ func (s *webServer) installTool(stub *cobra.Command, name, version, proxy string
 
 // upgradeTool upgrades a tool from its source repository, the proxy is
 // optional and works the same as in installTool
-func (s *webServer) upgradeTool(stub *cobra.Command, org, repo, proxy string) error {
+func (s *webServer) upgradeTool(stub *cobra.Command, org, repo, proxy string, job *webJob) error {
 	up := &upgradeOption{
 		installOption: s.newInstallOption(),
 	}
 	up.ProxyGitHub = proxy
+	if job != nil {
+		job.setPhase("resolving")
+		up.onDownloadProgress = func(delta, total int64) {
+			job.markDownloading()
+			job.addBytes(delta, total)
+		}
+	}
 	return up.upgradeOne(stub, fmt.Sprintf("%s/%s", org, repo))
 }
 
@@ -795,4 +929,118 @@ func (s *webServer) removeTool(name string) (err error) {
 	stub.SetOut(io.Discard)
 	stub.SetErr(io.Discard)
 	return opt.runE(stub, []string{name})
+}
+
+// GET /api/processes returns the processes started from the console,
+// newest first
+func (s *webServer) handleProcesses(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
+		return
+	}
+	items := s.procs.list()
+	views := make([]managedProcess, 0, len(items))
+	for _, proc := range items {
+		views = append(views, proc.view())
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"data": views})
+}
+
+// GET /api/processes/{id} returns the process with its captured output
+// GET /api/processes/{id}/logs streams the output via SSE
+// DELETE /api/processes/{id} stops a running process
+func (s *webServer) handleProcess(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/processes/")
+	if path == "" {
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "process id is required")
+		return
+	}
+
+	idPart := path
+	sse := false
+	if idx := strings.Index(path, "/"); idx >= 0 {
+		idPart, sse = path[:idx], strings.HasSuffix(path, "/logs")
+	}
+	id, err := strconv.Atoi(idPart)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid process id")
+		return
+	}
+
+	proc := s.procs.get(id)
+	if proc == nil {
+		writeError(w, http.StatusNotFound, "PROCESS_NOT_FOUND", "process does not exist")
+		return
+	}
+
+	switch {
+	case r.Method == http.MethodGet && sse:
+		s.streamProcessOutput(w, r, proc)
+	case r.Method == http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"data": proc.view(), "output": proc.snapshotLines(),
+		})
+	case r.Method == http.MethodDelete:
+		if err = s.procs.stop(id); err != nil {
+			writeError(w, http.StatusConflict, "STOP_FAILED",
+				fmt.Sprintf("failed to stop process %d", id))
+			return
+		}
+		// the exit is reported by the process waiter as stopped
+		writeJSON(w, http.StatusOK, map[string]interface{}{"data": proc.view()})
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED",
+			"only GET and DELETE are supported")
+	}
+}
+
+// streamProcessOutput replays the captured output first, then streams the
+// new lines until the process ends
+func (s *webServer) streamProcessOutput(w http.ResponseWriter, r *http.Request, proc *managedProcess) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "STREAM_UNSUPPORTED", "streaming is not supported")
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	send := func(payload interface{}) bool {
+		data, err := json.Marshal(payload)
+		if err != nil {
+			return true
+		}
+		if _, err = fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+			return false
+		}
+		flusher.Flush()
+		return true
+	}
+
+	sent := 0
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		lines := proc.snapshotLines()
+		for ; sent < len(lines); sent++ {
+			if !send(map[string]string{"type": "log", "line": lines[sent]}) {
+				return
+			}
+		}
+
+		proc.mu.Lock()
+		status := proc.Status
+		proc.mu.Unlock()
+		if status != processRunning && sent >= len(proc.snapshotLines()) {
+			_ = send(map[string]string{"type": "done", "status": status, "message": proc.ExitHint})
+			return
+		}
+		select {
+		case <-ticker.C:
+		case <-r.Context().Done():
+			return
+		}
+	}
 }

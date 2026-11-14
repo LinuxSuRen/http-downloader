@@ -22,6 +22,10 @@ type MultiThreadDownloader struct {
 	suggestedFilename  string
 	timeout            time.Duration
 	maxAttempts        int
+
+	// OnProgress reports every transferred chunk of the whole file together
+	// with the total size in bytes, it works without the progress rendering
+	OnProgress func(delta, total int64)
 }
 
 // GetSuggestedFilename returns the suggested filename
@@ -57,6 +61,13 @@ func (d *MultiThreadDownloader) WithoutProxy(noProxy bool) *MultiThreadDownloade
 // WithShowProgress indicate if show the download progress
 func (d *MultiThreadDownloader) WithShowProgress(showProgress bool) *MultiThreadDownloader {
 	d.showProgress = showProgress
+	return d
+}
+
+// WithOnProgress sets the headless progress callback, it is independent of
+// the progress bar rendering
+func (d *MultiThreadDownloader) WithOnProgress(onProgress func(delta, total int64)) *MultiThreadDownloader {
+	d.OnProgress = onProgress
 	return d
 }
 
@@ -128,15 +139,20 @@ func (d *MultiThreadDownloader) DownloadWithContext(ctx context.Context, targetU
 		// aggregated bar which does not need cursor movements
 		var progress *ProgressIndicator
 		var multiBar *MultiProgressIndicator
-		if d.showProgress {
-			if isInteractiveTerminal() {
+		if d.showProgress || d.OnProgress != nil {
+			if isInteractiveTerminal() && d.showProgress {
 				multiBar = NewMultiProgressIndicator()
 			} else {
 				progress = &ProgressIndicator{
 					Title: "Downloading",
 					Total: float64(total),
+					// the headless callback works without any bar
+					// rendering, the server side relies on it
+					OnProgress: d.OnProgress,
 				}
-				progress.Init()
+				if d.showProgress {
+					progress.Init()
+				}
 			}
 		}
 		fmt.Printf("start to download with %d threads, size: %s\n", thread, humanBytes(total))
@@ -286,15 +302,20 @@ func (d *MultiThreadDownloader) Download(targetURL, targetFilePath string, threa
 		// aggregated bar which does not need cursor movements
 		var progress *ProgressIndicator
 		var multiBar *MultiProgressIndicator
-		if d.showProgress {
-			if isInteractiveTerminal() {
+		if d.showProgress || d.OnProgress != nil {
+			if isInteractiveTerminal() && d.showProgress {
 				multiBar = NewMultiProgressIndicator()
 			} else {
 				progress = &ProgressIndicator{
 					Title: "Downloading",
 					Total: float64(total),
+					// the headless callback works without any bar
+					// rendering, the server side relies on it
+					OnProgress: d.OnProgress,
 				}
-				progress.Init()
+				if d.showProgress {
+					progress.Init()
+				}
 			}
 		}
 		fmt.Printf("start to download with %d threads, size: %s\n", thread, humanBytes(total))

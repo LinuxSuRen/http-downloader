@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -161,21 +162,11 @@ func TestWebJobLogsSSE(t *testing.T) {
 	client := httpServer.Client()
 
 	server := newWebServer(context.Background())
-	job := &webJob{ID: 1, Action: "install", Tool: "fake-cli", Status: jobRunning}
-	job.appendLog("downloading fake-cli")
+	job := &webJob{ID: 1, Action: "install", Tool: "fake-cli", Status: jobRunning, Percent: -1}
+	job.setPhase("resolving")
 	server.jobs[1] = job
 	sseServer := httptest.NewServer(server.routes())
 	t.Cleanup(sseServer.Close)
-
-	// consume the SSE stream after the job is finished
-	go func() {
-		job.appendLog("installing fake-cli")
-		time.Sleep(200 * time.Millisecond)
-		job.mu.Lock()
-		job.Status = jobSuccess
-		job.finished = true
-		job.mu.Unlock()
-	}()
 
 	resp, err := client.Get(sseServer.URL + "/api/jobs/1/logs")
 	assert.NoError(t, err)
@@ -185,6 +176,24 @@ func TestWebJobLogsSSE(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	events := ""
 	buf := make([]byte, 4096)
+
+	// consume the initial progress event first, then advance the job, so
+	// the assertions do not race with the updates
+	n, _ := resp.Body.Read(buf)
+	events += string(buf[:n])
+	assert.Contains(t, events, `"type":"progress"`)
+	assert.Contains(t, events, `"phase":"resolving"`)
+
+	go func() {
+		job.markDownloading()
+		job.addBytes(500, 1000)
+		time.Sleep(200 * time.Millisecond)
+		job.mu.Lock()
+		job.Status = jobSuccess
+		job.finished = true
+		job.mu.Unlock()
+	}()
+
 	for time.Now().Before(deadline) {
 		n, readErr := resp.Body.Read(buf)
 		events += string(buf[:n])
@@ -192,12 +201,15 @@ func TestWebJobLogsSSE(t *testing.T) {
 			break
 		}
 	}
-	assert.Contains(t, events, `"type":"log"`)
-	assert.Contains(t, events, "downloading fake-cli")
+	assert.Contains(t, events, `"phase":"downloading"`)
+	assert.Contains(t, events, `"percent":50`)
 	assert.Contains(t, events, `"type":"done"`)
 	assert.Contains(t, events, `"status":"success"`)
 
-	// job status query
+	// the job list carries the job for a page reload
+	listResp, err := client.Get(httpServer.URL + "/api/jobs")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, listResp.StatusCode)
 	_ = httpServer
 }
 
@@ -349,27 +361,26 @@ func TestWebPackageVersions(t *testing.T) {
 
 func TestWebOpenTool(t *testing.T) {
 	httpServer, server := setupWebServer(t)
-	launched := ""
-	server.launchTool = func(binPath string) error {
-		launched = binPath
-		return nil
+	started := ""
+	server.startTool = func(name, binPath string) (*managedProcess, error) {
+		started = binPath
+		proc := &managedProcess{ID: 7, Name: name, Binary: binPath, Status: processRunning}
+		return proc, nil
 	}
 	client := httpServer.Client()
 
-	// open the installed tool with its binary
+	// start the installed tool as a child process
 	resp, err := client.Post(httpServer.URL+"/api/tools/fake-cli/open", "application/json", nil)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	opened := struct {
-		Data struct {
-			Name   string `json:"name"`
-			Binary string `json:"binary"`
-		} `json:"data"`
+		Data managedProcess `json:"data"`
 	}{}
 	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&opened))
 	assert.Equal(t, "fake-cli", opened.Data.Name)
 	assert.Equal(t, filepath.Join(homedirHome(t), "bin", "fake-cli"), opened.Data.Binary)
-	assert.Equal(t, opened.Data.Binary, launched)
+	assert.Equal(t, 7, opened.Data.ID)
+	assert.Equal(t, opened.Data.Binary, started)
 
 	// open a tool which is not installed
 	resp, err = client.Post(httpServer.URL+"/api/tools/none/open", "application/json", nil)
@@ -392,6 +403,101 @@ func TestWebOpenTool(t *testing.T) {
 	resp, err = client.Get(httpServer.URL + "/api/tools/fake-cli/open")
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+// TestProcessHelper is not a test: it is the body of the child processes
+// which TestProcessManager starts. The behavior comes from the environment
+// variable HD_HELPER_MODE: "greets" prints two lines, "waits" sleeps long
+// enough to be stopped, "fails" exits with a non zero code.
+func TestProcessHelper(t *testing.T) {
+	mode := os.Getenv("HD_HELPER_MODE")
+	if mode == "" {
+		t.Skip("not started as a helper process")
+	}
+
+	switch mode {
+	case "greets":
+		fmt.Println("hello from the helper")
+		fmt.Println("second line")
+	case "waits":
+		time.Sleep(30 * time.Second)
+	case "fails":
+		os.Exit(3)
+	}
+}
+
+func TestProcessManager(t *testing.T) {
+	manager := newProcessManager()
+	helper := os.Args[0]
+	waitStatus := func(proc *managedProcess) string {
+		deadline := time.Now().Add(10 * time.Second)
+		for time.Now().Before(deadline) {
+			proc.mu.Lock()
+			status := proc.Status
+			proc.mu.Unlock()
+			if status != processRunning {
+				return status
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		return processRunning
+	}
+
+	// a short living process with output
+	t.Setenv("HD_HELPER_MODE", "greets")
+	proc, err := manager.start("helper", helper, []string{"-test.run", "TestProcessHelper"})
+	assert.NoError(t, err)
+	assert.Equal(t, processRunning, proc.Status)
+	assert.Equal(t, processExited, waitStatus(proc))
+	assert.Contains(t, proc.snapshotLines(), "hello from the helper")
+	assert.Contains(t, proc.snapshotLines(), "second line")
+
+	// the process list keeps the record
+	assert.Len(t, manager.list(), 1)
+
+	// stopping a process which already ended fails
+	assert.Error(t, manager.stop(proc.ID))
+
+	// a failing process keeps its exit hint
+	t.Setenv("HD_HELPER_MODE", "fails")
+	failed, err := manager.start("helper", helper, []string{"-test.run", "TestProcessHelper"})
+	assert.NoError(t, err)
+	assert.Equal(t, processFailed, waitStatus(failed))
+	assert.NotEmpty(t, failed.ExitHint)
+
+	// a running process can be stopped
+	t.Setenv("HD_HELPER_MODE", "waits")
+	waiting, err := manager.start("helper", helper, []string{"-test.run", "TestProcessHelper"})
+	assert.NoError(t, err)
+	assert.NoError(t, manager.stop(waiting.ID))
+	assert.Equal(t, processStopped, waitStatus(waiting))
+
+	// an unknown process cannot be stopped
+	assert.Error(t, manager.stop(9999))
+}
+
+func TestFetchProgressParsing(t *testing.T) {
+	job := &webJob{Status: jobRunning, Percent: -1}
+	progress := fetchProgress{job: job}
+
+	_, err := progress.Write([]byte("Counting objects: 123, done.\n"))
+	assert.NoError(t, err)
+	phase, percent, _, _ := job.snapshot()
+	assert.Equal(t, "", phase)
+	assert.Equal(t, -1, percent)
+
+	_, err = progress.Write([]byte("Receiving objects:  45% (90/200), 12 MiB | 3 MiB/s\n"))
+	assert.NoError(t, err)
+	_, percent, detail, _ := job.snapshot()
+	assert.Equal(t, 45, percent)
+	assert.Equal(t, "90 / 200 objects", detail)
+
+	// the last match of a line wins
+	_, err = progress.Write([]byte("Resolving deltas:  10% (1/10)  80% (8/10)\n"))
+	assert.NoError(t, err)
+	_, percent, detail, _ = job.snapshot()
+	assert.Equal(t, 80, percent)
+	assert.Equal(t, "8 / 10 objects", detail)
 }
 
 func homedirHome(t *testing.T) string {

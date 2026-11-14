@@ -107,14 +107,12 @@ Then open http://127.0.0.1:8080, you can:
 
 * see all the tools in one list, installed and not-installed ones together, the green badge tells them apart and the list sorts by name in both directions
 * search the packages or browse them by category, shown as a table or as cards
-* install a package with any release version, which also covers upgrades and downgrades
+* install a package with any release version, which also covers upgrades and downgrades; every task runs in the background and reports a progress bar instead of logs, the data refresh does the same
 * pick a GitHub acceleration proxy for the downloads, the candidates come from your hd config and from hd-home, a custom address also works
-* open an installed tool in a new terminal window
+* run an installed tool as a child process of the console, watch its output in the page and stop it from there, no terminal window pops up
 * open the link of a web tool directly, packages can declare their entry link with the `homepage` field in [hd-home](https://github.com/LinuxSuRen/hd-home)
 
-The install/upgrade logs are streamed into the page.
-
-Use `--port` to change the port and `--listen` to change the binding address. The server binds to 127.0.0.1 by default; it has no authentication and it can install, remove and launch programs on this machine, please do not expose it to an untrusted network.
+Use `--port` to change the port and `--listen` to change the binding address. The server binds to 127.0.0.1 by default; it has no authentication and it can install, remove and run programs on this machine, please do not expose it to an untrusted network.
 
 ## Use multi-stage builds
 Do you want to download tools in the Docker builds? It's pretty easy. Please see the following example:

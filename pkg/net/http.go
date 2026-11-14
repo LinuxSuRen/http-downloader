@@ -197,6 +197,15 @@ func (h *HTTPDownloader) DownloadAsStream(writer io.Writer) (err error) {
 		// adopt a shared progress bar, e.g. all the parts of a multi-thread
 		// download feed the same aggregated bar
 		h.progressIndicator.Writer = writer
+		if h.progressIndicator.Total <= 0 {
+			// a headless caller passed a callback-only indicator which does
+			// not know the size yet, the response header carries it
+			if total, ok := resp.Header["Content-Length"]; ok && len(total) > 0 {
+				if fileLength, parseErr := strconv.ParseInt(total[0], 10, 64); parseErr == nil {
+					h.progressIndicator.Total = float64(fileLength + h.ProgressBase)
+				}
+			}
+		}
 	} else if showProgress && !h.progressInjected {
 		indicator := &ProgressIndicator{
 			Title:  h.Title,
@@ -383,7 +392,7 @@ func (c *ContinueDownloader) DownloadWithContinueAsStream(targetURL string, outp
 		Timeout:            c.Timeout,
 	}
 	if c.progress != nil {
-		c.downloader.progressIndicator = c.progress.Share()
+		c.downloader.progressIndicator = c.progress.shareInto()
 		c.downloader.progressInjected = true
 	}
 	if index >= 0 {
@@ -452,7 +461,7 @@ func (c *ContinueDownloader) DownloadWithContinue(targetURL, output string, inde
 			ProgressBase:       downloaded,
 		}
 		if c.progress != nil {
-			c.downloader.progressIndicator = c.progress.Share()
+			c.downloader.progressIndicator = c.progress.shareInto()
 			c.downloader.progressInjected = true
 		}
 		if index >= 0 {

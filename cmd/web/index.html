@@ -19,6 +19,9 @@
   .view-toggle .btn:last-child { border-radius: 0 6px 6px 0; border-left: none; }
   main { max-width: 1080px; margin: 24px auto; padding: 0 16px; }
   .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+  .card > h2 { font-size: 15px; margin: 0 0 12px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .card-head h2 { font-size: 15px; margin: 0; }
   .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
   .toolbar input[type=text] { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
   #proxy-select, #proxy-custom { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: #fff; }
@@ -49,12 +52,28 @@
   .btn.view-btn.active, .btn.sort-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   select.ver { border: 1px solid var(--border); border-radius: 6px; padding: 5px 6px; font-size: 12px; max-width: 130px; }
   a.silent { color: var(--accent); text-decoration: none; }
-  #logs { background: #0f172a; color: #d1e7ff; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; border-radius: 8px; padding: 12px; height: 260px; overflow-y: auto; white-space: pre-wrap; }
+  .task { padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .task:last-child { border-bottom: none; }
+  .task-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  .task-title { font-size: 13px; font-weight: 600; }
+  .progress { background: var(--chip); border-radius: 6px; height: 8px; overflow: hidden; }
+  .progress-bar { background: var(--accent); height: 100%; width: 0; transition: width .3s ease; border-radius: 6px; }
+  .progress-bar.indeterminate { width: 30%; animation: slide 1.2s ease-in-out infinite; }
+  @keyframes slide { 0% { margin-left: -30%; } 100% { margin-left: 100%; } }
+  .task-detail { color: var(--muted); font-size: 12px; margin-top: 4px; min-height: 14px; }
+  .proc { padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .proc:last-child { border-bottom: none; }
+  .proc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .proc-title { font-size: 13px; font-weight: 600; }
+  .proc-meta { color: var(--muted); font-size: 12px; }
+  .proc-actions { display: flex; gap: 6px; }
+  .proc-output { background: #0f172a; color: #d1e7ff; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; border-radius: 6px; padding: 10px; margin-top: 8px; height: 180px; overflow-y: auto; white-space: pre-wrap; }
   .status { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
   .status.running { background: #fef3c7; color: #92400e; }
-  .status.success { background: #dcfce7; color: #166534; }
+  .status.success, .status.exited { background: #dcfce7; color: #166534; }
   .status.failed  { background: #fee2e2; color: #991b1b; }
-  .empty { color: var(--muted); text-align: center; padding: 20px 0; }
+  .status.stopped { background: #e5e7eb; color: #374151; }
+  .empty { color: var(--muted); text-align: center; padding: 16px 0; font-size: 13px; }
   .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
 </style>
 </head>
@@ -96,14 +115,16 @@
   </div>
 
   <div class="card">
-    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-      <strong>Logs</strong>
-      <span style="display:flex; gap:16px; align-items:center;">
-        <label style="font-size:12px; color:var(--muted);"><input type="checkbox" id="force-install"> force install</label>
-        <span id="log-status" style="color:var(--muted); font-size:12px;"></span>
-      </span>
+    <div class="card-head">
+      <h2>Tasks</h2>
+      <label style="font-size:12px; color:var(--muted);"><input type="checkbox" id="force-install"> force install</label>
     </div>
-    <div id="logs">waiting for a job…</div>
+    <div id="tasks-list"><div class="empty">No task yet. Installing a tool or refreshing the data shows its progress here.</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Processes</h2>
+    <div id="processes-list"><div class="empty">No process yet. Open an installed tool to run it here, its output shows up below the entry.</div></div>
   </div>
 </main>
 <script>
@@ -116,9 +137,8 @@ const texts = {
   packagesFailed: 'Could not load the tools. Try again later.',
   categoriesFailed: 'Could not load the categories. Try Refresh data.',
   proxyFailed: 'Could not load the proxy settings. The direct connection is used.',
-  openFailed: 'Could not launch the tool. It may be missing or unsupported on this system.',
-  jobFailed: 'The job did not finish successfully. Check the logs above for details.',
-  streamFailed: 'Lost the connection to the log stream. Reconnecting is not available, refresh the page.',
+  openFailed: 'Could not start the tool. It may be missing or unsupported on this system.',
+  stopFailed: 'Could not stop the process. It may have already ended.',
 };
 
 let activeCategory = '';
@@ -181,7 +201,7 @@ function friendly(err, fallback) {
 
 function badge(status) {
   if (!status) return '';
-  return `<span class="status ${status}">${status}</span>`;
+  return `<span class="status ${esc(status)}">${esc(status)}</span>`;
 }
 
 // the proxy used by the installs: empty means downloading from GitHub directly
@@ -403,7 +423,11 @@ document.getElementById('packages-card').addEventListener('click', async ev => {
     }
   } else if (actionBtn.dataset.action === 'open') {
     try {
-      await api('POST', '/api/tools/' + encodeURIComponent(name) + '/open');
+      const data = await api('POST', '/api/tools/' + encodeURIComponent(name) + '/open');
+      await loadProcesses();
+      if (data.data && data.data.id) {
+        toggleProcessOutput(data.data.id, true);
+      }
     } catch (err) {
       alert(friendly(err, texts.openFailed));
     }
@@ -429,29 +453,53 @@ document.getElementById('fetch-btn').addEventListener('click', () => {
   startJob('POST', '/api/fetch', null, texts.fetchFailed);
 });
 
-async function startJob(method, url, body, fallback) {
-  let job;
-  try {
-    job = await api(method, url, body);
-  } catch (err) {
-    alert(friendly(err, fallback));
-    return;
+// ---- tasks: background jobs with a progress bar ----
+
+const taskStreams = {};
+
+function taskRow(job) {
+  const bar = job.percent < 0
+    ? '<div class="progress-bar indeterminate"></div>'
+    : `<div class="progress-bar" style="width:${job.percent}%"></div>`;
+  const detail = [job.phase, job.detail].filter(Boolean).join(' · ');
+  return `
+    <div class="task-head">
+      <span class="task-title">${esc(job.action)} ${esc(job.tool)}</span>
+      ${badge(job.status)}
+    </div>
+    ${job.status === 'running' ? `<div class="progress">${bar}</div>` : ''}
+    <div class="task-detail">${esc(detail)}</div>`;
+}
+
+function renderTask(job) {
+  let row = document.getElementById(`task-${job.id}`);
+  if (!row) {
+    row = document.createElement('div');
+    row.className = 'task';
+    row.id = `task-${job.id}`;
+    document.getElementById('tasks-list').prepend(row);
   }
-  document.getElementById('logs').textContent = '';
-  document.getElementById('job-badge').innerHTML = badge(job.status);
-  document.getElementById('log-status').textContent = `${job.action} ${job.tool} …`;
+  row.innerHTML = taskRow(job);
+}
+
+function watchTask(job) {
+  renderTask(job);
+  if (job.status !== 'running' || taskStreams[job.id]) return;
 
   const es = new EventSource(`/api/jobs/${job.id}/logs`);
+  taskStreams[job.id] = es;
   es.onmessage = ev => {
     const msg = JSON.parse(ev.data);
-    if (msg.type === 'log') {
-      document.getElementById('logs').textContent += msg.line + '\n';
-      document.getElementById('logs').scrollTop = document.getElementById('logs').scrollHeight;
+    if (msg.type === 'progress') {
+      Object.assign(job, {phase: msg.phase, percent: msg.percent, detail: msg.detail});
+      renderTask(job);
     } else if (msg.type === 'done') {
       es.close();
+      delete taskStreams[job.id];
+      job.status = msg.status;
+      job.message = msg.message;
+      renderTask(job);
       document.getElementById('job-badge').innerHTML = badge(msg.status);
-      document.getElementById('log-status').textContent =
-        msg.status === 'success' ? `${job.action} ${job.tool} finished` : texts.jobFailed;
       loadPackages();
       if (job.action === 'fetch') {
         loadCategories();
@@ -460,14 +508,162 @@ async function startJob(method, url, body, fallback) {
   };
   es.onerror = () => {
     es.close();
-    document.getElementById('log-status').textContent = texts.streamFailed;
+    delete taskStreams[job.id];
   };
 }
+
+async function loadTasks() {
+  let data;
+  try {
+    data = await api('GET', '/api/jobs');
+  } catch (err) {
+    return;
+  }
+  const jobs = data.data || [];
+  if (jobs.length === 0) return;
+  document.getElementById('tasks-list').innerHTML = '';
+  jobs.forEach(job => watchTask(job));
+}
+
+async function startJob(method, url, body, fallback) {
+  let job;
+  try {
+    job = await api(method, url, body);
+  } catch (err) {
+    alert(friendly(err, fallback));
+    return;
+  }
+  document.getElementById('job-badge').innerHTML = badge(job.status);
+  watchTask(job);
+}
+
+// ---- processes: the tools started as child processes ----
+
+const processStreams = {};
+
+function procRow(proc) {
+  const started = proc.started_at ? new Date(proc.started_at) : null;
+  const meta = started && !isNaN(started)
+    ? `pid ${esc(proc.id)} · started ${started.toLocaleTimeString()}` : `pid ${esc(proc.id)}`;
+  const stopDisabled = proc.status === 'running' ? '' : 'disabled';
+  const output = processStreams[proc.id]
+    ? `<pre class="proc-output" id="proc-output-${esc(proc.id)}"></pre>` : '';
+  return `
+    <div class="proc-head">
+      <span>
+        <span class="proc-title">${esc(proc.name)}</span>
+        <span class="proc-meta">${meta}${proc.exit_hint ? ' · ' + esc(proc.exit_hint) : ''}</span>
+      </span>
+      <span style="display:flex; gap:8px; align-items:center;">
+        ${badge(proc.status)}
+        <span class="proc-actions">
+          <button class="btn" data-proc-action="output" data-id="${esc(proc.id)}">Output</button>
+          <button class="btn danger" data-proc-action="stop" data-id="${esc(proc.id)}" ${stopDisabled}>Stop</button>
+        </span>
+      </span>
+    </div>
+    ${output}`;
+}
+
+function renderProcess(proc) {
+  let row = document.getElementById(`proc-${proc.id}`);
+  if (!row) {
+    row = document.createElement('div');
+    row.className = 'proc';
+    row.id = `proc-${proc.id}`;
+    document.getElementById('processes-list').prepend(row);
+  }
+  const keepOutput = document.getElementById(`proc-output-${proc.id}`);
+  const kept = keepOutput ? keepOutput.innerHTML : null;
+  row.innerHTML = procRow(proc);
+  if (kept !== null) {
+    const restored = document.getElementById(`proc-output-${proc.id}`);
+    if (restored) restored.innerHTML = kept;
+  }
+}
+
+async function loadProcesses() {
+  let data;
+  try {
+    data = await api('GET', '/api/processes');
+  } catch (err) {
+    return;
+  }
+  const procs = data.data || [];
+  if (procs.length === 0) return;
+  document.getElementById('processes-list').innerHTML = '';
+  procs.forEach(proc => renderProcess(proc));
+}
+
+function appendProcessOutput(id, line) {
+  const output = document.getElementById(`proc-output-${id}`);
+  if (!output) return;
+  output.textContent += line + '\n';
+  output.scrollTop = output.scrollHeight;
+}
+
+function watchProcess(id) {
+  if (processStreams[id]) return;
+  const es = new EventSource(`/api/processes/${id}/logs`);
+  processStreams[id] = es;
+  es.onmessage = ev => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'log') {
+      appendProcessOutput(id, msg.line);
+    } else if (msg.type === 'done') {
+      es.close();
+      delete processStreams[id];
+      loadProcesses();
+    }
+  };
+  es.onerror = () => {
+    es.close();
+    delete processStreams[id];
+  };
+}
+
+function toggleProcessOutput(id, forceOpen) {
+  if (processStreams[id] && !forceOpen) {
+    const es = processStreams[id];
+    delete processStreams[id];
+    es.close();
+    loadProcesses();
+    return;
+  }
+  if (processStreams[id]) return;
+
+  const row = document.getElementById(`proc-${id}`);
+  if (row) {
+    const pre = document.createElement('pre');
+    pre.className = 'proc-output';
+    pre.id = `proc-output-${id}`;
+    row.appendChild(pre);
+  }
+  watchProcess(id);
+}
+
+document.getElementById('processes-list').addEventListener('click', async ev => {
+  const btn = ev.target.closest('button[data-proc-action]');
+  if (!btn || btn.disabled) return;
+  const id = btn.dataset.id;
+  if (btn.dataset.procAction === 'stop') {
+    try {
+      await api('DELETE', '/api/processes/' + encodeURIComponent(id));
+      loadProcesses();
+    } catch (err) {
+      alert(friendly(err, texts.stopFailed));
+    }
+  } else {
+    toggleProcessOutput(id, false);
+  }
+});
 
 applyView();
 loadPackages();
 loadCategories();
 loadProxy();
+loadTasks();
+loadProcesses();
 </script>
 </body>
 </html>
