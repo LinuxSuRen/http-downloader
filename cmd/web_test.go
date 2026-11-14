@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -303,6 +304,70 @@ categories:
 	assert.Len(t, packages.Data, 2)
 	assert.Equal(t, "fake-cli", packages.Data[0].Repo)
 	assert.Equal(t, "fake-web", packages.Data[1].Repo)
+}
+
+func TestWebPackagesPagination(t *testing.T) {
+	httpServer, _ := setupWebServer(t)
+	client := httpServer.Client()
+
+	// five packages of one dedicated category, their names decide the order
+	for i := 1; i <= 5; i++ {
+		seedPkgConfig(t, "page-org", fmt.Sprintf("tool-%d", i),
+			fmt.Sprintf("name: tool-%d\ncategories:\n  - paging\n", i))
+	}
+	decode := func(resp *http.Response) (result struct {
+		Data           []packageItem `json:"data"`
+		Page           int           `json:"page"`
+		PageSize       int           `json:"page_size"`
+		Total          int           `json:"total"`
+		InstalledTotal int           `json:"installed_total"`
+	}) {
+		assert.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
+		return
+	}
+
+	// the first page carries the alphabetically smallest names
+	resp, err := client.Get(httpServer.URL + "/api/packages?category=paging&page_size=2")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	first := decode(resp)
+	assert.Equal(t, 5, first.Total)
+	assert.Equal(t, 2, first.PageSize)
+	assert.Equal(t, 1, first.Page)
+	assert.Len(t, first.Data, 2)
+	assert.Equal(t, "tool-1", first.Data[0].Name)
+	assert.Equal(t, "tool-2", first.Data[1].Name)
+
+	// the last page carries the rest
+	resp, err = client.Get(httpServer.URL + "/api/packages?category=paging&page_size=2&page=3")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	last := decode(resp)
+	assert.Len(t, last.Data, 1)
+	assert.Equal(t, "tool-5", last.Data[0].Name)
+
+	// the descending order flips the pages
+	resp, err = client.Get(httpServer.URL + "/api/packages?category=paging&page_size=2&order=desc")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	desc := decode(resp)
+	assert.Equal(t, "tool-5", desc.Data[0].Name)
+	assert.Equal(t, "tool-4", desc.Data[1].Name)
+
+	// a page beyond the range is empty but still reports the total
+	resp, err = client.Get(httpServer.URL + "/api/packages?category=paging&page=9")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	beyond := decode(resp)
+	assert.Empty(t, beyond.Data)
+	assert.Equal(t, 5, beyond.Total)
+
+	// the page size has an upper bound
+	resp, err = client.Get(httpServer.URL + "/api/packages?category=paging&page_size=999")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	capped := decode(resp)
+	assert.Equal(t, maxPackagePageSize, capped.PageSize)
 }
 
 func TestWebPackageVersions(t *testing.T) {

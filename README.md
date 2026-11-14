@@ -105,7 +105,7 @@ hd web
 
 Then open http://127.0.0.1:8080, you can:
 
-* see all the tools in one list, installed and not-installed ones together, the green badge tells them apart and the list sorts by name in both directions
+* see all the tools in one list, installed and not-installed ones together, the green badge tells them apart; the list sorts by name in both directions and is paginated instead of rendering everything at once
 * search the packages or browse them by category, shown as a table or as cards
 * install a package with any release version, which also covers upgrades and downgrades
 * pick a GitHub acceleration proxy for the downloads, the candidates come from your hd config and from hd-home, a custom address also works

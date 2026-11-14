@@ -241,6 +241,8 @@ type packageItem struct {
 // package is listed and the installed tools which are not part of the
 // cache are merged in, so installed and not-installed tools share one
 // view. A category or a keyword filters the cache packages only.
+// The list is paginated (page starts at 1) and sorted server side, name
+// ascending by default: ?page=1&page_size=48&sort=name&order=asc
 func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
@@ -248,6 +250,14 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 	}
 	category := strings.TrimSpace(r.URL.Query().Get("category"))
 	keyword := strings.TrimSpace(r.URL.Query().Get("q"))
+	sortField := strings.TrimSpace(r.URL.Query().Get("sort"))
+	sortOrder := strings.TrimSpace(r.URL.Query().Get("order"))
+
+	page := parsePositiveInt(r.URL.Query().Get("page"), 1)
+	pageSize := parsePositiveInt(r.URL.Query().Get("page_size"), defaultPackagePageSize)
+	if pageSize > maxPackagePageSize {
+		pageSize = maxPackagePageSize
+	}
 
 	configDir, ok := s.ensureConfigCache()
 	if !ok {
@@ -322,10 +332,66 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].Org+"/"+items[i].Repo < items[j].Org+"/"+items[j].Repo
+
+	// the whole list is sorted before it is sliced into the requested page
+	sortPackages(items, sortField, sortOrder)
+
+	installedTotal := 0
+	for i := range items {
+		if items[i].Installed {
+			installedTotal++
+		}
+	}
+	total := len(items)
+	start := (page - 1) * pageSize
+	if start > total {
+		start = total
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data":            items[start:end],
+		"page":            page,
+		"page_size":       pageSize,
+		"total":           total,
+		"installed_total": installedTotal,
 	})
-	writeJSON(w, http.StatusOK, map[string]interface{}{"data": items})
+}
+
+// packagePageLimits are the defaults and the upper bound of the package
+// list pagination
+const (
+	defaultPackagePageSize = 48
+	maxPackagePageSize     = 200
+)
+
+// sortPackages orders the list in place, name is the default sort field
+// and asc the default order, the org/repo is the stable tie breaker
+func sortPackages(items []packageItem, field, order string) {
+	desc := order == "desc"
+	less := func(i, j int) bool {
+		var a, b string
+		switch field {
+		case "org":
+			a = items[i].Org + "/" + items[i].Repo
+			b = items[j].Org + "/" + items[j].Repo
+		default:
+			a = strings.ToLower(items[i].Name)
+			b = strings.ToLower(items[j].Name)
+		}
+		if a == b {
+			// keep a stable order for the tools sharing one name
+			a = items[i].Org + "/" + items[i].Repo
+			b = items[j].Org + "/" + items[j].Repo
+		}
+		if desc {
+			return a > b
+		}
+		return a < b
+	}
+	sort.Slice(items, less)
 }
 
 // versionTag is the API view of a release tag
@@ -392,6 +458,15 @@ func splitOrgRepo(orgRepo string) (org, repo string, valid bool) {
 		return "", "", false
 	}
 	return items[0], items[1], true
+}
+
+// parsePositiveInt reads a positive integer query parameter, it falls back
+// to the given default when the value is missing or invalid
+func parsePositiveInt(value string, fallback int) int {
+	if parsed, err := strconv.Atoi(value); err == nil && parsed > 0 {
+		return parsed
+	}
+	return fallback
 }
 
 // loadInstalledRecords loads the installed tools, a broken record file
