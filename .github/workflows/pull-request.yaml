@@ -20,7 +20,7 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3.6.0
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v4.4.0
+        uses: goreleaser/goreleaser-action@v6.0.0
         with:
           github_token: ${{ secrets.GH_PUBLISH_SECRETS }}
           version: v1.14.0
