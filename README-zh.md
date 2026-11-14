@@ -42,6 +42,53 @@ hd install jenkins-zh/jenkins-cli/jcli -t 6
 hd get --pre ks
 ```
 
+## 安装系统安装包
+`hd install` 同样支持主流的系统安装包格式，例如：`deb`、`rpm`、`msi`、`pkg`（macOS）、`apk`（Alpine）以及 `pacman` 包。
+这一过程会复用操作系统自带的包管理工具（例如：`apt-get`、`dnf`、`msiexec`、`installer`），不会重复造轮子。
+
+```shell
+# 安装一个 deb 格式的 release 附件
+hd install xxx/yyy --format deb
+
+# 或者，直接给一个安装包的下载地址
+hd install https://example.com/foo_1.0.0_amd64.deb
+```
+
+在 Linux 和 macOS 上，如果当前用户不是 root，包管理工具会通过 `sudo` 执行；在 Windows 上，`msiexec` 可能需要管理员权限的终端。
+
+## 从系统软件包仓库安装
+主流软件包仓库中的软件包可以通过 `管理器:名称` 的格式来安装：
+
+```shell
+hd install apt:jenkins
+hd install winget:Git.Git
+hd install brew:wget
+```
+
+支持的包管理器有：`apt`、`dnf`、`yum`、`apk`、`pacman`、`zypper`、`snap`、`flatpak`、`brew`、`winget`、`choco`、`scoop` 和 `npm`。
+当前平台上没有安装的管理器会被直接拒绝；`hd remove` 会通过同一个包管理器来卸载这类软件包。
+
+## 搜索
+首次使用前，请先执行命令初始化：`hd fetch`
+
+然后就可以通过关键字搜索：`hd search jenkins`
+
+你也可以搜索已安装的系统包管理器仓库中的软件包，搜索结果会带上 `管理器:名称` 前缀，可以直接安装：
+
+```shell
+hd search jenkins --repos
+hd search jenkins --repos --managers apt,winget
+```
+
+输出示例：
+
+```shell
+$ hd search jenkins --repos
+linuxsuren/jenkins-cli
+apt:jenkins (2.426) - Jenkins continuous integration server
+winget:Jenkins.Project.Jenkins - Jenkins
+```
+
 # 功能
 
 * 基于 HTTP 协议下载文件的 Golang 工具库
@@ -84,6 +131,7 @@ hd web
 
 * 在一个列表里看到全部工具，已安装与未安装混排展示，绿色徽标区分安装状态，列表支持按名称双向排序
 * 搜索可安装的软件包，或者按分类浏览，支持表格与卡片两种展示方式
+* 打开“系统仓库”开关后，可以同时搜索 `apt`、`winget`、`brew` 等包管理器仓库中的软件包，并直接安装
 * 安装任意发布版本，升级与降级都支持
 * 为下载选择 GitHub 加速代理，候选项来自 hd 的配置和 hd-home，也支持自定义地址
 * 在新的终端窗口中打开已安装的工具

@@ -20,6 +20,7 @@ import (
 	hdpkg "github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	hdos "github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -69,6 +70,9 @@ type webServer struct {
 	// is neither available nor desired in the unit tests
 	listVersions func(org, repo string, count int) ([]versionTag, error)
 	launchTool   func(binPath string) error
+	// repoSearch searches the system package repositories, it shells out
+	// to the installed package managers which is not desired in the tests
+	repoSearch func(keyword string, managers []string) []hdos.RepoPackage
 }
 
 func newWebServer(ctx context.Context) *webServer {
@@ -80,6 +84,9 @@ func newWebServer(ctx context.Context) *webServer {
 	}
 	server.listVersions = listGitHubVersions
 	server.launchTool = openInTerminal
+	server.repoSearch = func(keyword string, managers []string) []hdos.RepoPackage {
+		return (&hdos.RepositorySearcher{}).Search(keyword, managers)
+	}
 	return server
 }
 
@@ -234,6 +241,14 @@ type packageItem struct {
 	Version       string `json:"version,omitempty"`
 	InstalledAt   string `json:"installed_at,omitempty"`
 	Native        bool   `json:"native,omitempty"`
+	// Manager is the system package manager of a repository package, for
+	// instance: apt, winget. It is only set by the repository search.
+	Manager string `json:"manager,omitempty"`
+	// Ref is the installable reference of a repository package, for
+	// instance: apt:jenkins
+	Ref string `json:"ref,omitempty"`
+	// Description is the summary which comes from the package repository
+	Description string `json:"description,omitempty"`
 }
 
 // GET /api/packages lists the tools of the local hd-home cache together
@@ -272,6 +287,7 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 
 	records := loadInstalledRecords()
 	installed := installedIndex(records)
+	managerInstalled := managerInstalledIndex(records)
 	seen := make(map[string]bool, len(orgRepos))
 	items := make([]packageItem, 0, len(orgRepos)+len(records))
 	for _, orgRepo := range orgRepos {
@@ -322,10 +338,55 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
+	// the repository results extend the keyword search with the packages
+	// of the system package repositories, for instance: apt:jenkins
+	if keyword != "" && r.URL.Query().Get("repos") == "true" && s.repoSearch != nil {
+		for _, pkg := range s.repoSearch(keyword, nil) {
+			item := packageItem{
+				Manager:     pkg.Manager,
+				Name:        pkg.Name,
+				Version:     pkg.Version,
+				Ref:         pkg.Ref(),
+				Description: pkg.Description,
+			}
+			if record := managerInstalled[pkg.Ref()]; record != nil {
+				item.Installed = true
+				item.InstalledName = record.Name
+				item.InstalledAt = record.InstalledAt
+				item.Native = record.Native
+				if record.Version != "" {
+					item.Version = record.Version
+				}
+			}
+			items = append(items, item)
+		}
+	}
+
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].Org+"/"+items[i].Repo < items[j].Org+"/"+items[j].Repo
+		return packageSortKey(items[i]) < packageSortKey(items[j])
 	})
 	writeJSON(w, http.StatusOK, map[string]interface{}{"data": items})
+}
+
+// packageSortKey sorts the hd-home packages by their org/repo and the
+// repository packages by their name
+func packageSortKey(item packageItem) string {
+	if item.Org != "" && item.Repo != "" {
+		return item.Org + "/" + item.Repo
+	}
+	return item.Name
+}
+
+// managerInstalledIndex indexes the installed tools by their package
+// manager reference, for instance: apt:jenkins
+func managerInstalledIndex(records []installer.InstalledPackage) (index map[string]*installer.InstalledPackage) {
+	index = make(map[string]*installer.InstalledPackage, len(records))
+	for i := range records {
+		if records[i].PackageManager != "" {
+			index[records[i].PackageManager+":"+records[i].Name] = &records[i]
+		}
+	}
+	return
 }
 
 // versionTag is the API view of a release tag

@@ -20,6 +20,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/compress"
+	"github.com/linuxsuren/http-downloader/pkg/native"
 	"github.com/linuxsuren/http-downloader/pkg/net"
 	"github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/mitchellh/go-homedir"
@@ -529,7 +530,9 @@ func getPackagingFormat(installer *Installer) string {
 }
 
 func hasPackageSuffix(packageURL string) bool {
-	return compress.IsSupport(path.Ext(packageURL))
+	// the native installer packages, for instance: deb, rpm and msi, also
+	// carry their format in the file name suffix
+	return compress.IsSupport(path.Ext(packageURL)) || native.IsInstallerFile(packageURL)
 }
 
 // hdHomeConfigDir returns the config directory of the local hd-home cache,

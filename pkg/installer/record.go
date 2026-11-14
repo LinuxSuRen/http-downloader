@@ -20,6 +20,10 @@ type InstalledPackage struct {
 	InstalledAt     string   `yaml:"installedAt,omitempty" json:"installedAt,omitempty"`
 	FromSource      bool     `yaml:"fromSource,omitempty" json:"fromSource,omitempty"`
 	Native          bool     `yaml:"native,omitempty" json:"native,omitempty"`
+	// PackageManager records the system package manager which installed the
+	// tool, for instance: apt, winget. It allows hd to uninstall the tool
+	// through the same package manager.
+	PackageManager string `yaml:"packageManager,omitempty" json:"packageManager,omitempty"`
 }
 
 // installedFile is the structure of the installed tools record file

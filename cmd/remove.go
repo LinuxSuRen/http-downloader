@@ -8,6 +8,7 @@ import (
 
 	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/spf13/cobra"
 )
 
@@ -45,6 +46,19 @@ func (o *removeOption) runE(cmd *cobra.Command, args []string) (err error) {
 
 		if o.keepRecord {
 			cmd.Printf("removed record of %s\n", name)
+			continue
+		}
+
+		if tool.PackageManager != "" {
+			// uninstall it via the package manager which installed it
+			if rmErr := os.UninstallWithManager(tool.PackageManager, name, o.execer); rmErr != nil {
+				cmd.Printf("cannot uninstall %s via %s, error: %v\n", name, tool.PackageManager, rmErr)
+				if err == nil {
+					err = rmErr
+				}
+			} else {
+				cmd.Printf("uninstalled %s via %s\n", name, tool.PackageManager)
+			}
 			continue
 		}
 

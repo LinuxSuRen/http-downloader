@@ -64,6 +64,30 @@ or install by a category name:
 hd install --category security
 ```
 
+## Install native packages
+`hd install` also understands the native installer packages, for instance: `deb`, `rpm`, `msi`, `pkg` (macOS), `apk` (Alpine) and `pacman` packages. It reuses the package tools which are already shipped by your operating system, for instance: `apt-get`, `dnf`, `msiexec` and `installer`. Nothing is re-implemented here.
+
+```shell
+# a release asset which is a deb package
+hd install xxx/yyy --format deb
+
+# or a direct package URL
+hd install https://example.com/foo_1.0.0_amd64.deb
+```
+
+On Linux and macOS the package tools run via `sudo` when the current user is not root, on Windows an elevated terminal might be needed by `msiexec`.
+
+## Install from the system package repositories
+Packages of the mainstream package repositories can be installed with a `manager:name` reference:
+
+```shell
+hd install apt:jenkins
+hd install winget:Git.Git
+hd install brew:wget
+```
+
+The supported package managers are: `apt`, `dnf`, `yum`, `apk`, `pacman`, `zypper`, `snap`, `flatpak`, `brew`, `winget`, `choco`, `scoop` and `npm`. A manager which is not installed on your platform is simply rejected. `hd remove` uninstalls such a package through the very same package manager.
+
 ## Search
 hd can download or install via the format of `$org/$repo`. If you find that it's not working. It might because of there's 
 no record in [hd-home](https://github.com/LinuxSuRen/hd-home). You're welcome to help us to maintain it.
@@ -71,6 +95,23 @@ no record in [hd-home](https://github.com/LinuxSuRen/hd-home). You're welcome to
 When you first run it, please init via: `hd fetch`
 
 then you can search it by a keyword: `hd search jenkins`
+
+You can also search the repositories of the installed system package managers, the results carry the `manager:name`
+prefix and can be installed directly:
+
+```shell
+hd search jenkins --repos
+hd search jenkins --repos --managers apt,winget
+```
+
+Output example:
+
+```shell
+$ hd search jenkins --repos
+linuxsuren/jenkins-cli
+apt:jenkins (2.426) - Jenkins continuous integration server
+winget:Jenkins.Project.Jenkins - Jenkins
+```
 
 ## Manage the installed tools
 Every tool installed via `hd install` is recorded into `~/.config/hd-installed.yaml`. You can manage them with the following commands:
@@ -107,6 +148,7 @@ Then open http://127.0.0.1:8080, you can:
 
 * see all the tools in one list, installed and not-installed ones together, the green badge tells them apart and the list sorts by name in both directions
 * search the packages or browse them by category, shown as a table or as cards
+* turn on *System repositories* to also search the packages of `apt`, `winget`, `brew` and friends, and install them right from the results
 * install a package with any release version, which also covers upgrades and downgrades
 * pick a GitHub acceleration proxy for the downloads, the candidates come from your hd config and from hd-home, a custom address also works
 * open an installed tool in a new terminal window

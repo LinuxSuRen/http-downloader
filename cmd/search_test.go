@@ -10,6 +10,7 @@ import (
 
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/log"
+	hdos "github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -61,6 +62,10 @@ func Test_newSearchCmd(t *testing.T) {
 		name: "provider",
 	}, {
 		name: "proxy-github",
+	}, {
+		name: "repos",
+	}, {
+		name: "managers",
 	}}
 	for i := range flags {
 		tt := flags[i]
@@ -71,4 +76,52 @@ func Test_newSearchCmd(t *testing.T) {
 			assert.Equal(t, tt.shorthand, flag.Shorthand)
 		})
 	}
+}
+
+func TestFormatRepoPackage(t *testing.T) {
+	for i, tt := range []struct {
+		pkg    hdos.RepoPackage
+		expect string
+	}{{
+		pkg:    hdos.RepoPackage{Manager: "apt", Name: "jenkins"},
+		expect: "apt:jenkins",
+	}, {
+		pkg:    hdos.RepoPackage{Manager: "winget", Name: "Git.Git", Version: "2.47.0"},
+		expect: "winget:Git.Git (2.47.0)",
+	}, {
+		pkg:    hdos.RepoPackage{Manager: "apt", Name: "jenkins", Description: "Jenkins CI"},
+		expect: "apt:jenkins - Jenkins CI",
+	}, {
+		pkg:    hdos.RepoPackage{Manager: "choco", Name: "git", Version: "2.47", Description: "Git tool"},
+		expect: "choco:git (2.47) - Git tool",
+	}} {
+		t.Run(tt.expect, func(t *testing.T) {
+			assert.Equal(t, tt.expect, FormatRepoPackage(tt.pkg), "failed with case [%d]", i)
+		})
+	}
+}
+
+func TestSearchRepos(t *testing.T) {
+	buf := &bytes.Buffer{}
+	opt := &searchOption{
+		Repos: true,
+		repoSearch: func(keyword string, managers []string) []hdos.RepoPackage {
+			assert.Equal(t, "jenkins", keyword)
+			assert.Equal(t, []string{"apt", "winget"}, managers)
+			return []hdos.RepoPackage{{
+				Manager:     "apt",
+				Name:        "jenkins",
+				Version:     "2.426",
+				Description: "Jenkins automation server",
+			}}
+		},
+		Managers: []string{"apt", "winget"},
+	}
+	opt.searchRepos("jenkins", buf)
+	assert.Equal(t, "apt:jenkins (2.426) - Jenkins automation server\n", buf.String())
+
+	// without the repos flag nothing is searched
+	empty := &bytes.Buffer{}
+	(&searchOption{}).searchRepos("jenkins", empty)
+	assert.Empty(t, empty.String())
 }

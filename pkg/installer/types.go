@@ -87,6 +87,11 @@ type Installer struct {
 	Fetch            bool
 	AdditionBinaries []string
 
+	// InstalledNative tells the package was installed as a native installer
+	// package, for instance: a deb or msi file which was handled by the
+	// system package tools
+	InstalledNative bool
+
 	Org         string
 	Repo        string
 	ProxyGitHub string
