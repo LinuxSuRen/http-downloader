@@ -28,6 +28,7 @@
   .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .list-meta { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 8px; }
   .list-meta .count { color: var(--muted); font-size: 12px; }
+  .pager { display: inline-flex; align-items: center; gap: 6px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   th { color: var(--muted); font-weight: 500; }
@@ -85,7 +86,14 @@
     <div class="hint">Installed and not-installed tools share this list, the green badge marks the installed ones with their version. If a package is missing, it may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
     <div class="list-meta">
       <span class="count" id="pkg-count"></span>
-      <button class="btn sort-btn" id="sort-btn" title="Sort the list by the tool name">Name ↑</button>
+      <span style="display:flex; gap:8px; align-items:center;">
+        <span class="pager">
+          <button class="btn" id="prev-page" title="Previous page">‹</button>
+          <span id="page-indicator" class="count">1 / 1</span>
+          <button class="btn" id="next-page" title="Next page">›</button>
+        </span>
+        <button class="btn sort-btn" id="sort-btn" title="Sort the list by the tool name">Name ↑</button>
+      </span>
     </div>
     <table id="packages-table">
       <thead><tr><th>Package</th><th>Categories</th><th>Installed</th><th>Actions</th></tr></thead>
@@ -123,6 +131,11 @@ const texts = {
 
 let activeCategory = '';
 let packageItems = [];
+// the pagination state of the merged list, the page always resets when
+// the query changes
+let pageNumber = 1;
+let pageTotal = 1;
+const pageSize = 48;
 
 // the view preference of the user wins over the viewport width, which is
 // only read once when the page loads
@@ -156,7 +169,8 @@ document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('clic
 document.getElementById('sort-btn').addEventListener('click', () => {
   sortDir = sortDir === 'asc' ? 'desc' : 'asc';
   localStorage.setItem('hd-sort', sortDir);
-  renderPackages(packageItems);
+  pageNumber = 1;
+  loadPackages();
 });
 
 function esc(value) {
@@ -259,29 +273,59 @@ document.getElementById('categories').addEventListener('click', ev => {
   if (activeCategory) {
     document.getElementById('search-keyword').value = '';
   }
+  pageNumber = 1;
   loadCategories();
   loadPackages();
 });
 
+document.getElementById('prev-page').addEventListener('click', () => {
+  if (pageNumber <= 1) return;
+  pageNumber--;
+  loadPackages();
+});
+
+document.getElementById('next-page').addEventListener('click', () => {
+  if (pageNumber >= pageTotal) return;
+  pageNumber++;
+  loadPackages();
+});
+
 async function loadPackages() {
-  let url = '/api/packages';
+  const params = new URLSearchParams({
+    page: pageNumber, page_size: pageSize, sort: 'name', order: sortDir,
+  });
   if (activeCategory) {
-    url += '?category=' + encodeURIComponent(activeCategory);
+    params.set('category', activeCategory);
   } else {
     const keyword = document.getElementById('search-keyword').value.trim();
     if (keyword) {
-      url += '?q=' + encodeURIComponent(keyword);
+      params.set('q', keyword);
     }
   }
 
   let data;
   try {
-    data = await api('GET', url);
+    data = await api('GET', '/api/packages?' + params.toString());
   } catch (err) {
     alert(friendly(err, texts.packagesFailed));
     return;
   }
-  renderPackages(data.data || []);
+
+  const items = data.data || [];
+  const total = data.total || 0;
+  pageTotal = Math.max(1, Math.ceil(total / (data.page_size || pageSize)));
+  if (items.length === 0 && pageNumber > 1 && total > 0) {
+    // the last page emptied after an install or a removal, go back one
+    pageNumber = pageTotal;
+    loadPackages();
+    return;
+  }
+  document.getElementById('pkg-count').textContent =
+    `${total} tools, ${data.installed_total || 0} installed`;
+  document.getElementById('page-indicator').textContent = `${pageNumber} / ${pageTotal}`;
+  document.getElementById('prev-page').disabled = pageNumber <= 1;
+  document.getElementById('next-page').disabled = pageNumber >= pageTotal;
+  renderPackages(items);
 }
 
 // the installed actions address the record, which may carry a different
@@ -323,15 +367,9 @@ function packageSource(item) {
 
 function renderPackages(items) {
   packageItems = items;
-  const direction = sortDir === 'asc' ? 1 : -1;
-  const sorted = [...items].sort((a, b) =>
-    direction * String(a.name || '').localeCompare(String(b.name || ''), undefined, {sensitivity: 'base'}));
-
   document.getElementById('sort-btn').textContent = sortDir === 'asc' ? 'Name ↑' : 'Name ↓';
-  document.getElementById('pkg-count').textContent =
-    `${sorted.length} tools, ${sorted.filter(item => item.installed).length} installed`;
-  document.getElementById('packages-empty').hidden = sorted.length > 0;
-  document.getElementById('packages-body').innerHTML = sorted.map(item => `
+  document.getElementById('packages-empty').hidden = items.length > 0;
+  document.getElementById('packages-body').innerHTML = items.map(item => `
     <tr>
       <td>
         <div class="pkg-name">${esc(item.name)}</div>
@@ -341,7 +379,7 @@ function renderPackages(items) {
       <td>${packageInstalled(item) || '-'}</td>
       <td class="actions">${packageActions(item)}</td>
     </tr>`).join('');
-  document.getElementById('packages-cards').innerHTML = sorted.map(item => `
+  document.getElementById('packages-cards').innerHTML = items.map(item => `
     <div class="tool-card ${item.installed ? 'installed' : ''}">
       <div class="tool-card-head">
         <span class="pkg-name">${esc(item.name)}</span>
@@ -416,6 +454,7 @@ function searchPackages() {
   const input = document.getElementById('search-keyword');
   if (!input.value.trim()) { input.focus(); return; }
   activeCategory = '';
+  pageNumber = 1;
   loadCategories();
   loadPackages();
 }
