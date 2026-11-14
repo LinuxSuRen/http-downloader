@@ -30,6 +30,7 @@ type HDConfig struct {
 	AdditionBinaries  []string          `yaml:"additionBinaries"`
 	FromSource        bool              `yaml:"fromSource"`
 	URL               string            `yaml:"url"`
+	Homepage          string            `yaml:"homepage"` // entry link of a web tool
 	Tar               string            `yaml:"tar"`
 	LatestVersion     string            `yaml:"latestVersion"`
 	SupportOS         []string          `yaml:"supportOS"`

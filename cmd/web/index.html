@@ -5,23 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>hd console</title>
 <style>
-  :root { --border: #ddd; --muted: #777; --accent: #2563eb; --danger: #dc2626; --ok: #16a34a; }
+  :root { --border: #ddd; --muted: #777; --accent: #2563eb; --danger: #dc2626; --ok: #16a34a; --chip: #eef2f7; }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f6f7f9; color: #222; }
   header { background: #fff; border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
   header h1 { font-size: 18px; margin: 0; }
-  main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+  main { max-width: 1080px; margin: 24px auto; padding: 0 16px; }
   .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-  .install-form { display: flex; gap: 8px; }
-  .install-form input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  .card h2 { font-size: 15px; margin: 0 0 12px; }
+  .toolbar { display: flex; gap: 8px; }
+  .toolbar input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { border: 1px solid var(--border); background: var(--chip); border-radius: 14px; padding: 3px 12px; font-size: 12px; cursor: pointer; }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   th { color: var(--muted); font-weight: 500; }
   td.actions { text-align: right; white-space: nowrap; }
-  .btn { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  .pkg-name { font-weight: 600; }
+  .pkg-source { color: var(--muted); font-size: 12px; }
+  .badge { display: inline-block; background: var(--chip); border-radius: 10px; padding: 1px 8px; font-size: 11px; margin-right: 4px; }
+  .badge.installed { background: #dcfce7; color: #166534; }
+  .btn { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; text-decoration: none; }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .btn.danger { color: var(--danger); border-color: var(--danger); }
   .btn:disabled { opacity: .5; cursor: not-allowed; }
+  select.ver { border: 1px solid var(--border); border-radius: 6px; padding: 5px 6px; font-size: 12px; max-width: 130px; }
+  a.silent { color: var(--accent); text-decoration: none; }
   #logs { background: #0f172a; color: #d1e7ff; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; border-radius: 8px; padding: 12px; height: 260px; overflow-y: auto; white-space: pre-wrap; }
   .status { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
   .status.running { background: #fef3c7; color: #92400e; }
@@ -38,22 +48,24 @@
 </header>
 <main>
   <div class="card">
-    <div class="install-form">
+    <div class="toolbar">
       <input id="search-keyword" placeholder="Search packages, e.g. jenkins" autofocus>
       <button class="btn primary" id="search-btn">Search</button>
       <button class="btn" id="fetch-btn">Refresh data</button>
     </div>
-    <div class="hint">Search the installable packages, then install from the results. If nothing is found, the package may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
-    <div id="search-results" hidden>
+    <div class="chips" id="categories"></div>
+    <div class="hint">Search or pick a category to browse the installable packages, then install them with any release version. If nothing is found, the package may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
+    <div id="packages" hidden>
       <table>
-        <thead><tr><th>Package</th><th></th></tr></thead>
-        <tbody id="search-body"></tbody>
+        <thead><tr><th>Package</th><th>Categories</th><th>Installed</th><th>Actions</th></tr></thead>
+        <tbody id="packages-body"></tbody>
       </table>
-      <div class="empty" id="search-empty" hidden>No package matches the keyword. The data may be stale, try Refresh data.</div>
+      <div class="empty" id="packages-empty" hidden>No package matches. The data may be stale, try Refresh data.</div>
     </div>
   </div>
 
   <div class="card">
+    <h2>Installed tools</h2>
     <table>
       <thead><tr><th>Name</th><th>Version</th><th>Source</th><th>Installed at</th><th>Actions</th></tr></thead>
       <tbody id="tools-body"></tbody>
@@ -75,15 +87,24 @@
 <script>
 const texts = {
   confirmRemove: 'Remove this tool from your system?',
-  searchFailed: 'Could not search. Check the keyword and try again.',
   fetchFailed: 'Could not refresh the package data. Try again later.',
   installFailed: 'Could not start the install. Check the tool name and try again.',
   upgradeFailed: 'Could not start the upgrade. Try again later.',
   removeFailed: 'Could not remove the tool. It may be protected or missing.',
   loadFailed: 'Could not load the installed tools. Refresh the page and try again.',
+  categoriesFailed: 'Could not load the categories. Try Refresh data.',
+  packagesFailed: 'Could not load the packages. Try again later.',
+  openFailed: 'Could not launch the tool. It may be missing or unsupported on this system.',
   jobFailed: 'The job did not finish successfully. Check the logs above for details.',
   streamFailed: 'Lost the connection to the log stream. Reconnecting is not available, refresh the page.',
 };
+
+let activeCategory = '';
+
+function esc(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g,
+    ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
 
 async function api(method, url, body) {
   const resp = await fetch(url, {
@@ -119,13 +140,16 @@ function renderTools(tools) {
   document.getElementById('tools-empty').hidden = tools.length > 0;
   body.innerHTML = tools.map(t => `
     <tr>
-      <td>${t.name}</td>
-      <td>${t.version || '-'}</td>
-      <td>${t.org && t.repo ? t.org + '/' + t.repo : (t.native ? 'native' : '-')}</td>
-      <td>${t.installed_at || '-'}</td>
+      <td>${esc(t.name)}</td>
+      <td>${esc(t.version || '-')}</td>
+      <td>${t.org && t.repo
+        ? `<a class="silent" href="https://github.com/${esc(t.org)}/${esc(t.repo)}" target="_blank" rel="noopener noreferrer">${esc(t.org)}/${esc(t.repo)}</a>`
+        : (t.native ? 'native' : '-')}</td>
+      <td>${esc(t.installed_at || '-')}</td>
       <td class="actions">
-        <button class="btn" data-action="upgrade" data-name="${t.name}" ${t.upgradable ? '' : 'disabled'}>Upgrade</button>
-        <button class="btn danger" data-action="remove" data-name="${t.name}">Remove</button>
+        <button class="btn" data-action="open" data-name="${esc(t.name)}">Open</button>
+        <button class="btn" data-action="upgrade" data-name="${esc(t.name)}" ${t.upgradable ? '' : 'disabled'}>Upgrade</button>
+        <button class="btn danger" data-action="remove" data-name="${esc(t.name)}">Remove</button>
       </td>
     </tr>`).join('');
 }
@@ -142,30 +166,131 @@ document.getElementById('tools-body').addEventListener('click', async ev => {
     } catch (err) {
       alert(friendly(err, texts.removeFailed));
     }
+  } else if (btn.dataset.action === 'open') {
+    try {
+      await api('POST', '/api/tools/' + encodeURIComponent(name) + '/open');
+    } catch (err) {
+      alert(friendly(err, texts.openFailed));
+    }
   } else {
     startJob('POST', `/api/tools/${encodeURIComponent(name)}/upgrade`, null, texts.upgradeFailed);
   }
 });
 
-async function searchPackages() {
-  const input = document.getElementById('search-keyword');
-  const keyword = input.value.trim();
-  if (!keyword) { input.focus(); return; }
+async function loadCategories() {
   let data;
   try {
-    data = await api('GET', '/api/search?q=' + encodeURIComponent(keyword));
+    data = await api('GET', '/api/categories');
   } catch (err) {
-    alert(friendly(err, texts.searchFailed));
+    alert(friendly(err, texts.categoriesFailed));
     return;
   }
-  const results = data.data || [];
-  document.getElementById('search-results').hidden = false;
-  document.getElementById('search-empty').hidden = results.length > 0;
-  document.getElementById('search-body').innerHTML = results.map(name => `
+  const categories = Array.isArray(data.data) ? data.data : [];
+  document.getElementById('categories').innerHTML =
+    `<button class="chip ${activeCategory === '' ? 'active' : ''}" data-cat="">All</button>` +
+    categories.map(cat =>
+      `<button class="chip ${activeCategory === cat ? 'active' : ''}" data-cat="${esc(cat)}">${esc(cat)}</button>`).join('');
+}
+
+document.getElementById('categories').addEventListener('click', ev => {
+  const chip = ev.target.closest('button[data-cat]');
+  if (!chip) return;
+  activeCategory = chip.dataset.cat;
+  if (activeCategory) {
+    document.getElementById('search-keyword').value = '';
+  }
+  loadCategories();
+  loadPackages();
+});
+
+async function loadPackages() {
+  let url;
+  if (activeCategory) {
+    url = '/api/packages?category=' + encodeURIComponent(activeCategory);
+  } else {
+    const keyword = document.getElementById('search-keyword').value.trim();
+    if (!keyword) return;
+    url = '/api/packages?q=' + encodeURIComponent(keyword);
+  }
+
+  let data;
+  try {
+    data = await api('GET', url);
+  } catch (err) {
+    alert(friendly(err, texts.packagesFailed));
+    return;
+  }
+  renderPackages(data.data || []);
+}
+
+function renderPackages(items) {
+  document.getElementById('packages').hidden = false;
+  document.getElementById('packages-empty').hidden = items.length > 0;
+  document.getElementById('packages-body').innerHTML = items.map(item => {
+    const categories = (item.categories || []).map(cat => `<span class="badge">${esc(cat)}</span>`).join('');
+    const installed = item.installed
+      ? `<span class="badge installed">${esc(item.version || 'installed')}</span>` : '-';
+    const link = /^https?:\/\//i.test(item.homepage || '')
+      ? `<a class="btn" href="${esc(item.homepage)}" target="_blank" rel="noopener noreferrer">Open link</a>` : '';
+    const install = item.web ? '' : `
+      <select class="ver" data-org="${esc(item.org)}" data-repo="${esc(item.repo)}" title="Release version, latest by default">
+        <option value="">latest</option>
+      </select>
+      <button class="btn primary" data-install="${esc(item.org)}/${esc(item.repo)}">Install</button>`;
+    return `
     <tr>
-      <td>${name}</td>
-      <td class="actions"><button class="btn primary" data-install="${name}">Install</button></td>
-    </tr>`).join('');
+      <td>
+        <div class="pkg-name">${esc(item.name)}</div>
+        <div class="pkg-source"><a class="silent" href="https://github.com/${esc(item.org)}/${esc(item.repo)}" target="_blank" rel="noopener noreferrer">${esc(item.org)}/${esc(item.repo)}</a></div>
+      </td>
+      <td>${categories}</td>
+      <td>${installed}</td>
+      <td class="actions">${install}${link}</td>
+    </tr>`;
+  }).join('');
+}
+
+// the release tags are fetched when the version dropdown is opened the first time
+async function fillVersions(select) {
+  if (select.dataset.loaded) return;
+  select.dataset.loaded = '1';
+  try {
+    const data = await api('GET',
+      `/api/packages/${encodeURIComponent(select.dataset.org)}/${encodeURIComponent(select.dataset.repo)}/versions`);
+    (data.data || []).forEach(tag => {
+      const option = document.createElement('option');
+      option.value = tag.tag;
+      option.textContent = tag.tag;
+      select.appendChild(option);
+    });
+  } catch (err) {
+    delete select.dataset.loaded;
+    select.title = 'Could not load the versions, try again';
+  }
+}
+
+document.getElementById('packages-body').addEventListener('click', ev => {
+  const select = ev.target.closest('select.ver');
+  if (select) {
+    fillVersions(select);
+    return;
+  }
+
+  const btn = ev.target.closest('button[data-install]');
+  if (!btn) return;
+  const row = btn.closest('tr');
+  const selectEl = row ? row.querySelector('select.ver') : null;
+  const version = selectEl ? selectEl.value : '';
+  const force = document.getElementById('force-install').checked;
+  startJob('POST', '/api/tools', {name: btn.dataset.install, version, force}, texts.installFailed);
+});
+
+function searchPackages() {
+  const input = document.getElementById('search-keyword');
+  if (!input.value.trim()) { input.focus(); return; }
+  activeCategory = '';
+  loadCategories();
+  loadPackages();
 }
 
 document.getElementById('search-btn').addEventListener('click', searchPackages);
@@ -175,13 +300,6 @@ document.getElementById('search-keyword').addEventListener('keydown', ev => {
 
 document.getElementById('fetch-btn').addEventListener('click', () => {
   startJob('POST', '/api/fetch', null, texts.fetchFailed);
-});
-
-document.getElementById('search-body').addEventListener('click', ev => {
-  const btn = ev.target.closest('button[data-install]');
-  if (!btn) return;
-  const force = document.getElementById('force-install').checked;
-  startJob('POST', '/api/tools', {name: btn.dataset.install, force}, texts.installFailed);
 });
 
 async function startJob(method, url, body, fallback) {
@@ -208,8 +326,13 @@ async function startJob(method, url, body, fallback) {
       document.getElementById('log-status').textContent =
         msg.status === 'success' ? `${job.action} ${job.tool} finished` : texts.jobFailed;
       loadTools();
-      if (job.action === 'fetch' && document.getElementById('search-keyword').value.trim()) {
-        searchPackages();
+      if (job.action === 'fetch') {
+        loadCategories();
+        if (activeCategory || document.getElementById('search-keyword').value.trim()) {
+          loadPackages();
+        }
+      } else if (!document.getElementById('packages').hidden) {
+        loadPackages();
       }
     }
   };
@@ -220,6 +343,7 @@ async function startJob(method, url, body, fallback) {
 }
 
 loadTools();
+loadCategories();
 </script>
 </body>
 </html>

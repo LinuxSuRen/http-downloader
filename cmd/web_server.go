@@ -8,13 +8,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	fakeruntime "github.com/linuxsuren/go-fake-runtime"
+	hdpkg "github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
@@ -60,15 +63,23 @@ type webServer struct {
 	jobs   map[int]*webJob
 	// only one job runs at a time: its output is captured globally
 	jobLock chan struct{}
+
+	// overridable behaviors, they talk to GitHub or to the desktop, which
+	// is neither available nor desired in the unit tests
+	listVersions func(org, repo string, count int) ([]versionTag, error)
+	launchTool   func(binPath string) error
 }
 
 func newWebServer(ctx context.Context) *webServer {
-	return &webServer{
+	server := &webServer{
 		ctx:     ctx,
 		execer:  &fakeruntime.DefaultExecer{},
 		jobs:    map[int]*webJob{},
 		jobLock: make(chan struct{}, 1),
 	}
+	server.listVersions = listGitHubVersions
+	server.launchTool = openInTerminal
+	return server
 }
 
 func (s *webServer) routes() http.Handler {
@@ -79,6 +90,9 @@ func (s *webServer) routes() http.Handler {
 	mux.HandleFunc("/api/search", s.handleSearch)
 	mux.HandleFunc("/api/fetch", s.handleFetch)
 	mux.HandleFunc("/api/jobs/", s.handleJob)
+	mux.HandleFunc("/api/categories", s.handleCategories)
+	mux.HandleFunc("/api/packages", s.handlePackages)
+	mux.HandleFunc("/api/packages/", s.handlePackageVersions)
 	return mux
 }
 
@@ -93,22 +107,30 @@ func (s *webServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/tools returns the installed tools
-// POST /api/tools {"name":"jcli","force":true} starts an install job
+// POST /api/tools {"name":"jcli","version":"v1.2.3","force":true} starts an
+// install job, the optional version pins the release tag, so it also covers
+// upgrades and downgrades
 func (s *webServer) handleTools(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]interface{}{"data": s.loadTools()})
 	case http.MethodPost:
 		var req struct {
-			Name  string `json:"name"`
-			Force bool   `json:"force"`
+			Name    string `json:"name"`
+			Version string `json:"version"`
+			Force   bool   `json:"force"`
 		}
 		if err := decodeJSON(r, &req); err != nil || strings.TrimSpace(req.Name) == "" {
 			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "please provide the tool name")
 			return
 		}
+		version := strings.TrimSpace(req.Version)
+		target := strings.TrimSpace(req.Name)
+		if version != "" && !strings.Contains(target, "@") {
+			target = fmt.Sprintf("%s@%s", target, version)
+		}
 		job := s.startJob("install", req.Name, func(stub *cobra.Command) error {
-			return s.installTool(stub, req.Name, req.Force)
+			return s.installTool(stub, target, version, req.Force)
 		})
 		writeJSON(w, http.StatusAccepted, job)
 	default:
@@ -128,25 +150,200 @@ func (s *webServer) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fetcher := &installer.DefaultFetcher{}
-	fetcher.SetContext(s.ctx)
-	configDir, err := fetcher.GetConfigDir()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "SEARCH_FAILED", "failed to search packages")
+	configDir, ok := s.ensureConfigCache()
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "SEARCH_FAILED",
+			"failed to load the package index, please try again later")
 		return
-	}
-	if exists, _ := common.PathExists(configDir); !exists {
-		// no local cache yet, fetch it once so that the search works
-		if err = fetcher.FetchLatestRepo("", "", io.Discard); err != nil {
-			log.Printf("cannot fetch the hd-home config: %v", err)
-			writeError(w, http.StatusInternalServerError, "SEARCH_FAILED",
-				"failed to load the package index, please try again later")
-			return
-		}
 	}
 
 	result := installer.FindByKeyword(keyword, configDir)
 	writeJSON(w, http.StatusOK, map[string]interface{}{"data": result})
+}
+
+// ensureConfigCache returns the local hd-home config directory, it fetches
+// the repository once when there is no cache yet
+func (s *webServer) ensureConfigCache() (configDir string, ok bool) {
+	fetcher := &installer.DefaultFetcher{}
+	fetcher.SetContext(s.ctx)
+	var err error
+	if configDir, err = fetcher.GetConfigDir(); err != nil {
+		return "", false
+	}
+	if exists, _ := common.PathExists(configDir); exists {
+		return configDir, true
+	}
+	if err = fetcher.FetchLatestRepo("", "", io.Discard); err != nil {
+		log.Printf("cannot fetch the hd-home config: %v", err)
+		return "", false
+	}
+	return configDir, true
+}
+
+// GET /api/categories returns the package categories of the local hd-home cache
+func (s *webServer) handleCategories(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"data": installer.FindCategories()})
+}
+
+// packageItem is the API view of an installable package from hd-home
+type packageItem struct {
+	Org        string   `json:"org"`
+	Repo       string   `json:"repo"`
+	Name       string   `json:"name"`
+	Categories []string `json:"categories,omitempty"`
+	Homepage   string   `json:"homepage,omitempty"`
+	// Web marks a package which has nothing to install, the UI opens its
+	// homepage instead
+	Web       bool   `json:"web"`
+	Installed bool   `json:"installed"`
+	Version   string `json:"version,omitempty"`
+}
+
+// GET /api/packages?category=security or ?q=keyword lists the installable
+// packages together with their installed state
+func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
+		return
+	}
+	category := strings.TrimSpace(r.URL.Query().Get("category"))
+	keyword := strings.TrimSpace(r.URL.Query().Get("q"))
+	if category == "" && keyword == "" {
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST",
+			"please provide the category or the search keyword")
+		return
+	}
+
+	configDir, ok := s.ensureConfigCache()
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "PACKAGES_FAILED",
+			"failed to load the package index, please try again later")
+		return
+	}
+
+	var orgRepos []string
+	if category != "" {
+		packages := installer.FindPackagesByCategory(category)
+		orgRepos = make([]string, 0, len(packages))
+		for i := range packages {
+			orgRepos = append(orgRepos, packages[i].Org+"/"+packages[i].Repo)
+		}
+	} else {
+		orgRepos = installer.FindByKeyword(keyword, configDir)
+	}
+
+	installed := installedIndex()
+	items := make([]packageItem, 0, len(orgRepos))
+	for _, orgRepo := range orgRepos {
+		org, repo, valid := splitOrgRepo(orgRepo)
+		if !valid {
+			continue
+		}
+
+		item := packageItem{Org: org, Repo: repo, Name: repo}
+		if config := installer.LoadPackageConfig(org, repo); config != nil {
+			if config.Name != "" {
+				item.Name = config.Name
+			}
+			item.Categories = config.Categories
+			item.Homepage = config.Homepage
+			item.Web = config.Homepage != "" && config.Filename == "" &&
+				config.Binary == "" && config.TargetBinary == "" && !config.FromSource
+		}
+		if record := installed[orgRepo]; record != nil {
+			item.Installed = true
+			item.Version = record.Version
+		}
+		items = append(items, item)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Org+"/"+items[i].Repo < items[j].Org+"/"+items[j].Repo
+	})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"data": items})
+}
+
+// versionTag is the API view of a release tag
+type versionTag struct {
+	Tag string `json:"tag"`
+}
+
+// GET /api/packages/{org}/{repo}/versions returns the recent release tags
+// of a package, the first one is the latest
+func (s *webServer) handlePackageVersions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
+		return
+	}
+
+	rest := strings.TrimPrefix(r.URL.Path, "/api/packages/")
+	if !strings.HasSuffix(rest, "/versions") {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "page not found")
+		return
+	}
+	org, repo, valid := splitOrgRepo(strings.TrimSuffix(rest, "/versions"))
+	if !valid || org == "" || repo == "" {
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid package path")
+		return
+	}
+
+	count, err := strconv.Atoi(r.URL.Query().Get("count"))
+	if err != nil || count <= 0 || count > 50 {
+		count = 20
+	}
+	tags, err := s.listVersions(org, repo, count)
+	if err != nil {
+		log.Printf("cannot list the versions of %s/%s: %v", org, repo, err)
+		writeError(w, http.StatusInternalServerError, "VERSIONS_FAILED",
+			"failed to query the versions, please try again later")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"data": tags})
+}
+
+// listGitHubVersions returns the recent release tags of a GitHub repository
+func listGitHubVersions(org, repo string, count int) (tags []versionTag, err error) {
+	client := hdpkg.ReleaseClient{Org: org, Repo: repo}
+	client.Init()
+
+	var releases []hdpkg.ReleaseAsset
+	if releases, err = client.ListReleases(org, repo, count); err == nil {
+		tags = make([]versionTag, 0, len(releases))
+		for i := range releases {
+			if releases[i].TagName != "" {
+				tags = append(tags, versionTag{Tag: releases[i].TagName})
+			}
+		}
+	}
+	return
+}
+
+// splitOrgRepo splits an org/repo string
+func splitOrgRepo(orgRepo string) (org, repo string, valid bool) {
+	items := strings.Split(strings.Trim(orgRepo, "/"), "/")
+	if len(items) != 2 || items[0] == "" || items[1] == "" {
+		return "", "", false
+	}
+	return items[0], items[1], true
+}
+
+// installedIndex indexes the installed tools by their org/repo
+func installedIndex() (index map[string]*installer.InstalledPackage) {
+	packages, err := installer.LoadInstalledPackages()
+	if err != nil {
+		return map[string]*installer.InstalledPackage{}
+	}
+
+	index = make(map[string]*installer.InstalledPackage, len(packages))
+	for i := range packages {
+		if packages[i].Org != "" && packages[i].Repo != "" {
+			index[packages[i].Org+"/"+packages[i].Repo] = &packages[i]
+		}
+	}
+	return
 }
 
 // POST /api/fetch updates the local hd-home config cache as a background job
@@ -180,6 +377,7 @@ func (s *webServer) handleFetch(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /api/tools/{name} removes a tool
 // POST /api/tools/{name}/upgrade starts an upgrade job
+// POST /api/tools/{name}/open launches the tool in a new terminal window
 func (s *webServer) handleTool(w http.ResponseWriter, r *http.Request) {
 	rest := strings.TrimPrefix(r.URL.Path, "/api/tools/")
 	name, action := rest, ""
@@ -210,9 +408,59 @@ func (s *webServer) handleTool(w http.ResponseWriter, r *http.Request) {
 			return s.upgradeTool(stub, tool.Org, tool.Repo)
 		})
 		writeJSON(w, http.StatusAccepted, job)
+	case r.Method == http.MethodPost && action == "open":
+		s.openTool(w, name)
 	default:
 		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "unsupported action")
 	}
+}
+
+// openTool launches an installed tool in a new terminal window
+func (s *webServer) openTool(w http.ResponseWriter, name string) {
+	tool, _ := installer.FindInstalledPackage(name)
+	if tool == nil {
+		writeError(w, http.StatusNotFound, "TOOL_NOT_FOUND",
+			fmt.Sprintf("tool %s is not installed yet", name))
+		return
+	}
+
+	binPath := s.findToolBinary(tool)
+	if binPath == "" {
+		writeError(w, http.StatusNotFound, "BINARY_NOT_FOUND",
+			fmt.Sprintf("cannot find the binary of %s, please reinstall it", name))
+		return
+	}
+	if err := s.launchTool(binPath); err != nil {
+		log.Printf("cannot launch %s: %v", name, err)
+		writeError(w, http.StatusInternalServerError, "LAUNCH_FAILED",
+			fmt.Sprintf("failed to launch %s in a terminal window", name))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data": map[string]string{"name": name, "binary": binPath},
+	})
+}
+
+// findToolBinary returns an existing binary path of an installed tool
+func (s *webServer) findToolBinary(tool *installer.InstalledPackage) (binPath string) {
+	for _, binary := range tool.Binaries {
+		if binary == "" {
+			continue
+		}
+		if exists, _ := common.PathExists(binary); exists {
+			return binary
+		}
+	}
+	if tool.TargetDirectory != "" {
+		candidate := filepath.Join(tool.TargetDirectory, tool.Name)
+		if exists, _ := common.PathExists(candidate); exists {
+			return candidate
+		}
+	}
+	if found, err := s.execer.LookPath(tool.Name); err == nil && found != "" {
+		return found
+	}
+	return
 }
 
 // GET /api/jobs/{id} returns the job status
@@ -426,14 +674,27 @@ func (s *webServer) newInstallOption() *installOption {
 	return opt
 }
 
-// installTool installs a tool by its name, the same way as hd install
-func (s *webServer) installTool(stub *cobra.Command, name string, force bool) (err error) {
+// installTool installs a tool by its name, the same way as hd install.
+// The version is optional, when set it pins the release tag which covers
+// upgrades and downgrades.
+func (s *webServer) installTool(stub *cobra.Command, name, version string, force bool) (err error) {
 	opt := s.newInstallOption()
 	opt.force = force
 	if err = opt.preRunE(stub, []string{name}); err != nil {
 		return
 	}
-	return opt.install(stub, []string{name})
+	if err = opt.install(stub, []string{name}); err != nil {
+		return
+	}
+	if version != "" {
+		// the config cache may carry a different latest version than the
+		// pinned one, keep the installed record in sync with the request
+		if tool, _ := installer.FindInstalledPackage(opt.tool); tool != nil {
+			tool.Version = version
+			_ = installer.RecordInstalledPackage(*tool)
+		}
+	}
+	return
 }
 
 // upgradeTool upgrades a tool from its source repository
