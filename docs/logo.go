@@ -3,7 +3,7 @@
 // same bytes.
 package docs
 
-import _ "embed"
+import _ "embed" // embed the brand assets into the binary at build time
 
 // Logo is the SVG logo of the project
 //
