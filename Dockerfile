@@ -2,6 +2,7 @@ FROM docker.io/golang:1.26 AS builder
 
 WORKDIR /workspace
 COPY cmd/ cmd/
+COPY docs/ docs/
 COPY hack/ hack/
 COPY mock/ mock/
 COPY pkg/ pkg/

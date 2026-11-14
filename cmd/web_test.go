@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -70,6 +71,32 @@ func TestWebProxy(t *testing.T) {
 
 	// method check
 	resp, err = client.Post(httpServer.URL+"/api/proxy", "application/json", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+}
+
+func TestWebBranding(t *testing.T) {
+	httpServer, _ := setupWebServer(t)
+	client := httpServer.Client()
+
+	// the single source logo is served for the favicon and the header
+	resp, err := client.Get(httpServer.URL + "/logo.svg")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "image/svg+xml", resp.Header.Get("Content-Type"))
+
+	// the page carries the branding: favicon, logo and the GitHub link
+	resp, err = client.Get(httpServer.URL + "/")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Contains(t, string(body), `href="/logo.svg"`)
+	assert.Contains(t, string(body), `src="/logo.svg"`)
+	assert.Contains(t, string(body), `href="https://github.com/LinuxSuRen/http-downloader"`)
+
+	// the logo route is GET only
+	resp, err = client.Post(httpServer.URL+"/logo.svg", "application/json", nil)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
 }
