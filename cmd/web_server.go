@@ -226,13 +226,21 @@ type packageItem struct {
 	Homepage   string   `json:"homepage,omitempty"`
 	// Web marks a package which has nothing to install, the UI opens its
 	// homepage instead
-	Web       bool   `json:"web"`
-	Installed bool   `json:"installed"`
-	Version   string `json:"version,omitempty"`
+	Web bool `json:"web"`
+	// InstalledName is the name of the installed record, it is the name
+	// expected by the open, upgrade and remove actions
+	InstalledName string `json:"installed_name,omitempty"`
+	Installed     bool   `json:"installed"`
+	Version       string `json:"version,omitempty"`
+	InstalledAt   string `json:"installed_at,omitempty"`
+	Native        bool   `json:"native,omitempty"`
 }
 
-// GET /api/packages?category=security or ?q=keyword lists the installable
-// packages together with their installed state
+// GET /api/packages lists the tools of the local hd-home cache together
+// with their installed state. Without a category and a keyword every
+// package is listed and the installed tools which are not part of the
+// cache are merged in, so installed and not-installed tools share one
+// view. A category or a keyword filters the cache packages only.
 func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
@@ -240,11 +248,6 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 	}
 	category := strings.TrimSpace(r.URL.Query().Get("category"))
 	keyword := strings.TrimSpace(r.URL.Query().Get("q"))
-	if category == "" && keyword == "" {
-		writeError(w, http.StatusBadRequest, "INVALID_REQUEST",
-			"please provide the category or the search keyword")
-		return
-	}
 
 	configDir, ok := s.ensureConfigCache()
 	if !ok {
@@ -254,18 +257,23 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var orgRepos []string
-	if category != "" {
+	switch {
+	case category != "":
 		packages := installer.FindPackagesByCategory(category)
 		orgRepos = make([]string, 0, len(packages))
 		for i := range packages {
 			orgRepos = append(orgRepos, packages[i].Org+"/"+packages[i].Repo)
 		}
-	} else {
+	case keyword != "":
 		orgRepos = installer.FindByKeyword(keyword, configDir)
+	default:
+		orgRepos = installer.FindAllPackages(configDir)
 	}
 
-	installed := installedIndex()
-	items := make([]packageItem, 0, len(orgRepos))
+	records := loadInstalledRecords()
+	installed := installedIndex(records)
+	seen := make(map[string]bool, len(orgRepos))
+	items := make([]packageItem, 0, len(orgRepos)+len(records))
 	for _, orgRepo := range orgRepos {
 		org, repo, valid := splitOrgRepo(orgRepo)
 		if !valid {
@@ -285,8 +293,34 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 		if record := installed[orgRepo]; record != nil {
 			item.Installed = true
 			item.Version = record.Version
+			item.InstalledName = record.Name
+			item.InstalledAt = record.InstalledAt
 		}
+		seen[orgRepo] = true
 		items = append(items, item)
+	}
+
+	// the unfiltered view also carries the installed tools which are not
+	// part of the hd-home cache, so nothing installed is lost from the
+	// merged list
+	if category == "" && keyword == "" {
+		for i := range records {
+			record := records[i]
+			if record.Org != "" && record.Repo != "" && seen[record.Org+"/"+record.Repo] {
+				continue
+			}
+
+			items = append(items, packageItem{
+				Org:           record.Org,
+				Repo:          record.Repo,
+				Name:          record.Name,
+				Installed:     true,
+				Version:       record.Version,
+				InstalledName: record.Name,
+				InstalledAt:   record.InstalledAt,
+				Native:        record.Native,
+			})
+		}
 	}
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].Org+"/"+items[i].Repo < items[j].Org+"/"+items[j].Repo
@@ -360,17 +394,21 @@ func splitOrgRepo(orgRepo string) (org, repo string, valid bool) {
 	return items[0], items[1], true
 }
 
-// installedIndex indexes the installed tools by their org/repo
-func installedIndex() (index map[string]*installer.InstalledPackage) {
-	packages, err := installer.LoadInstalledPackages()
-	if err != nil {
-		return map[string]*installer.InstalledPackage{}
+// loadInstalledRecords loads the installed tools, a broken record file
+// yields an empty list
+func loadInstalledRecords() (records []installer.InstalledPackage) {
+	if loaded, err := installer.LoadInstalledPackages(); err == nil {
+		records = loaded
 	}
+	return
+}
 
-	index = make(map[string]*installer.InstalledPackage, len(packages))
-	for i := range packages {
-		if packages[i].Org != "" && packages[i].Repo != "" {
-			index[packages[i].Org+"/"+packages[i].Repo] = &packages[i]
+// installedIndex indexes the installed tools by their org/repo
+func installedIndex(records []installer.InstalledPackage) (index map[string]*installer.InstalledPackage) {
+	index = make(map[string]*installer.InstalledPackage, len(records))
+	for i := range records {
+		if records[i].Org != "" && records[i].Repo != "" {
+			index[records[i].Org+"/"+records[i].Repo] = &records[i]
 		}
 	}
 	return

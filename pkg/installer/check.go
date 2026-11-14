@@ -453,6 +453,23 @@ func FindByKeyword(keyword, configDir string) (result []string) {
 	return
 }
 
+// FindAllPackages returns every package of the local hd-home cache as
+// org/repo strings, the native packages of the operating system are not
+// included, unlike FindByKeyword with an empty keyword
+func FindAllPackages(configDir string) (result []string) {
+	files, err := filepath.Glob(path.Join(configDir, "config/**/*.yml"))
+	if err != nil {
+		return
+	}
+	for _, metaFile := range files {
+		fileName := filepath.Base(metaFile)
+		org := filepath.Base(filepath.Dir(metaFile))
+		repo := strings.TrimSuffix(fileName, path.Ext(metaFile))
+		result = append(result, path.Join(org, repo))
+	}
+	return
+}
+
 func hasKeyword(metaFile, keyword string) (ok bool) {
 	data, err := sysos.ReadFile(metaFile)
 	if err != nil {

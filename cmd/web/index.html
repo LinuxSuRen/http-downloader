@@ -19,7 +19,6 @@
   .view-toggle .btn:last-child { border-radius: 0 6px 6px 0; border-left: none; }
   main { max-width: 1080px; margin: 24px auto; padding: 0 16px; }
   .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-  .card h2 { font-size: 15px; margin: 0 0 12px; }
   .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
   .toolbar input[type=text] { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
   #proxy-select, #proxy-custom { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: #fff; }
@@ -27,12 +26,15 @@
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .chip { border: 1px solid var(--border); background: var(--chip); border-radius: 14px; padding: 3px 12px; font-size: 12px; cursor: pointer; }
   .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .list-meta { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 8px; }
+  .list-meta .count { color: var(--muted); font-size: 12px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   th { color: var(--muted); font-weight: 500; }
   td.actions { text-align: right; white-space: nowrap; }
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
   .tool-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: #fff; }
+  .tool-card.installed { border-color: #bbf7d0; }
   .tool-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   .tool-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; align-items: center; }
   .pkg-name { font-weight: 600; }
@@ -44,7 +46,7 @@
   .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .btn.danger { color: var(--danger); border-color: var(--danger); }
   .btn:disabled { opacity: .5; cursor: not-allowed; }
-  .btn.view-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.view-btn.active, .btn.sort-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   select.ver { border: 1px solid var(--border); border-radius: 6px; padding: 5px 6px; font-size: 12px; max-width: 130px; }
   a.silent { color: var(--accent); text-decoration: none; }
   #logs { background: #0f172a; color: #d1e7ff; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; border-radius: 8px; padding: 12px; height: 260px; overflow-y: auto; white-space: pre-wrap; }
@@ -68,7 +70,7 @@
   </span>
 </header>
 <main>
-  <div class="card">
+  <div class="card" id="packages-card">
     <div class="toolbar">
       <input type="text" id="search-keyword" placeholder="Search packages, e.g. jenkins" autofocus>
       <button class="btn primary" id="search-btn">Search</button>
@@ -80,25 +82,17 @@
       <input type="text" id="proxy-custom" placeholder="proxy host, e.g. gh.api.99988866.xyz" hidden>
     </div>
     <div class="chips" id="categories"></div>
-    <div class="hint">Search or pick a category to browse the installable packages, then install them with any release version. If nothing is found, the package may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
-    <div id="packages" hidden>
-      <table id="packages-table">
-        <thead><tr><th>Package</th><th>Categories</th><th>Installed</th><th>Actions</th></tr></thead>
-        <tbody id="packages-body"></tbody>
-      </table>
-      <div class="cards" id="packages-cards" hidden></div>
-      <div class="empty" id="packages-empty" hidden>No package matches. The data may be stale, try Refresh data.</div>
+    <div class="hint">Installed and not-installed tools share this list, the green badge marks the installed ones with their version. If a package is missing, it may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
+    <div class="list-meta">
+      <span class="count" id="pkg-count"></span>
+      <button class="btn sort-btn" id="sort-btn" title="Sort the list by the tool name">Name ↑</button>
     </div>
-  </div>
-
-  <div class="card" id="tools-section">
-    <h2>Installed tools</h2>
-    <table id="tools-table">
-      <thead><tr><th>Name</th><th>Version</th><th>Source</th><th>Installed at</th><th>Actions</th></tr></thead>
-      <tbody id="tools-body"></tbody>
+    <table id="packages-table">
+      <thead><tr><th>Package</th><th>Categories</th><th>Installed</th><th>Actions</th></tr></thead>
+      <tbody id="packages-body"></tbody>
     </table>
-    <div class="cards" id="tools-cards" hidden></div>
-    <div class="empty" id="tools-empty" hidden>No tools installed yet.</div>
+    <div class="cards" id="packages-cards" hidden></div>
+    <div class="empty" id="packages-empty" hidden>No package matches. The data may be stale, try Refresh data.</div>
   </div>
 
   <div class="card">
@@ -119,9 +113,8 @@ const texts = {
   installFailed: 'Could not start the install. Check the tool name and try again.',
   upgradeFailed: 'Could not start the upgrade. Try again later.',
   removeFailed: 'Could not remove the tool. It may be protected or missing.',
-  loadFailed: 'Could not load the installed tools. Refresh the page and try again.',
+  packagesFailed: 'Could not load the tools. Try again later.',
   categoriesFailed: 'Could not load the categories. Try Refresh data.',
-  packagesFailed: 'Could not load the packages. Try again later.',
   proxyFailed: 'Could not load the proxy settings. The direct connection is used.',
   openFailed: 'Could not launch the tool. It may be missing or unsupported on this system.',
   jobFailed: 'The job did not finish successfully. Check the logs above for details.',
@@ -130,7 +123,6 @@ const texts = {
 
 let activeCategory = '';
 let packageItems = [];
-let installedItems = [];
 
 // the view preference of the user wins over the viewport width, which is
 // only read once when the page loads
@@ -141,13 +133,17 @@ function initialView() {
 }
 let viewMode = initialView();
 
+// the name sort of the merged list, ascending by default
+function initialSort() {
+  return localStorage.getItem('hd-sort') === 'desc' ? 'desc' : 'asc';
+}
+let sortDir = initialSort();
+
 function applyView() {
   document.querySelectorAll('.view-btn').forEach(btn =>
     btn.classList.toggle('active', btn.dataset.view === viewMode));
   document.getElementById('packages-table').hidden = viewMode !== 'table';
   document.getElementById('packages-cards').hidden = viewMode !== 'cards';
-  document.getElementById('tools-table').hidden = viewMode !== 'table';
-  document.getElementById('tools-cards').hidden = viewMode !== 'cards';
 }
 
 document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('click', () => {
@@ -155,8 +151,13 @@ document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('clic
   localStorage.setItem('hd-view', viewMode);
   applyView();
   renderPackages(packageItems);
-  renderTools(installedItems);
 }));
+
+document.getElementById('sort-btn').addEventListener('click', () => {
+  sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  localStorage.setItem('hd-sort', sortDir);
+  renderPackages(packageItems);
+});
 
 function esc(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g,
@@ -236,74 +237,6 @@ document.getElementById('proxy-custom').addEventListener('change', () => {
   localStorage.setItem('hd-proxy-custom', document.getElementById('proxy-custom').value.trim());
 });
 
-async function loadTools() {
-  try {
-    const data = await api('GET', '/api/tools');
-    renderTools(data.data || []);
-  } catch (err) {
-    alert(friendly(err, texts.loadFailed));
-  }
-}
-
-function toolActions(t) {
-  return `
-    <button class="btn" data-action="open" data-name="${esc(t.name)}">Open</button>
-    <button class="btn" data-action="upgrade" data-name="${esc(t.name)}" ${t.upgradable ? '' : 'disabled'}>Upgrade</button>
-    <button class="btn danger" data-action="remove" data-name="${esc(t.name)}">Remove</button>`;
-}
-
-function toolSource(t) {
-  return t.org && t.repo
-    ? `<a class="silent" href="https://github.com/${esc(t.org)}/${esc(t.repo)}" target="_blank" rel="noopener noreferrer">${esc(t.org)}/${esc(t.repo)}</a>`
-    : (t.native ? 'native' : '-');
-}
-
-function renderTools(tools) {
-  installedItems = tools;
-  document.getElementById('tools-empty').hidden = tools.length > 0;
-  document.getElementById('tools-body').innerHTML = tools.map(t => `
-    <tr>
-      <td>${esc(t.name)}</td>
-      <td>${esc(t.version || '-')}</td>
-      <td>${toolSource(t)}</td>
-      <td>${esc(t.installed_at || '-')}</td>
-      <td class="actions">${toolActions(t)}</td>
-    </tr>`).join('');
-  document.getElementById('tools-cards').innerHTML = tools.map(t => `
-    <div class="tool-card">
-      <div class="tool-card-head">
-        <span class="pkg-name">${esc(t.name)}</span>
-        <span class="badge installed">${esc(t.version || 'installed')}</span>
-      </div>
-      <div class="pkg-source">${toolSource(t)}</div>
-      <div class="pkg-source">${esc(t.installed_at || '')}</div>
-      <div class="tool-card-actions">${toolActions(t)}</div>
-    </div>`).join('');
-}
-
-document.getElementById('tools-section').addEventListener('click', async ev => {
-  const btn = ev.target.closest('button[data-action]');
-  if (!btn || btn.disabled) return;
-  const name = btn.dataset.name;
-  if (btn.dataset.action === 'remove') {
-    if (!confirm(texts.confirmRemove)) return;
-    try {
-      const data = await api('DELETE', '/api/tools/' + encodeURIComponent(name));
-      renderTools(data.data || []);
-    } catch (err) {
-      alert(friendly(err, texts.removeFailed));
-    }
-  } else if (btn.dataset.action === 'open') {
-    try {
-      await api('POST', '/api/tools/' + encodeURIComponent(name) + '/open');
-    } catch (err) {
-      alert(friendly(err, texts.openFailed));
-    }
-  } else {
-    startJob('POST', `/api/tools/${encodeURIComponent(name)}/upgrade`, {proxy: currentProxy()}, texts.upgradeFailed);
-  }
-});
-
 async function loadCategories() {
   let data;
   try {
@@ -331,13 +264,14 @@ document.getElementById('categories').addEventListener('click', ev => {
 });
 
 async function loadPackages() {
-  let url;
+  let url = '/api/packages';
   if (activeCategory) {
-    url = '/api/packages?category=' + encodeURIComponent(activeCategory);
+    url += '?category=' + encodeURIComponent(activeCategory);
   } else {
     const keyword = document.getElementById('search-keyword').value.trim();
-    if (!keyword) return;
-    url = '/api/packages?q=' + encodeURIComponent(keyword);
+    if (keyword) {
+      url += '?q=' + encodeURIComponent(keyword);
+    }
   }
 
   let data;
@@ -350,15 +284,26 @@ async function loadPackages() {
   renderPackages(data.data || []);
 }
 
+// the installed actions address the record, which may carry a different
+// name than the registry entry
+function recordName(item) {
+  return item.installed_name || item.name;
+}
+
 function packageActions(item) {
   const link = /^https?:\/\//i.test(item.homepage || '')
     ? `<a class="btn" href="${esc(item.homepage)}" target="_blank" rel="noopener noreferrer">Open link</a>` : '';
-  const install = item.web ? '' : `
+  const install = item.web || !(item.org && item.repo) ? '' : `
       <select class="ver" data-org="${esc(item.org)}" data-repo="${esc(item.repo)}" title="Release version, latest by default">
         <option value="">latest</option>
       </select>
       <button class="btn primary" data-install="${esc(item.org)}/${esc(item.repo)}">Install</button>`;
-  return install + link;
+  const upgradable = item.installed && item.org && item.repo && !item.native;
+  const record = item.installed ? `
+      <button class="btn" data-action="open" data-name="${esc(recordName(item))}">Open</button>
+      <button class="btn" data-action="upgrade" data-name="${esc(recordName(item))}" ${upgradable ? '' : 'disabled'}>Upgrade</button>
+      <button class="btn danger" data-action="remove" data-name="${esc(recordName(item))}">Remove</button>` : '';
+  return install + record + link;
 }
 
 function packageCategories(item) {
@@ -370,27 +315,39 @@ function packageInstalled(item) {
     ? `<span class="badge installed">${esc(item.version || 'installed')}</span>` : '';
 }
 
+function packageSource(item) {
+  return item.org && item.repo
+    ? `<a class="silent" href="https://github.com/${esc(item.org)}/${esc(item.repo)}" target="_blank" rel="noopener noreferrer">${esc(item.org)}/${esc(item.repo)}</a>`
+    : (item.native ? 'native' : '');
+}
+
 function renderPackages(items) {
   packageItems = items;
-  document.getElementById('packages').hidden = false;
-  document.getElementById('packages-empty').hidden = items.length > 0;
-  document.getElementById('packages-body').innerHTML = items.map(item => `
+  const direction = sortDir === 'asc' ? 1 : -1;
+  const sorted = [...items].sort((a, b) =>
+    direction * String(a.name || '').localeCompare(String(b.name || ''), undefined, {sensitivity: 'base'}));
+
+  document.getElementById('sort-btn').textContent = sortDir === 'asc' ? 'Name ↑' : 'Name ↓';
+  document.getElementById('pkg-count').textContent =
+    `${sorted.length} tools, ${sorted.filter(item => item.installed).length} installed`;
+  document.getElementById('packages-empty').hidden = sorted.length > 0;
+  document.getElementById('packages-body').innerHTML = sorted.map(item => `
     <tr>
       <td>
         <div class="pkg-name">${esc(item.name)}</div>
-        <div class="pkg-source"><a class="silent" href="https://github.com/${esc(item.org)}/${esc(item.repo)}" target="_blank" rel="noopener noreferrer">${esc(item.org)}/${esc(item.repo)}</a></div>
+        <div class="pkg-source">${packageSource(item)}</div>
       </td>
       <td>${packageCategories(item)}</td>
       <td>${packageInstalled(item) || '-'}</td>
       <td class="actions">${packageActions(item)}</td>
     </tr>`).join('');
-  document.getElementById('packages-cards').innerHTML = items.map(item => `
-    <div class="tool-card">
+  document.getElementById('packages-cards').innerHTML = sorted.map(item => `
+    <div class="tool-card ${item.installed ? 'installed' : ''}">
       <div class="tool-card-head">
         <span class="pkg-name">${esc(item.name)}</span>
         ${packageInstalled(item)}
       </div>
-      <div class="pkg-source"><a class="silent" href="https://github.com/${esc(item.org)}/${esc(item.repo)}" target="_blank" rel="noopener noreferrer">${esc(item.org)}/${esc(item.repo)}</a></div>
+      <div class="pkg-source">${packageSource(item)}</div>
       <div class="pkg-cats">${packageCategories(item)}</div>
       <div class="tool-card-actions">${packageActions(item)}</div>
     </div>`).join('');
@@ -415,21 +372,44 @@ async function fillVersions(select) {
   }
 }
 
-document.getElementById('packages').addEventListener('click', ev => {
+document.getElementById('packages-card').addEventListener('click', async ev => {
   const select = ev.target.closest('select.ver');
   if (select) {
     fillVersions(select);
     return;
   }
 
-  const btn = ev.target.closest('button[data-install]');
-  if (!btn) return;
-  const card = btn.closest('tr, .tool-card');
-  const selectEl = card ? card.querySelector('select.ver') : null;
-  const version = selectEl ? selectEl.value : '';
-  const force = document.getElementById('force-install').checked;
-  startJob('POST', '/api/tools',
-    {name: btn.dataset.install, version, proxy: currentProxy(), force}, texts.installFailed);
+  const installBtn = ev.target.closest('button[data-install]');
+  if (installBtn) {
+    const row = installBtn.closest('tr, .tool-card');
+    const selectEl = row ? row.querySelector('select.ver') : null;
+    const version = selectEl ? selectEl.value : '';
+    const force = document.getElementById('force-install').checked;
+    startJob('POST', '/api/tools',
+      {name: installBtn.dataset.install, version, proxy: currentProxy(), force}, texts.installFailed);
+    return;
+  }
+
+  const actionBtn = ev.target.closest('button[data-action]');
+  if (!actionBtn || actionBtn.disabled) return;
+  const name = actionBtn.dataset.name;
+  if (actionBtn.dataset.action === 'remove') {
+    if (!confirm(texts.confirmRemove)) return;
+    try {
+      await api('DELETE', '/api/tools/' + encodeURIComponent(name));
+      loadPackages();
+    } catch (err) {
+      alert(friendly(err, texts.removeFailed));
+    }
+  } else if (actionBtn.dataset.action === 'open') {
+    try {
+      await api('POST', '/api/tools/' + encodeURIComponent(name) + '/open');
+    } catch (err) {
+      alert(friendly(err, texts.openFailed));
+    }
+  } else {
+    startJob('POST', `/api/tools/${encodeURIComponent(name)}/upgrade`, {proxy: currentProxy()}, texts.upgradeFailed);
+  }
 });
 
 function searchPackages() {
@@ -472,14 +452,9 @@ async function startJob(method, url, body, fallback) {
       document.getElementById('job-badge').innerHTML = badge(msg.status);
       document.getElementById('log-status').textContent =
         msg.status === 'success' ? `${job.action} ${job.tool} finished` : texts.jobFailed;
-      loadTools();
+      loadPackages();
       if (job.action === 'fetch') {
         loadCategories();
-        if (activeCategory || document.getElementById('search-keyword').value.trim()) {
-          loadPackages();
-        }
-      } else if (!document.getElementById('packages').hidden) {
-        loadPackages();
       }
     }
   };
@@ -490,7 +465,7 @@ async function startJob(method, url, body, fallback) {
 }
 
 applyView();
-loadTools();
+loadPackages();
 loadCategories();
 loadProxy();
 </script>
