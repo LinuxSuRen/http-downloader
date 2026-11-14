@@ -50,6 +50,30 @@ func seedPkgConfig(t *testing.T, org, repo, content string) {
 	assert.NoError(t, os.WriteFile(filepath.Join(dir, repo+".yml"), []byte(content), 0644))
 }
 
+func TestWebProxy(t *testing.T) {
+	httpServer, _ := setupWebServer(t)
+	client := httpServer.Client()
+
+	// seed the proxy candidates of the local hd-home cache
+	assert.NoError(t, os.MkdirAll(filepath.Join(homedirHome(t), ".config", "hd-home"), 0750))
+	assert.NoError(t, os.WriteFile(filepath.Join(homedirHome(t), ".config", "hd-home", "proxy.yaml"),
+		[]byte("servers:\n- fake-proxy.com\n"), 0644))
+
+	resp, err := client.Get(httpServer.URL + "/api/proxy")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	result := struct {
+		Data proxyInfo `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
+	assert.Equal(t, []string{"fake-proxy.com"}, result.Data.Servers)
+
+	// method check
+	resp, err = client.Post(httpServer.URL+"/api/proxy", "application/json", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+}
+
 func TestWebAPI(t *testing.T) {
 	httpServer, _ := setupWebServer(t)
 	client := httpServer.Client()
