@@ -64,6 +64,8 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 		"Clean the package if the installation is success")
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
+	flags.StringVarP(&opt.Format, "format", "", "",
+		"Specific the file format, for instance: tar, zip, deb, msi")
 	return
 }
 
@@ -92,8 +94,11 @@ type installOption struct {
 
 	// inner fields
 	nativePackage bool
-	tool          string
-	execer        fakeruntime.Execer
+	// packageManager carries the system package manager of a package
+	// reference, for instance: the apt of apt:jenkins
+	packageManager string
+	tool           string
+	execer         fakeruntime.Execer
 }
 
 func (o *installOption) shouldInstall() (should, exist bool) {
@@ -128,24 +133,37 @@ func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	// try to find if it's a native package
-	o.nativePackage = os.HasPackage(o.tool)
-	if !o.nativePackage {
-		if o.Category == "" {
-			err = o.downloadOption.preRunE(cmd, args)
+	// a package reference with a package manager prefix, for instance:
+	// apt:jenkins, winget:Git.Git. It hands the package over to the
+	// system package manager.
+	if manager, name, ok := os.ParseManagerRef(o.tool); ok {
+		// the version pinning is not supported by the system package managers
+		if idx := strings.Index(name, "@"); idx > 0 {
+			name = name[:idx]
+		}
+		o.nativePackage = true
+		o.packageManager = manager
+		o.tool = name
+	} else {
+		// try to find if it's a native package
+		o.nativePackage = os.HasPackage(o.tool)
+		if !o.nativePackage {
+			if o.Category == "" {
+				err = o.downloadOption.preRunE(cmd, args)
 
-			if o.downloadOption.Package != nil {
-				// try to find the real tool name
-				if o.downloadOption.Package.TargetBinary != "" {
-					o.tool = o.downloadOption.Package.TargetBinary
-				} else if o.downloadOption.Package.Binary != "" {
-					o.tool = o.downloadOption.Package.Binary
-				} else {
-					o.tool = o.downloadOption.Package.Repo
+				if o.downloadOption.Package != nil {
+					// try to find the real tool name
+					if o.downloadOption.Package.TargetBinary != "" {
+						o.tool = o.downloadOption.Package.TargetBinary
+					} else if o.downloadOption.Package.Binary != "" {
+						o.tool = o.downloadOption.Package.Binary
+					} else {
+						o.tool = o.downloadOption.Package.Repo
+					}
 				}
+			} else {
+				err = o.downloadOption.fetch()
 			}
-		} else {
-			err = o.downloadOption.fetch()
 		}
 	}
 	return
@@ -157,6 +175,14 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		if should, exist := o.shouldInstall(); !should {
 			if exist {
 				cmd.Printf("%s is already exist, please use the flag --force if you install it again\n", o.tool)
+			}
+			return
+		}
+
+		if o.packageManager != "" {
+			// install the package via its system package manager
+			if err = os.InstallWithManager(o.packageManager, o.tool, o.execer); err == nil {
+				err = o.recordInstall(true)
 			}
 			return
 		}
@@ -236,7 +262,9 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 	if err = process.Install(); err == nil {
-		err = o.recordInstall(false)
+		// a native installer package file, for instance: deb, rpm and msi,
+		// was installed by the system package tools
+		err = o.recordInstall(process.InstalledNative)
 	}
 	return
 }
@@ -280,6 +308,7 @@ func (o *installOption) recordInstall(native bool) (err error) {
 		InstalledAt:     time.Now().Format(time.RFC3339),
 		FromSource:      o.fromSource,
 		Native:          native,
+		PackageManager:  o.packageManager,
 	})
 }
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/compress"
+	"github.com/linuxsuren/http-downloader/pkg/native"
 )
 
 // Install installs a package
@@ -28,14 +29,25 @@ func (o *Installer) Install() (err error) {
 	var source string
 	var target string
 	tarFile := o.Output
-	if o.Tar {
+	// an explicit installation command from the package config wins over
+	// the built-in behaviors, including the native installer packages
+	hasCustomInstall := o.Package != nil && o.Package.Installation != nil
+	switch {
+	case !hasCustomInstall && native.IsInstallerFile(tarFile):
+		// the package is a native installer file, for instance: deb, rpm,
+		// msi and pkg. Hand it over to the system package tools instead of
+		// extracting a binary from it.
+		if err = o.installNativeInstallerFile(tarFile); err == nil {
+			o.InstalledNative = true
+		}
+	case o.Tar:
 		if err = o.extractFiles(tarFile, o.Name); err == nil {
 			source = fmt.Sprintf("%s/%s", filepath.Dir(tarFile), o.Name)
 			target = path.Join(o.TargetDirectory, targetBinary)
 		} else {
 			err = fmt.Errorf("cannot extract %s from tar file, error: %v", tarFile, err)
 		}
-	} else {
+	default:
 		source = o.Source
 		target = path.Join(o.TargetDirectory, targetBinary)
 	}
@@ -49,7 +61,7 @@ func (o *Installer) Install() (err error) {
 
 		if o.Package != nil && o.Package.Installation != nil {
 			err = o.Execer.RunCommand(o.Package.Installation.Cmd, o.Package.Installation.Args...)
-		} else {
+		} else if !o.InstalledNative {
 			if err = o.OverWriteBinary(source, target); err != nil {
 				return
 			}
@@ -113,6 +125,13 @@ func (o *Installer) Install() (err error) {
 		}
 	}
 	return
+}
+
+// installNativeInstallerFile hands a native installer package file over to
+// the system package tools, for instance: apt-get and msiexec
+func (o *Installer) installNativeInstallerFile(file string) (err error) {
+	fmt.Println("install the native installer package:", file)
+	return (&native.Installer{Execer: o.Execer}).Install(file)
 }
 
 // OverWriteBinary install a binary file

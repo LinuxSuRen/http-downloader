@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	hdos "github.com/linuxsuren/http-downloader/pkg/os"
 	"github.com/mitchellh/go-homedir"
 	"github.com/stretchr/testify/assert"
 )
@@ -303,6 +304,82 @@ categories:
 	assert.Len(t, packages.Data, 2)
 	assert.Equal(t, "fake-cli", packages.Data[0].Repo)
 	assert.Equal(t, "fake-web", packages.Data[1].Repo)
+}
+
+func TestWebRepositoryPackages(t *testing.T) {
+	httpServer, server := setupWebServer(t)
+	client := httpServer.Client()
+
+	// the local cache exists, so no hd-home fetch is needed
+	seedPkgConfig(t, "fake-org", "fake-cli", "name: fake-cli\n")
+
+	// an installed tool which comes from a system package manager
+	assert.NoError(t, installer.RecordInstalledPackage(installer.InstalledPackage{
+		Name:           "repo-cli",
+		Version:        "1.2.3",
+		Native:         true,
+		PackageManager: "apt",
+	}))
+
+	searched := 0
+	server.repoSearch = func(keyword string, managers []string) []hdos.RepoPackage {
+		assert.Equal(t, "repo", keyword)
+		assert.Empty(t, managers)
+		searched++
+		return []hdos.RepoPackage{{
+			Manager:     "apt",
+			Name:        "repo-cli",
+			Version:     "1.2.3",
+			Description: "a repository package",
+		}, {
+			Manager: "winget",
+			Name:    "RepoSoft",
+			Version: "2.0",
+		}}
+	}
+
+	// the repository results extend the keyword search
+	resp, err := client.Get(httpServer.URL + "/api/packages?q=repo&repos=true")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	packages := struct {
+		Data []packageItem `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&packages))
+	assert.Len(t, packages.Data, 2)
+	assert.Equal(t, 1, searched)
+
+	// the results are sorted by name: RepoSoft < repo-cli
+	assert.Equal(t, "RepoSoft", packages.Data[0].Name)
+	assert.Equal(t, "winget", packages.Data[0].Manager)
+	assert.Equal(t, "winget:RepoSoft", packages.Data[0].Ref)
+	assert.False(t, packages.Data[0].Installed)
+
+	assert.Equal(t, "repo-cli", packages.Data[1].Name)
+	assert.Equal(t, "apt", packages.Data[1].Manager)
+	assert.Equal(t, "apt:repo-cli", packages.Data[1].Ref)
+	assert.Equal(t, "a repository package", packages.Data[1].Description)
+	assert.True(t, packages.Data[1].Installed)
+	assert.Equal(t, "repo-cli", packages.Data[1].InstalledName)
+	assert.Equal(t, "1.2.3", packages.Data[1].Version)
+	assert.True(t, packages.Data[1].Native)
+
+	// without the repos flag the repositories are not searched
+	resp, err = client.Get(httpServer.URL + "/api/packages?q=repo")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, 1, searched)
+	packages = struct {
+		Data []packageItem `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&packages))
+	assert.Empty(t, packages.Data)
+
+	// without a keyword the repositories are not searched either
+	resp, err = client.Get(httpServer.URL + "/api/packages?repos=true")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, 1, searched)
 }
 
 func TestWebPackageVersions(t *testing.T) {

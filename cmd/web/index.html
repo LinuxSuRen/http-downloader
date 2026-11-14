@@ -39,6 +39,7 @@
   .tool-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; align-items: center; }
   .pkg-name { font-weight: 600; }
   .pkg-source { color: var(--muted); font-size: 12px; }
+  .pkg-desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .pkg-cats { min-height: 18px; }
   .badge { display: inline-block; background: var(--chip); border-radius: 10px; padding: 1px 8px; font-size: 11px; margin-right: 4px; }
   .badge.installed { background: #dcfce7; color: #166534; }
@@ -80,9 +81,12 @@
         <option value="__custom__">Custom…</option>
       </select>
       <input type="text" id="proxy-custom" placeholder="proxy host, e.g. gh.api.99988866.xyz" hidden>
+      <label style="font-size:13px; color:var(--muted); white-space:nowrap;" title="Also search the repositories of the installed system package managers, e.g. apt, winget">
+        <input type="checkbox" id="repos-toggle"> System repositories
+      </label>
     </div>
     <div class="chips" id="categories"></div>
-    <div class="hint">Installed and not-installed tools share this list, the green badge marks the installed ones with their version. If a package is missing, it may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
+    <div class="hint">Installed and not-installed tools share this list, the green badge marks the installed ones with their version. If a package is missing, it may not be in hd-home yet, or the local data is stale — try Refresh data. Turn on System repositories to also find the packages of apt, winget, brew and friends.</div>
     <div class="list-meta">
       <span class="count" id="pkg-count"></span>
       <button class="btn sort-btn" id="sort-btn" title="Sort the list by the tool name">Name ↑</button>
@@ -92,7 +96,7 @@
       <tbody id="packages-body"></tbody>
     </table>
     <div class="cards" id="packages-cards" hidden></div>
-    <div class="empty" id="packages-empty" hidden>No package matches. The data may be stale, try Refresh data.</div>
+    <div class="empty" id="packages-empty" hidden>No package matches. Turn on System repositories, or try Refresh data.</div>
   </div>
 
   <div class="card">
@@ -271,6 +275,10 @@ async function loadPackages() {
     const keyword = document.getElementById('search-keyword').value.trim();
     if (keyword) {
       url += '?q=' + encodeURIComponent(keyword);
+      if (document.getElementById('repos-toggle').checked) {
+        // also search the system package repositories, e.g. apt, winget
+        url += '&repos=true';
+      }
     }
   }
 
@@ -290,14 +298,25 @@ function recordName(item) {
   return item.installed_name || item.name;
 }
 
+// the name which the install job consumes: hd-home packages install by
+// their org/repo, repository packages by their reference, e.g. apt:jenkins
+function installRef(item) {
+  return item.ref || (item.org && item.repo ? `${item.org}/${item.repo}` : '');
+}
+
 function packageActions(item) {
   const link = /^https?:\/\//i.test(item.homepage || '')
     ? `<a class="btn" href="${esc(item.homepage)}" target="_blank" rel="noopener noreferrer">Open link</a>` : '';
-  const install = item.web || !(item.org && item.repo) ? '' : `
+  const ref = installRef(item);
+  const install = item.web || !ref ? '' : ref === item.ref
+      // a repository package installs by its reference, without a release
+      // version picker
+    ? `<button class="btn primary" data-install="${esc(ref)}">Install</button>`
+    : `
       <select class="ver" data-org="${esc(item.org)}" data-repo="${esc(item.repo)}" title="Release version, latest by default">
         <option value="">latest</option>
       </select>
-      <button class="btn primary" data-install="${esc(item.org)}/${esc(item.repo)}">Install</button>`;
+      <button class="btn primary" data-install="${esc(ref)}">Install</button>`;
   const upgradable = item.installed && item.org && item.repo && !item.native;
   const record = item.installed ? `
       <button class="btn" data-action="open" data-name="${esc(recordName(item))}">Open</button>
@@ -316,9 +335,18 @@ function packageInstalled(item) {
 }
 
 function packageSource(item) {
-  return item.org && item.repo
-    ? `<a class="silent" href="https://github.com/${esc(item.org)}/${esc(item.repo)}" target="_blank" rel="noopener noreferrer">${esc(item.org)}/${esc(item.repo)}</a>`
-    : (item.native ? 'native' : '');
+  if (item.org && item.repo) {
+    return `<a class="silent" href="https://github.com/${esc(item.org)}/${esc(item.repo)}" target="_blank" rel="noopener noreferrer">${esc(item.org)}/${esc(item.repo)}</a>`;
+  }
+  if (item.manager) {
+    return `${esc(item.manager)} repository`;
+  }
+  return item.native ? 'native' : '';
+}
+
+// repository packages carry a short summary from their package manager
+function packageDesc(item) {
+  return item.description ? `<div class="pkg-desc">${esc(item.description)}</div>` : '';
 }
 
 function renderPackages(items) {
@@ -336,6 +364,7 @@ function renderPackages(items) {
       <td>
         <div class="pkg-name">${esc(item.name)}</div>
         <div class="pkg-source">${packageSource(item)}</div>
+        ${packageDesc(item)}
       </td>
       <td>${packageCategories(item)}</td>
       <td>${packageInstalled(item) || '-'}</td>
@@ -348,6 +377,7 @@ function renderPackages(items) {
         ${packageInstalled(item)}
       </div>
       <div class="pkg-source">${packageSource(item)}</div>
+      ${packageDesc(item)}
       <div class="pkg-cats">${packageCategories(item)}</div>
       <div class="tool-card-actions">${packageActions(item)}</div>
     </div>`).join('');
@@ -463,6 +493,17 @@ async function startJob(method, url, body, fallback) {
     document.getElementById('log-status').textContent = texts.streamFailed;
   };
 }
+
+// the repository search is opt-in per browser, it shells out to the
+// installed package managers which can be slow
+function initialRepos() {
+  return localStorage.getItem('hd-repos') === 'true';
+}
+document.getElementById('repos-toggle').checked = initialRepos();
+document.getElementById('repos-toggle').addEventListener('change', () => {
+  localStorage.setItem('hd-repos', document.getElementById('repos-toggle').checked);
+  loadPackages();
+});
 
 applyView();
 loadPackages();
