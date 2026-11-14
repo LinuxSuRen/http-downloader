@@ -7,6 +7,9 @@
 <style>
   :root { --border: #ddd; --muted: #777; --accent: #2563eb; --danger: #dc2626; --ok: #16a34a; --chip: #eef2f7; }
   * { box-sizing: border-box; }
+  /* the hidden attribute must win over author display rules like
+     .cards { display: grid }, otherwise both views render at once */
+  [hidden] { display: none !important; }
   body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f6f7f9; color: #222; }
   header { background: #fff; border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   header h1 { font-size: 18px; margin: 0; }
