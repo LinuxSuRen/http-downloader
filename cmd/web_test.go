@@ -50,6 +50,30 @@ func seedPkgConfig(t *testing.T, org, repo, content string) {
 	assert.NoError(t, os.WriteFile(filepath.Join(dir, repo+".yml"), []byte(content), 0644))
 }
 
+func TestWebProxy(t *testing.T) {
+	httpServer, _ := setupWebServer(t)
+	client := httpServer.Client()
+
+	// seed the proxy candidates of the local hd-home cache
+	assert.NoError(t, os.MkdirAll(filepath.Join(homedirHome(t), ".config", "hd-home"), 0750))
+	assert.NoError(t, os.WriteFile(filepath.Join(homedirHome(t), ".config", "hd-home", "proxy.yaml"),
+		[]byte("servers:\n- fake-proxy.com\n"), 0644))
+
+	resp, err := client.Get(httpServer.URL + "/api/proxy")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	result := struct {
+		Data proxyInfo `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
+	assert.Equal(t, []string{"fake-proxy.com"}, result.Data.Servers)
+
+	// method check
+	resp, err = client.Post(httpServer.URL+"/api/proxy", "application/json", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+}
+
 func TestWebAPI(t *testing.T) {
 	httpServer, _ := setupWebServer(t)
 	client := httpServer.Client()
@@ -202,16 +226,47 @@ categories:
 	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&categories))
 	assert.Equal(t, []string{"build", "ci", "web"}, categories.Data)
 
-	// missing both the category and the keyword
+	// the unfiltered view lists everything of the cache, the installed
+	// record of fake-cli is part of the cache, so no extra item appears
 	resp, err = client.Get(httpServer.URL + "/api/packages")
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-
-	// packages of a category carry the installed state
-	resp, err = client.Get(httpServer.URL + "/api/packages?category=ci")
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	packages := struct {
+		Data []packageItem `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&packages))
+	assert.Len(t, packages.Data, 2)
+	assert.Equal(t, "fake-cli", packages.Data[0].Repo)
+	assert.Equal(t, "fake-cli", packages.Data[0].InstalledName)
+	assert.Equal(t, "2026-01-01T00:00:00Z", packages.Data[0].InstalledAt)
+
+	// an installed tool which is not part of the cache is merged into the
+	// unfiltered view, so installed and not-installed share one list
+	assert.NoError(t, installer.RecordInstalledPackage(installer.InstalledPackage{
+		Name:    "lonely-cli",
+		Org:     "ghost-org",
+		Repo:    "lonely-cli",
+		Version: "v0.2.0",
+	}))
+	resp, err = client.Get(httpServer.URL + "/api/packages")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	packages = struct {
+		Data []packageItem `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&packages))
+	assert.Len(t, packages.Data, 3)
+	assert.Equal(t, "ghost-org/lonely-cli", packages.Data[2].Org+"/"+packages.Data[2].Repo)
+	assert.True(t, packages.Data[2].Installed)
+	assert.Equal(t, "lonely-cli", packages.Data[2].Name)
+	assert.Equal(t, "v0.2.0", packages.Data[2].Version)
+
+	// packages of a category carry the installed state, the record-only
+	// tool does not match the category and is not merged in
+	resp, err = client.Get(httpServer.URL + "/api/packages?category=ci")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	packages = struct {
 		Data []packageItem `json:"data"`
 	}{}
 	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&packages))

@@ -105,8 +105,10 @@ hd web
 
 Then open http://127.0.0.1:8080, you can:
 
-* search the installable packages or browse them by category
+* see all the tools in one list, installed and not-installed ones together, the green badge tells them apart and the list sorts by name in both directions
+* search the packages or browse them by category, shown as a table or as cards
 * install a package with any release version, which also covers upgrades and downgrades
+* pick a GitHub acceleration proxy for the downloads, the candidates come from your hd config and from hd-home, a custom address also works
 * open an installed tool in a new terminal window
 * open the link of a web tool directly, packages can declare their entry link with the `homepage` field in [hd-home](https://github.com/LinuxSuRen/hd-home)
 

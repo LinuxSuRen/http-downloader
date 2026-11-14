@@ -21,6 +21,7 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -93,6 +94,7 @@ func (s *webServer) routes() http.Handler {
 	mux.HandleFunc("/api/categories", s.handleCategories)
 	mux.HandleFunc("/api/packages", s.handlePackages)
 	mux.HandleFunc("/api/packages/", s.handlePackageVersions)
+	mux.HandleFunc("/api/proxy", s.handleProxy)
 	return mux
 }
 
@@ -107,9 +109,10 @@ func (s *webServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/tools returns the installed tools
-// POST /api/tools {"name":"jcli","version":"v1.2.3","force":true} starts an
-// install job, the optional version pins the release tag, so it also covers
-// upgrades and downgrades
+// POST /api/tools {"name":"jcli","version":"v1.2.3","proxy":"gh.api...","force":true}
+// starts an install job, the optional version pins the release tag, so it
+// also covers upgrades and downgrades, the optional proxy downloads the
+// release through a GitHub acceleration proxy
 func (s *webServer) handleTools(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -118,6 +121,7 @@ func (s *webServer) handleTools(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Name    string `json:"name"`
 			Version string `json:"version"`
+			Proxy   string `json:"proxy"`
 			Force   bool   `json:"force"`
 		}
 		if err := decodeJSON(r, &req); err != nil || strings.TrimSpace(req.Name) == "" {
@@ -125,17 +129,41 @@ func (s *webServer) handleTools(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		version := strings.TrimSpace(req.Version)
+		proxy := strings.TrimSpace(req.Proxy)
 		target := strings.TrimSpace(req.Name)
 		if version != "" && !strings.Contains(target, "@") {
 			target = fmt.Sprintf("%s@%s", target, version)
 		}
 		job := s.startJob("install", req.Name, func(stub *cobra.Command) error {
-			return s.installTool(stub, target, version, req.Force)
+			return s.installTool(stub, target, version, proxy, req.Force)
 		})
 		writeJSON(w, http.StatusAccepted, job)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET and POST are supported")
 	}
+}
+
+// proxyInfo is the API view of the GitHub acceleration proxy settings
+type proxyInfo struct {
+	// Current is the proxy configured in the hd config file, empty means
+	// downloading directly from GitHub
+	Current string   `json:"current"`
+	Servers []string `json:"servers,omitempty"`
+}
+
+// GET /api/proxy returns the GitHub acceleration proxy candidates: the
+// configured one plus the servers maintained in hd-home
+func (s *webServer) handleProxy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data": proxyInfo{
+			Current: strings.TrimSpace(viper.GetString("proxy-github")),
+			Servers: installer.GetProxyServers(),
+		},
+	})
 }
 
 // GET /api/search?q=keyword searches the installable packages from hd-home
@@ -198,13 +226,21 @@ type packageItem struct {
 	Homepage   string   `json:"homepage,omitempty"`
 	// Web marks a package which has nothing to install, the UI opens its
 	// homepage instead
-	Web       bool   `json:"web"`
-	Installed bool   `json:"installed"`
-	Version   string `json:"version,omitempty"`
+	Web bool `json:"web"`
+	// InstalledName is the name of the installed record, it is the name
+	// expected by the open, upgrade and remove actions
+	InstalledName string `json:"installed_name,omitempty"`
+	Installed     bool   `json:"installed"`
+	Version       string `json:"version,omitempty"`
+	InstalledAt   string `json:"installed_at,omitempty"`
+	Native        bool   `json:"native,omitempty"`
 }
 
-// GET /api/packages?category=security or ?q=keyword lists the installable
-// packages together with their installed state
+// GET /api/packages lists the tools of the local hd-home cache together
+// with their installed state. Without a category and a keyword every
+// package is listed and the installed tools which are not part of the
+// cache are merged in, so installed and not-installed tools share one
+// view. A category or a keyword filters the cache packages only.
 func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
@@ -212,11 +248,6 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 	}
 	category := strings.TrimSpace(r.URL.Query().Get("category"))
 	keyword := strings.TrimSpace(r.URL.Query().Get("q"))
-	if category == "" && keyword == "" {
-		writeError(w, http.StatusBadRequest, "INVALID_REQUEST",
-			"please provide the category or the search keyword")
-		return
-	}
 
 	configDir, ok := s.ensureConfigCache()
 	if !ok {
@@ -226,18 +257,23 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var orgRepos []string
-	if category != "" {
+	switch {
+	case category != "":
 		packages := installer.FindPackagesByCategory(category)
 		orgRepos = make([]string, 0, len(packages))
 		for i := range packages {
 			orgRepos = append(orgRepos, packages[i].Org+"/"+packages[i].Repo)
 		}
-	} else {
+	case keyword != "":
 		orgRepos = installer.FindByKeyword(keyword, configDir)
+	default:
+		orgRepos = installer.FindAllPackages(configDir)
 	}
 
-	installed := installedIndex()
-	items := make([]packageItem, 0, len(orgRepos))
+	records := loadInstalledRecords()
+	installed := installedIndex(records)
+	seen := make(map[string]bool, len(orgRepos))
+	items := make([]packageItem, 0, len(orgRepos)+len(records))
 	for _, orgRepo := range orgRepos {
 		org, repo, valid := splitOrgRepo(orgRepo)
 		if !valid {
@@ -257,8 +293,34 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 		if record := installed[orgRepo]; record != nil {
 			item.Installed = true
 			item.Version = record.Version
+			item.InstalledName = record.Name
+			item.InstalledAt = record.InstalledAt
 		}
+		seen[orgRepo] = true
 		items = append(items, item)
+	}
+
+	// the unfiltered view also carries the installed tools which are not
+	// part of the hd-home cache, so nothing installed is lost from the
+	// merged list
+	if category == "" && keyword == "" {
+		for i := range records {
+			record := records[i]
+			if record.Org != "" && record.Repo != "" && seen[record.Org+"/"+record.Repo] {
+				continue
+			}
+
+			items = append(items, packageItem{
+				Org:           record.Org,
+				Repo:          record.Repo,
+				Name:          record.Name,
+				Installed:     true,
+				Version:       record.Version,
+				InstalledName: record.Name,
+				InstalledAt:   record.InstalledAt,
+				Native:        record.Native,
+			})
+		}
 	}
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].Org+"/"+items[i].Repo < items[j].Org+"/"+items[j].Repo
@@ -332,17 +394,21 @@ func splitOrgRepo(orgRepo string) (org, repo string, valid bool) {
 	return items[0], items[1], true
 }
 
-// installedIndex indexes the installed tools by their org/repo
-func installedIndex() (index map[string]*installer.InstalledPackage) {
-	packages, err := installer.LoadInstalledPackages()
-	if err != nil {
-		return map[string]*installer.InstalledPackage{}
+// loadInstalledRecords loads the installed tools, a broken record file
+// yields an empty list
+func loadInstalledRecords() (records []installer.InstalledPackage) {
+	if loaded, err := installer.LoadInstalledPackages(); err == nil {
+		records = loaded
 	}
+	return
+}
 
-	index = make(map[string]*installer.InstalledPackage, len(packages))
-	for i := range packages {
-		if packages[i].Org != "" && packages[i].Repo != "" {
-			index[packages[i].Org+"/"+packages[i].Repo] = &packages[i]
+// installedIndex indexes the installed tools by their org/repo
+func installedIndex(records []installer.InstalledPackage) (index map[string]*installer.InstalledPackage) {
+	index = make(map[string]*installer.InstalledPackage, len(records))
+	for i := range records {
+		if records[i].Org != "" && records[i].Repo != "" {
+			index[records[i].Org+"/"+records[i].Repo] = &records[i]
 		}
 	}
 	return
@@ -406,8 +472,17 @@ func (s *webServer) handleTool(w http.ResponseWriter, r *http.Request) {
 				fmt.Sprintf("tool %s is not installed yet", name))
 			return
 		}
+		var req struct {
+			Proxy string `json:"proxy"`
+		}
+		if r.Body != nil {
+			// the body is optional, an empty or broken one keeps the
+			// direct download
+			_ = decodeJSON(r, &req)
+		}
+		proxy := strings.TrimSpace(req.Proxy)
 		job := s.startJob("upgrade", name, func(stub *cobra.Command) error {
-			return s.upgradeTool(stub, tool.Org, tool.Repo)
+			return s.upgradeTool(stub, tool.Org, tool.Repo, proxy)
 		})
 		writeJSON(w, http.StatusAccepted, job)
 	case r.Method == http.MethodPost && action == "open":
@@ -680,10 +755,12 @@ func (s *webServer) newInstallOption() *installOption {
 
 // installTool installs a tool by its name, the same way as hd install.
 // The version is optional, when set it pins the release tag which covers
-// upgrades and downgrades.
-func (s *webServer) installTool(stub *cobra.Command, name, version string, force bool) (err error) {
+// upgrades and downgrades. The proxy is optional, when set the release is
+// downloaded through the GitHub acceleration proxy.
+func (s *webServer) installTool(stub *cobra.Command, name, version, proxy string, force bool) (err error) {
 	opt := s.newInstallOption()
 	opt.force = force
+	opt.ProxyGitHub = proxy
 	if err = opt.preRunE(stub, []string{name}); err != nil {
 		return
 	}
@@ -701,11 +778,13 @@ func (s *webServer) installTool(stub *cobra.Command, name, version string, force
 	return
 }
 
-// upgradeTool upgrades a tool from its source repository
-func (s *webServer) upgradeTool(stub *cobra.Command, org, repo string) error {
+// upgradeTool upgrades a tool from its source repository, the proxy is
+// optional and works the same as in installTool
+func (s *webServer) upgradeTool(stub *cobra.Command, org, repo, proxy string) error {
 	up := &upgradeOption{
 		installOption: s.newInstallOption(),
 	}
+	up.ProxyGitHub = proxy
 	return up.upgradeOne(stub, fmt.Sprintf("%s/%s", org, repo))
 }
 

@@ -7,29 +7,46 @@
 <style>
   :root { --border: #ddd; --muted: #777; --accent: #2563eb; --danger: #dc2626; --ok: #16a34a; --chip: #eef2f7; }
   * { box-sizing: border-box; }
+  /* the hidden attribute must win over author display rules like
+     .cards { display: grid }, otherwise both views render at once */
+  [hidden] { display: none !important; }
   body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f6f7f9; color: #222; }
-  header { background: #fff; border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header { background: #fff; border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   header h1 { font-size: 18px; margin: 0; }
+  .view-toggle { display: flex; gap: 0; }
+  .view-toggle .btn { border-radius: 0; }
+  .view-toggle .btn:first-child { border-radius: 6px 0 0 6px; }
+  .view-toggle .btn:last-child { border-radius: 0 6px 6px 0; border-left: none; }
   main { max-width: 1080px; margin: 24px auto; padding: 0 16px; }
   .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-  .card h2 { font-size: 15px; margin: 0 0 12px; }
-  .toolbar { display: flex; gap: 8px; }
-  .toolbar input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+  .toolbar input[type=text] { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  #proxy-select, #proxy-custom { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: #fff; }
+  #proxy-custom { min-width: 220px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .chip { border: 1px solid var(--border); background: var(--chip); border-radius: 14px; padding: 3px 12px; font-size: 12px; cursor: pointer; }
   .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .list-meta { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 8px; }
+  .list-meta .count { color: var(--muted); font-size: 12px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   th { color: var(--muted); font-weight: 500; }
   td.actions { text-align: right; white-space: nowrap; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .tool-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: #fff; }
+  .tool-card.installed { border-color: #bbf7d0; }
+  .tool-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .tool-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; align-items: center; }
   .pkg-name { font-weight: 600; }
   .pkg-source { color: var(--muted); font-size: 12px; }
+  .pkg-cats { min-height: 18px; }
   .badge { display: inline-block; background: var(--chip); border-radius: 10px; padding: 1px 8px; font-size: 11px; margin-right: 4px; }
   .badge.installed { background: #dcfce7; color: #166534; }
   .btn { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; text-decoration: none; }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .btn.danger { color: var(--danger); border-color: var(--danger); }
   .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.view-btn.active, .btn.sort-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   select.ver { border: 1px solid var(--border); border-radius: 6px; padding: 5px 6px; font-size: 12px; max-width: 130px; }
   a.silent { color: var(--accent); text-decoration: none; }
   #logs { background: #0f172a; color: #d1e7ff; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; border-radius: 8px; padding: 12px; height: 260px; overflow-y: auto; white-space: pre-wrap; }
@@ -44,33 +61,38 @@
 <body>
 <header>
   <h1>hd console</h1>
-  <span id="job-badge"></span>
+  <span style="display:flex; gap:12px; align-items:center;">
+    <span class="view-toggle">
+      <button class="btn view-btn" data-view="table" title="Switch to the table view">Table</button>
+      <button class="btn view-btn" data-view="cards" title="Switch to the card view">Cards</button>
+    </span>
+    <span id="job-badge"></span>
+  </span>
 </header>
 <main>
-  <div class="card">
+  <div class="card" id="packages-card">
     <div class="toolbar">
-      <input id="search-keyword" placeholder="Search packages, e.g. jenkins" autofocus>
+      <input type="text" id="search-keyword" placeholder="Search packages, e.g. jenkins" autofocus>
       <button class="btn primary" id="search-btn">Search</button>
       <button class="btn" id="fetch-btn">Refresh data</button>
+      <select id="proxy-select" title="GitHub acceleration proxy used by the installs">
+        <option value="">Direct</option>
+        <option value="__custom__">Custom…</option>
+      </select>
+      <input type="text" id="proxy-custom" placeholder="proxy host, e.g. gh.api.99988866.xyz" hidden>
     </div>
     <div class="chips" id="categories"></div>
-    <div class="hint">Search or pick a category to browse the installable packages, then install them with any release version. If nothing is found, the package may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
-    <div id="packages" hidden>
-      <table>
-        <thead><tr><th>Package</th><th>Categories</th><th>Installed</th><th>Actions</th></tr></thead>
-        <tbody id="packages-body"></tbody>
-      </table>
-      <div class="empty" id="packages-empty" hidden>No package matches. The data may be stale, try Refresh data.</div>
+    <div class="hint">Installed and not-installed tools share this list, the green badge marks the installed ones with their version. If a package is missing, it may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
+    <div class="list-meta">
+      <span class="count" id="pkg-count"></span>
+      <button class="btn sort-btn" id="sort-btn" title="Sort the list by the tool name">Name ↑</button>
     </div>
-  </div>
-
-  <div class="card">
-    <h2>Installed tools</h2>
-    <table>
-      <thead><tr><th>Name</th><th>Version</th><th>Source</th><th>Installed at</th><th>Actions</th></tr></thead>
-      <tbody id="tools-body"></tbody>
+    <table id="packages-table">
+      <thead><tr><th>Package</th><th>Categories</th><th>Installed</th><th>Actions</th></tr></thead>
+      <tbody id="packages-body"></tbody>
     </table>
-    <div class="empty" id="tools-empty" hidden>No tools installed yet.</div>
+    <div class="cards" id="packages-cards" hidden></div>
+    <div class="empty" id="packages-empty" hidden>No package matches. The data may be stale, try Refresh data.</div>
   </div>
 
   <div class="card">
@@ -91,15 +113,51 @@ const texts = {
   installFailed: 'Could not start the install. Check the tool name and try again.',
   upgradeFailed: 'Could not start the upgrade. Try again later.',
   removeFailed: 'Could not remove the tool. It may be protected or missing.',
-  loadFailed: 'Could not load the installed tools. Refresh the page and try again.',
+  packagesFailed: 'Could not load the tools. Try again later.',
   categoriesFailed: 'Could not load the categories. Try Refresh data.',
-  packagesFailed: 'Could not load the packages. Try again later.',
+  proxyFailed: 'Could not load the proxy settings. The direct connection is used.',
   openFailed: 'Could not launch the tool. It may be missing or unsupported on this system.',
   jobFailed: 'The job did not finish successfully. Check the logs above for details.',
   streamFailed: 'Lost the connection to the log stream. Reconnecting is not available, refresh the page.',
 };
 
 let activeCategory = '';
+let packageItems = [];
+
+// the view preference of the user wins over the viewport width, which is
+// only read once when the page loads
+function initialView() {
+  const saved = localStorage.getItem('hd-view');
+  if (saved === 'table' || saved === 'cards') return saved;
+  return window.innerWidth < 1024 ? 'cards' : 'table';
+}
+let viewMode = initialView();
+
+// the name sort of the merged list, ascending by default
+function initialSort() {
+  return localStorage.getItem('hd-sort') === 'desc' ? 'desc' : 'asc';
+}
+let sortDir = initialSort();
+
+function applyView() {
+  document.querySelectorAll('.view-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.view === viewMode));
+  document.getElementById('packages-table').hidden = viewMode !== 'table';
+  document.getElementById('packages-cards').hidden = viewMode !== 'cards';
+}
+
+document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('click', () => {
+  viewMode = btn.dataset.view;
+  localStorage.setItem('hd-view', viewMode);
+  applyView();
+  renderPackages(packageItems);
+}));
+
+document.getElementById('sort-btn').addEventListener('click', () => {
+  sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  localStorage.setItem('hd-sort', sortDir);
+  renderPackages(packageItems);
+});
 
 function esc(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g,
@@ -126,55 +184,57 @@ function badge(status) {
   return `<span class="status ${status}">${status}</span>`;
 }
 
-async function loadTools() {
+// the proxy used by the installs: empty means downloading from GitHub directly
+function currentProxy() {
+  const select = document.getElementById('proxy-select');
+  if (select.value !== '__custom__') return select.value;
+  return document.getElementById('proxy-custom').value.trim();
+}
+
+async function loadProxy() {
+  let data;
   try {
-    const data = await api('GET', '/api/tools');
-    renderTools(data.data || []);
+    data = await api('GET', '/api/proxy');
   } catch (err) {
-    alert(friendly(err, texts.loadFailed));
+    alert(friendly(err, texts.proxyFailed));
+    return;
+  }
+  const info = data.data || {};
+  const servers = [];
+  if (info.current) servers.push(info.current);
+  (info.servers || []).forEach(server => { if (!servers.includes(server)) servers.push(server); });
+
+  const select = document.getElementById('proxy-select');
+  const saved = localStorage.getItem('hd-proxy');
+  const savedCustom = localStorage.getItem('hd-proxy-custom') || '';
+  servers.forEach(server => {
+    const option = document.createElement('option');
+    option.value = server;
+    option.textContent = server;
+    select.appendChild(option);
+  });
+
+  if (saved === '__custom__') {
+    select.value = '__custom__';
+    document.getElementById('proxy-custom').hidden = false;
+    document.getElementById('proxy-custom').value = savedCustom;
+  } else if (saved && servers.includes(saved)) {
+    select.value = saved;
+  } else if (info.current) {
+    select.value = info.current;
   }
 }
 
-function renderTools(tools) {
-  const body = document.getElementById('tools-body');
-  document.getElementById('tools-empty').hidden = tools.length > 0;
-  body.innerHTML = tools.map(t => `
-    <tr>
-      <td>${esc(t.name)}</td>
-      <td>${esc(t.version || '-')}</td>
-      <td>${t.org && t.repo
-        ? `<a class="silent" href="https://github.com/${esc(t.org)}/${esc(t.repo)}" target="_blank" rel="noopener noreferrer">${esc(t.org)}/${esc(t.repo)}</a>`
-        : (t.native ? 'native' : '-')}</td>
-      <td>${esc(t.installed_at || '-')}</td>
-      <td class="actions">
-        <button class="btn" data-action="open" data-name="${esc(t.name)}">Open</button>
-        <button class="btn" data-action="upgrade" data-name="${esc(t.name)}" ${t.upgradable ? '' : 'disabled'}>Upgrade</button>
-        <button class="btn danger" data-action="remove" data-name="${esc(t.name)}">Remove</button>
-      </td>
-    </tr>`).join('');
-}
+document.getElementById('proxy-select').addEventListener('change', () => {
+  const custom = document.getElementById('proxy-custom');
+  const isCustom = document.getElementById('proxy-select').value === '__custom__';
+  custom.hidden = !isCustom;
+  if (isCustom) custom.focus();
+  localStorage.setItem('hd-proxy', document.getElementById('proxy-select').value);
+});
 
-document.getElementById('tools-body').addEventListener('click', async ev => {
-  const btn = ev.target.closest('button[data-action]');
-  if (!btn || btn.disabled) return;
-  const name = btn.dataset.name;
-  if (btn.dataset.action === 'remove') {
-    if (!confirm(texts.confirmRemove)) return;
-    try {
-      const data = await api('DELETE', '/api/tools/' + encodeURIComponent(name));
-      renderTools(data.data || []);
-    } catch (err) {
-      alert(friendly(err, texts.removeFailed));
-    }
-  } else if (btn.dataset.action === 'open') {
-    try {
-      await api('POST', '/api/tools/' + encodeURIComponent(name) + '/open');
-    } catch (err) {
-      alert(friendly(err, texts.openFailed));
-    }
-  } else {
-    startJob('POST', `/api/tools/${encodeURIComponent(name)}/upgrade`, null, texts.upgradeFailed);
-  }
+document.getElementById('proxy-custom').addEventListener('change', () => {
+  localStorage.setItem('hd-proxy-custom', document.getElementById('proxy-custom').value.trim());
 });
 
 async function loadCategories() {
@@ -204,13 +264,14 @@ document.getElementById('categories').addEventListener('click', ev => {
 });
 
 async function loadPackages() {
-  let url;
+  let url = '/api/packages';
   if (activeCategory) {
-    url = '/api/packages?category=' + encodeURIComponent(activeCategory);
+    url += '?category=' + encodeURIComponent(activeCategory);
   } else {
     const keyword = document.getElementById('search-keyword').value.trim();
-    if (!keyword) return;
-    url = '/api/packages?q=' + encodeURIComponent(keyword);
+    if (keyword) {
+      url += '?q=' + encodeURIComponent(keyword);
+    }
   }
 
   let data;
@@ -223,31 +284,73 @@ async function loadPackages() {
   renderPackages(data.data || []);
 }
 
-function renderPackages(items) {
-  document.getElementById('packages').hidden = false;
-  document.getElementById('packages-empty').hidden = items.length > 0;
-  document.getElementById('packages-body').innerHTML = items.map(item => {
-    const categories = (item.categories || []).map(cat => `<span class="badge">${esc(cat)}</span>`).join('');
-    const installed = item.installed
-      ? `<span class="badge installed">${esc(item.version || 'installed')}</span>` : '-';
-    const link = /^https?:\/\//i.test(item.homepage || '')
-      ? `<a class="btn" href="${esc(item.homepage)}" target="_blank" rel="noopener noreferrer">Open link</a>` : '';
-    const install = item.web ? '' : `
+// the installed actions address the record, which may carry a different
+// name than the registry entry
+function recordName(item) {
+  return item.installed_name || item.name;
+}
+
+function packageActions(item) {
+  const link = /^https?:\/\//i.test(item.homepage || '')
+    ? `<a class="btn" href="${esc(item.homepage)}" target="_blank" rel="noopener noreferrer">Open link</a>` : '';
+  const install = item.web || !(item.org && item.repo) ? '' : `
       <select class="ver" data-org="${esc(item.org)}" data-repo="${esc(item.repo)}" title="Release version, latest by default">
         <option value="">latest</option>
       </select>
       <button class="btn primary" data-install="${esc(item.org)}/${esc(item.repo)}">Install</button>`;
-    return `
+  const upgradable = item.installed && item.org && item.repo && !item.native;
+  const record = item.installed ? `
+      <button class="btn" data-action="open" data-name="${esc(recordName(item))}">Open</button>
+      <button class="btn" data-action="upgrade" data-name="${esc(recordName(item))}" ${upgradable ? '' : 'disabled'}>Upgrade</button>
+      <button class="btn danger" data-action="remove" data-name="${esc(recordName(item))}">Remove</button>` : '';
+  return install + record + link;
+}
+
+function packageCategories(item) {
+  return (item.categories || []).map(cat => `<span class="badge">${esc(cat)}</span>`).join('');
+}
+
+function packageInstalled(item) {
+  return item.installed
+    ? `<span class="badge installed">${esc(item.version || 'installed')}</span>` : '';
+}
+
+function packageSource(item) {
+  return item.org && item.repo
+    ? `<a class="silent" href="https://github.com/${esc(item.org)}/${esc(item.repo)}" target="_blank" rel="noopener noreferrer">${esc(item.org)}/${esc(item.repo)}</a>`
+    : (item.native ? 'native' : '');
+}
+
+function renderPackages(items) {
+  packageItems = items;
+  const direction = sortDir === 'asc' ? 1 : -1;
+  const sorted = [...items].sort((a, b) =>
+    direction * String(a.name || '').localeCompare(String(b.name || ''), undefined, {sensitivity: 'base'}));
+
+  document.getElementById('sort-btn').textContent = sortDir === 'asc' ? 'Name ↑' : 'Name ↓';
+  document.getElementById('pkg-count').textContent =
+    `${sorted.length} tools, ${sorted.filter(item => item.installed).length} installed`;
+  document.getElementById('packages-empty').hidden = sorted.length > 0;
+  document.getElementById('packages-body').innerHTML = sorted.map(item => `
     <tr>
       <td>
         <div class="pkg-name">${esc(item.name)}</div>
-        <div class="pkg-source"><a class="silent" href="https://github.com/${esc(item.org)}/${esc(item.repo)}" target="_blank" rel="noopener noreferrer">${esc(item.org)}/${esc(item.repo)}</a></div>
+        <div class="pkg-source">${packageSource(item)}</div>
       </td>
-      <td>${categories}</td>
-      <td>${installed}</td>
-      <td class="actions">${install}${link}</td>
-    </tr>`;
-  }).join('');
+      <td>${packageCategories(item)}</td>
+      <td>${packageInstalled(item) || '-'}</td>
+      <td class="actions">${packageActions(item)}</td>
+    </tr>`).join('');
+  document.getElementById('packages-cards').innerHTML = sorted.map(item => `
+    <div class="tool-card ${item.installed ? 'installed' : ''}">
+      <div class="tool-card-head">
+        <span class="pkg-name">${esc(item.name)}</span>
+        ${packageInstalled(item)}
+      </div>
+      <div class="pkg-source">${packageSource(item)}</div>
+      <div class="pkg-cats">${packageCategories(item)}</div>
+      <div class="tool-card-actions">${packageActions(item)}</div>
+    </div>`).join('');
 }
 
 // the release tags are fetched when the version dropdown is opened the first time
@@ -269,20 +372,44 @@ async function fillVersions(select) {
   }
 }
 
-document.getElementById('packages-body').addEventListener('click', ev => {
+document.getElementById('packages-card').addEventListener('click', async ev => {
   const select = ev.target.closest('select.ver');
   if (select) {
     fillVersions(select);
     return;
   }
 
-  const btn = ev.target.closest('button[data-install]');
-  if (!btn) return;
-  const row = btn.closest('tr');
-  const selectEl = row ? row.querySelector('select.ver') : null;
-  const version = selectEl ? selectEl.value : '';
-  const force = document.getElementById('force-install').checked;
-  startJob('POST', '/api/tools', {name: btn.dataset.install, version, force}, texts.installFailed);
+  const installBtn = ev.target.closest('button[data-install]');
+  if (installBtn) {
+    const row = installBtn.closest('tr, .tool-card');
+    const selectEl = row ? row.querySelector('select.ver') : null;
+    const version = selectEl ? selectEl.value : '';
+    const force = document.getElementById('force-install').checked;
+    startJob('POST', '/api/tools',
+      {name: installBtn.dataset.install, version, proxy: currentProxy(), force}, texts.installFailed);
+    return;
+  }
+
+  const actionBtn = ev.target.closest('button[data-action]');
+  if (!actionBtn || actionBtn.disabled) return;
+  const name = actionBtn.dataset.name;
+  if (actionBtn.dataset.action === 'remove') {
+    if (!confirm(texts.confirmRemove)) return;
+    try {
+      await api('DELETE', '/api/tools/' + encodeURIComponent(name));
+      loadPackages();
+    } catch (err) {
+      alert(friendly(err, texts.removeFailed));
+    }
+  } else if (actionBtn.dataset.action === 'open') {
+    try {
+      await api('POST', '/api/tools/' + encodeURIComponent(name) + '/open');
+    } catch (err) {
+      alert(friendly(err, texts.openFailed));
+    }
+  } else {
+    startJob('POST', `/api/tools/${encodeURIComponent(name)}/upgrade`, {proxy: currentProxy()}, texts.upgradeFailed);
+  }
 });
 
 function searchPackages() {
@@ -325,14 +452,9 @@ async function startJob(method, url, body, fallback) {
       document.getElementById('job-badge').innerHTML = badge(msg.status);
       document.getElementById('log-status').textContent =
         msg.status === 'success' ? `${job.action} ${job.tool} finished` : texts.jobFailed;
-      loadTools();
+      loadPackages();
       if (job.action === 'fetch') {
         loadCategories();
-        if (activeCategory || document.getElementById('search-keyword').value.trim()) {
-          loadPackages();
-        }
-      } else if (!document.getElementById('packages').hidden) {
-        loadPackages();
       }
     }
   };
@@ -342,8 +464,10 @@ async function startJob(method, url, body, fallback) {
   };
 }
 
-loadTools();
+applyView();
+loadPackages();
 loadCategories();
+loadProxy();
 </script>
 </body>
 </html>
