@@ -120,6 +120,8 @@ func newProcessManager() *processManager {
 // start launches a binary as a child process of the server and captures
 // its output
 func (m *processManager) start(name, binPath string, args []string) (proc *managedProcess, err error) {
+	// #nosec G702 -- the path points to an existing binary of the local
+	// install record, the console binds to 127.0.0.1 only
 	cmd := exec.Command(binPath, args...)
 	// the child must not inherit the pipes of the HTTP server
 	cmd.Stdin = nil
