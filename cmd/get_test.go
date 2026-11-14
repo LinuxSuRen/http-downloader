@@ -171,25 +171,23 @@ func TestRunE(t *testing.T) {
 
 			ctrl := gomock.NewController(t)
 			roundTripper := mhttp.NewMockRoundTripper(ctrl)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer func() {
-				cancel()
-			}()
 
 			// for size detecting
-			mockRequest, _ := http.NewRequestWithContext(ctx, http.MethodGet, do.URL, nil)
-			mockRequest.Header.Set("Range", "bytes=2-")
-			mockResponse := &http.Response{
-				StatusCode: http.StatusPartialContent,
-				Proto:      "HTTP/1.1",
-				Request:    mockRequest,
-				Header: map[string][]string{
-					"Content-Length": {"100"},
-				},
-				Body: io.NopCloser(bytes.NewBufferString("responseBody")),
-			}
-
-			roundTripper.EXPECT().RoundTrip(gomock.Any()).Return(mockResponse, nil).AnyTimes()
+			// every round trip should return a fresh response, the
+			// response body can only be read once and the parts download
+			// in parallel
+			roundTripper.EXPECT().RoundTrip(gomock.Any()).DoAndReturn(
+				func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusPartialContent,
+						Proto:      "HTTP/1.1",
+						Request:    req,
+						Header: map[string][]string{
+							"Content-Length": {"100"},
+						},
+						Body: io.NopCloser(bytes.NewBufferString("responseBody")),
+					}, nil
+				}).AnyTimes()
 			do.RoundTripper = roundTripper
 		},
 		wantErr: false,
