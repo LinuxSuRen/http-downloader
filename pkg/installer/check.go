@@ -499,6 +499,12 @@ func getPackagingFormat(installer *Installer) string {
 		}
 		return "zip"
 	}
+	// the os might have already been replaced, for example darwin -> macOS
+	if platformType == "darwin" || platformType == "macos" {
+		if installer.Package != nil && installer.Package.FormatOverrides.Darwin != "" {
+			return installer.Package.FormatOverrides.Darwin
+		}
+	}
 	if installer.Package != nil && installer.Package.FormatOverrides.Linux != "" {
 		return installer.Package.FormatOverrides.Linux
 	}
