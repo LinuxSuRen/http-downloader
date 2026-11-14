@@ -122,14 +122,15 @@ type downloadOption struct {
 	PrintCategories   bool
 
 	// inner fields
-	name          string
-	Tar           bool
-	Package       *installer.HDConfig
-	org           string
-	repo          string
-	fetcher       installer.Fetcher
-	execer        fakeruntime.Execer
-	ExpectVersion string // should be like >v1.1.0
+	name               string
+	Tar                bool
+	Package            *installer.HDConfig
+	org                string
+	repo               string
+	fetcher            installer.Fetcher
+	execer             fakeruntime.Execer
+	ExpectVersion      string // should be like >v1.1.0
+	onDownloadProgress func(delta, total int64)
 }
 
 const (
@@ -330,6 +331,14 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	if o.Thread <= 1 {
 		downloader := &net.ContinueDownloader{}
 		suggestedFilenameAware = downloader
+		if o.onDownloadProgress != nil {
+			// a callback-only indicator follows the transfer without
+			// rendering any progress bar
+			downloader.WithProgressIndicator(&net.ProgressIndicator{
+				Title:      "Downloading",
+				OnProgress: o.onDownloadProgress,
+			})
+		}
 		downloader.WithoutProxy(o.NoProxy).
 			WithRoundTripper(o.RoundTripper).
 			WithInsecureSkipVerify(o.SkipTLS).
@@ -340,6 +349,9 @@ func (o *downloadOption) runE(cmd *cobra.Command, args []string) (err error) {
 	} else {
 		downloader := &net.MultiThreadDownloader{}
 		suggestedFilenameAware = downloader
+		if o.onDownloadProgress != nil {
+			downloader.WithOnProgress(o.onDownloadProgress)
+		}
 		downloader.WithKeepParts(o.KeepPart).
 			WithShowProgress(o.ShowProgress).
 			WithoutProxy(o.NoProxy).

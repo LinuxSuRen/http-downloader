@@ -24,6 +24,13 @@ type ProgressIndicator struct {
 	Reader io.Reader
 	Title  string
 
+	// OnProgress reports every transferred chunk together with the expected
+	// total size in bytes, a non positive total means the size is unknown.
+	// It works without any progress bar rendering, which allows headless
+	// callers, like a web server, to follow the transfer. The callback must
+	// be cheap, the rendering throttle does not apply to it.
+	OnProgress func(delta, total int64)
+
 	// Total is the expected total size in bytes. Zero or a negative value
 	// means the size is unknown, in that case the bar works in the spinner
 	// mode which still reports the transferred bytes.
@@ -218,6 +225,20 @@ func (i *ProgressIndicator) Share() *ProgressIndicator {
 	return &ProgressIndicator{shared: i.shared}
 }
 
+// shareInto returns the indicator which an individual download reports
+// through: nil when this indicator carries neither a bar nor a callback,
+// so that the progress is disabled globally. A headless indicator, which
+// only carries the OnProgress callback, shares the callback this way.
+func (i *ProgressIndicator) shareInto() *ProgressIndicator {
+	if i == nil || (i.shared == nil && i.OnProgress == nil) {
+		return nil
+	}
+	if i.shared != nil {
+		return i.Share()
+	}
+	return &ProgressIndicator{OnProgress: i.OnProgress, Total: i.Total}
+}
+
 // Close shutdowns the progress rendering. Only the owner of the underlying
 // bar finishes it, shared indicators are not affected.
 func (i *ProgressIndicator) Close() {
@@ -255,7 +276,13 @@ func (i *ProgressIndicator) Read(p []byte) (n int, err error) {
 // report adds the transferred bytes into the shared progress bar.
 // The rendering issue of the bar never fails the data transfer itself.
 func (i *ProgressIndicator) report(n int) {
-	if i.shared != nil && n > 0 {
+	if n <= 0 {
+		return
+	}
+	if i.shared != nil {
 		_ = i.shared.bar.Add(n)
+	}
+	if i.OnProgress != nil {
+		i.OnProgress(int64(n), int64(i.Total))
 	}
 }
