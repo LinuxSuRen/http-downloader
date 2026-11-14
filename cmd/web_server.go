@@ -17,6 +17,7 @@ import (
 	"time"
 
 	fakeruntime "github.com/linuxsuren/go-fake-runtime"
+	"github.com/linuxsuren/http-downloader/docs"
 	hdpkg "github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
@@ -86,6 +87,7 @@ func newWebServer(ctx context.Context) *webServer {
 func (s *webServer) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleIndex)
+	mux.HandleFunc("/logo.svg", s.handleLogo)
 	mux.HandleFunc("/api/tools", s.handleTools)
 	mux.HandleFunc("/api/tools/", s.handleTool)
 	mux.HandleFunc("/api/search", s.handleSearch)
@@ -96,6 +98,18 @@ func (s *webServer) routes() http.Handler {
 	mux.HandleFunc("/api/packages/", s.handlePackageVersions)
 	mux.HandleFunc("/api/proxy", s.handleProxy)
 	return mux
+}
+
+// handleLogo serves the project logo, the favicon and the header of the
+// console embed the same single source file
+func (s *webServer) handleLogo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
+		return
+	}
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write(docs.Logo)
 }
 
 // handleIndex serves the embedded single page UI

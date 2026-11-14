@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="http-downloader">
+  <title>http-downloader</title>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#2563eb"/>
+  <path d="M32 14v16" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M21 26l11 11 11-11" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M16 47h32" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+</svg>
