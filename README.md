@@ -97,15 +97,22 @@ hd upgrade jcli
 ```
 
 ## Web console
-Manage the installed tools in a browser instead of the terminal:
+Use the browser as the central entry of your tools:
 
 ```shell
 hd web
 ```
 
-Then open http://127.0.0.1:8080, you can install, remove and upgrade tools there, with the install/upgrade logs streamed into the page.
+Then open http://127.0.0.1:8080, you can:
 
-Use `--port` to change the port and `--listen` to change the binding address. The server binds to 127.0.0.1 by default; it has no authentication, please do not expose it to an untrusted network.
+* search the installable packages or browse them by category
+* install a package with any release version, which also covers upgrades and downgrades
+* open an installed tool in a new terminal window
+* open the link of a web tool directly, packages can declare their entry link with the `homepage` field in [hd-home](https://github.com/LinuxSuRen/hd-home)
+
+The install/upgrade logs are streamed into the page.
+
+Use `--port` to change the port and `--listen` to change the binding address. The server binds to 127.0.0.1 by default; it has no authentication and it can install, remove and launch programs on this machine, please do not expose it to an untrusted network.
 
 ## Use multi-stage builds
 Do you want to download tools in the Docker builds? It's pretty easy. Please see the following example:

@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -508,10 +509,22 @@ func hasPackageSuffix(packageURL string) bool {
 	return compress.IsSupport(path.Ext(packageURL))
 }
 
+// hdHomeConfigDir returns the config directory of the local hd-home cache,
+// it resolves the user home directory instead of the $HOME variable so that
+// it also works on Windows
+func hdHomeConfigDir() (configDir string) {
+	fetcher := &DefaultFetcher{}
+	dir, err := fetcher.GetConfigDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, "config")
+}
+
 // FindCategories returns the whole supported categories
 func FindCategories() (result []string) {
 	categories := make(map[string]string, 0)
-	configDir := sysos.ExpandEnv("$HOME/.config/hd-home/config/")
+	configDir := hdHomeConfigDir()
 	_ = filepath.Walk(configDir, func(basepath string, info fs.FileInfo, err error) error {
 		if !strings.HasSuffix(basepath, ".yml") {
 			return nil
@@ -530,12 +543,13 @@ func FindCategories() (result []string) {
 	for key := range categories {
 		result = append(result, key)
 	}
+	sort.Strings(result)
 	return
 }
 
 // FindPackagesByCategory returns the HDConfigs by category
 func FindPackagesByCategory(category string) (result []HDConfig) {
-	configDir := sysos.ExpandEnv("$HOME/.config/hd-home/config/")
+	configDir := hdHomeConfigDir()
 	_ = filepath.Walk(configDir, func(basepath string, info fs.FileInfo, err error) error {
 		if !strings.HasSuffix(basepath, ".yml") {
 			return nil
@@ -544,10 +558,14 @@ func FindPackagesByCategory(category string) (result []HDConfig) {
 		if data, err := sysos.ReadFile(basepath); err == nil {
 			hdCfg := &HDConfig{}
 			if err := yaml.Unmarshal(data, hdCfg); err == nil {
-				orgAndRepo := strings.TrimPrefix(basepath, configDir)
+				orgAndRepo := strings.TrimPrefix(strings.TrimPrefix(basepath, configDir), string(filepath.Separator))
+				items := strings.Split(filepath.ToSlash(orgAndRepo), "/")
+				if len(items) < 2 {
+					return nil
+				}
 
-				hdCfg.Org = strings.Split(orgAndRepo, "/")[0]
-				hdCfg.Repo = strings.TrimSuffix(strings.Split(orgAndRepo, "/")[1], ".yml")
+				hdCfg.Org = items[0]
+				hdCfg.Repo = strings.TrimSuffix(items[1], ".yml")
 
 				for _, item := range hdCfg.Categories {
 					if item == category {
@@ -559,6 +577,27 @@ func FindPackagesByCategory(category string) (result []HDConfig) {
 		}
 		return nil
 	})
+	return
+}
+
+// LoadPackageConfig loads the config of a package from the local hd-home cache,
+// it returns nil when there is no such package
+func LoadPackageConfig(org, repo string) (config *HDConfig) {
+	if org == "" || repo == "" {
+		return
+	}
+
+	fetcher := &DefaultFetcher{}
+	var configDir string
+	var err error
+	if configDir, err = fetcher.GetConfigDir(); err != nil {
+		return
+	}
+
+	if config = getHDConfig(configDir, fmt.Sprintf("%s/%s", org, repo)); config != nil {
+		config.Org = org
+		config.Repo = repo
+	}
 	return
 }
 

@@ -1,3 +1,8 @@
+//go:build !windows
+
+// The console tests drive an interactive prompt through a pseudo terminal,
+// and neither creack/pty nor vt10x builds on Windows, so they only run on
+// unix-like systems.
 package cmd
 
 import (
