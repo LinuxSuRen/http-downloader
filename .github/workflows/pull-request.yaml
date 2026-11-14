@@ -39,7 +39,7 @@ jobs:
           # test with specific version
           sudo hd i mde@v0.0.4 -f
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.23.0
+        uses: aquasecurity/trivy-action@0.35.0
         if: github.event_name == 'pull_request'
         with:
           scan-type: 'fs'
@@ -95,7 +95,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3.6.0
-      - uses: gaurav-nelson/github-action-markdown-link-check@1.0.13
+      - uses: gaurav-nelson/github-action-markdown-link-check@1.0.15
         with:
           use-verbose-mode: 'yes'
 
