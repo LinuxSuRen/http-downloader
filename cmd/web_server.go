@@ -296,6 +296,8 @@ func (s *webServer) handlePackageVersions(w http.ResponseWriter, r *http.Request
 	}
 	tags, err := s.listVersions(org, repo, count)
 	if err != nil {
+		// #nosec G706 -- the values come from the local request path, they
+		// only reach the server side log
 		log.Printf("cannot list the versions of %s/%s: %v", org, repo, err)
 		writeError(w, http.StatusInternalServerError, "VERSIONS_FAILED",
 			"failed to query the versions, please try again later")
@@ -431,6 +433,8 @@ func (s *webServer) openTool(w http.ResponseWriter, name string) {
 		return
 	}
 	if err := s.launchTool(binPath); err != nil {
+		// #nosec G706 -- the values come from the local install record, they
+		// only reach the server side log
 		log.Printf("cannot launch %s: %v", name, err)
 		writeError(w, http.StatusInternalServerError, "LAUNCH_FAILED",
 			fmt.Sprintf("failed to launch %s in a terminal window", name))

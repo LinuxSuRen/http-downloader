@@ -33,8 +33,12 @@ func terminalCommand(binPath string) (cmd *exec.Cmd, err error) {
 		// an empty title is required when the path is quoted, /D sets the
 		// working directory of the new window and cmd /k keeps the window
 		// open after the tool exits
+		// #nosec G702 -- the path points to an existing binary of the local
+		// install record, the console binds to 127.0.0.1 only
 		cmd = exec.Command("cmd", "/c", "start", "", "/D", dir, "cmd", "/k", binPath)
 	case "darwin":
+		// #nosec G702 -- the path points to an existing binary of the local
+		// install record, the console binds to 127.0.0.1 only
 		cmd = exec.Command("open", "-a", "Terminal", binPath)
 	case "linux":
 		cmd, err = linuxTerminalCommand(binPath)
@@ -50,6 +54,8 @@ func linuxTerminalCommand(binPath string) (cmd *exec.Cmd, err error) {
 	for _, terminal := range linuxTerminals {
 		if _, lookupErr := exec.LookPath(terminal.bin); lookupErr == nil {
 			args := append(append([]string{}, terminal.args...), binPath)
+			// #nosec G702 -- the path points to an existing binary of the local
+			// install record, the console binds to 127.0.0.1 only
 			return exec.Command(terminal.bin, args...), nil
 		}
 	}
