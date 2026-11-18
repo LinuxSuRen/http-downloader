@@ -9,13 +9,14 @@ import (
 // PackagingFormat is used for containing config depending on machine
 type PackagingFormat struct {
 	Windows string `yaml:"windows"`
+	Darwin  string `yaml:"darwin"`
 	Linux   string `yaml:"linux"`
 	Format  string
 }
 
 // String returns a pretty string
 func (f PackagingFormat) String() string {
-	return fmt.Sprintf("Windows: %s, Linux: %s, Format: %s", f.Windows, f.Linux, f.Format)
+	return fmt.Sprintf("Windows: %s, Darwin: %s, Linux: %s, Format: %s", f.Windows, f.Darwin, f.Linux, f.Format)
 }
 
 // HDConfig is the config of http-downloader
