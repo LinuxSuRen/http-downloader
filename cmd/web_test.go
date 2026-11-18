@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -83,6 +86,14 @@ func TestWebAPI(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "text/html; charset=utf-8", resp.Header.Get("Content-Type"))
+
+	// logo of the project
+	resp, err = client.Get(httpServer.URL + "/logo.svg")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "image/svg+xml", resp.Header.Get("Content-Type"))
+	body, _ := io.ReadAll(resp.Body)
+	assert.Contains(t, string(body), "<svg")
 
 	// unknown page
 	resp, err = client.Get(httpServer.URL + "/nope")
@@ -347,51 +358,277 @@ func TestWebPackageVersions(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
-func TestWebOpenTool(t *testing.T) {
+func TestWebProcessLifecycle(t *testing.T) {
 	httpServer, server := setupWebServer(t)
-	launched := ""
-	server.launchTool = func(binPath string) error {
-		launched = binPath
-		return nil
+	server.buildCommand = func(binPath string, args []string) *exec.Cmd {
+		cmd := exec.Command(binPath, append([]string{"-test.run=TestHelperProcess"}, args...)...)
+		cmd.Env = append(os.Environ(), processHelperEnv+"=1", processHelperMode+"="+processHelperModeHang)
+		return cmd
 	}
-	client := httpServer.Client()
-
-	// open the installed tool with its binary
-	resp, err := client.Post(httpServer.URL+"/api/tools/fake-cli/open", "application/json", nil)
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	opened := struct {
-		Data struct {
-			Name   string `json:"name"`
-			Binary string `json:"binary"`
-		} `json:"data"`
-	}{}
-	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&opened))
-	assert.Equal(t, "fake-cli", opened.Data.Name)
-	assert.Equal(t, filepath.Join(homedirHome(t), "bin", "fake-cli"), opened.Data.Binary)
-	assert.Equal(t, opened.Data.Binary, launched)
-
-	// open a tool which is not installed
-	resp, err = client.Post(httpServer.URL+"/api/tools/none/open", "application/json", nil)
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-
-	// open an installed tool whose binary is gone
+	server.probeWeb = func(pid int) (string, bool) {
+		return "http://localhost:19800", true
+	}
+	// point the installed record to the test binary, the helper process
+	// inside it acts as the tool
 	assert.NoError(t, installer.RecordInstalledPackage(installer.InstalledPackage{
-		Name:            "ghost-cli",
+		Name:            "fake-cli",
 		Org:             "fake-org",
-		Repo:            "ghost-cli",
-		Binaries:        []string{filepath.Join(homedirHome(t), "bin", "ghost-cli")},
+		Repo:            "fake-cli",
+		Version:         "v1.0.0",
+		Binaries:        []string{os.Args[0]},
 		TargetDirectory: filepath.Join(homedirHome(t), "bin"),
 	}))
-	resp, err = client.Post(httpServer.URL+"/api/tools/ghost-cli/open", "application/json", nil)
+	client := httpServer.Client()
+
+	// nothing runs yet
+	resp, err := client.Get(httpServer.URL + "/api/processes")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	initial := struct {
+		Data []procState `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&initial))
+	assert.Empty(t, initial.Data)
+
+	// start the tool as a managed process
+	resp, err = client.Post(httpServer.URL+"/api/tools/fake-cli/start", "application/json", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	started := struct {
+		Data procState `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&started))
+	assert.Equal(t, "fake-cli", started.Data.Name)
+	assert.Equal(t, procRunning, started.Data.Status)
+	assert.Greater(t, started.Data.PID, 0)
+
+	// a running tool cannot start twice
+	resp, err = client.Post(httpServer.URL+"/api/tools/fake-cli/start", "application/json", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusConflict, resp.StatusCode)
+
+	// the HTTP endpoint of the tool is detected automatically
+	var detected procState
+	assert.Eventually(t, func() bool {
+		resp, err := client.Get(httpServer.URL + "/api/processes")
+		assert.NoError(t, err)
+		list := struct {
+			Data []procState `json:"data"`
+		}{}
+		assert.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+		if len(list.Data) == 1 && list.Data[0].URL != "" {
+			detected = list.Data[0]
+			return true
+		}
+		return false
+	}, 5*time.Second, 200*time.Millisecond)
+	assert.Equal(t, "http://localhost:19800", detected.URL)
+
+	// the process output is captured
+	resp, err = client.Get(httpServer.URL + "/api/processes/fake-cli/logs")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	logs := struct {
+		Logs []string `json:"logs"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&logs))
+	assert.Contains(t, strings.Join(logs.Logs, "\n"), "fake tool is running")
+
+	// stop the tool
+	resp, err = client.Post(httpServer.URL+"/api/tools/fake-cli/stop", "application/json", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Eventually(t, func() bool {
+		proc := server.findProc("fake-cli")
+		return proc != nil && proc.status() == procStopped
+	}, 5*time.Second, 200*time.Millisecond)
+	assert.Equal(t, procStopped, server.findProc("fake-cli").snapshot().Status)
+
+	// stopped processes are not retained in the list
+	assert.Eventually(t, func() bool {
+		resp, err := client.Get(httpServer.URL + "/api/processes")
+		assert.NoError(t, err)
+		list := struct {
+			Data []procState `json:"data"`
+		}{}
+		assert.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+		return len(list.Data) == 0
+	}, 5*time.Second, 200*time.Millisecond)
+
+	// stopping again is a no-op which answers the current state
+	resp, err = client.Post(httpServer.URL+"/api/tools/fake-cli/stop", "application/json", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// unknown tools and missing binaries
+	resp, err = client.Post(httpServer.URL+"/api/tools/none/start", "application/json", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	resp, err = client.Post(httpServer.URL+"/api/tools/none/stop", "application/json", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	assert.NoError(t, installer.RecordInstalledPackage(installer.InstalledPackage{
+		Name:     "ghost-cli",
+		Org:      "fake-org",
+		Repo:     "ghost-cli",
+		Binaries: []string{filepath.Join(homedirHome(t), "bin", "ghost-cli")},
+	}))
+	resp, err = client.Post(httpServer.URL+"/api/tools/ghost-cli/start", "application/json", nil)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 
-	// open is POST only
-	resp, err = client.Get(httpServer.URL + "/api/tools/fake-cli/open")
+	// start is POST only
+	resp, err = client.Get(httpServer.URL + "/api/tools/fake-cli/start")
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	// the log endpoint of an unknown process
+	resp, err = client.Get(httpServer.URL + "/api/processes/missing/logs")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestWebProcessExit(t *testing.T) {
+	httpServer, server := setupWebServer(t)
+	server.buildCommand = func(binPath string, args []string) *exec.Cmd {
+		cmd := exec.Command(binPath, append([]string{"-test.run=TestHelperProcess"}, args...)...)
+		cmd.Env = append(os.Environ(), processHelperEnv+"=1", processHelperMode+"="+processHelperModeFail)
+		return cmd
+	}
+	server.probeWeb = func(pid int) (string, bool) { return "", false }
+	assert.NoError(t, installer.RecordInstalledPackage(installer.InstalledPackage{
+		Name:     "fake-cli",
+		Org:      "fake-org",
+		Repo:     "fake-cli",
+		Binaries: []string{os.Args[0]},
+	}))
+	client := httpServer.Client()
+
+	resp, err := client.Post(httpServer.URL+"/api/tools/fake-cli/start", "application/json", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// a tool which exits by itself is reported with its exit code
+	assert.Eventually(t, func() bool {
+		proc := server.findProc("fake-cli")
+		if proc == nil || proc.status() != procExited {
+			return false
+		}
+		state := proc.snapshot()
+		return state.ExitCode != nil && *state.ExitCode == 3
+	}, 5*time.Second, 200*time.Millisecond)
+
+	// exited processes are not retained in the list either
+	resp, err = client.Get(httpServer.URL + "/api/processes")
+	assert.NoError(t, err)
+	final := struct {
+		Data []procState `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&final))
+	assert.Empty(t, final.Data)
+}
+
+func TestWebLaunchCommand(t *testing.T) {
+	httpServer, server := setupWebServer(t)
+	var gotArgs []string
+	server.buildCommand = func(binPath string, args []string) *exec.Cmd {
+		gotArgs = args
+		cmd := exec.Command(binPath, append([]string{"-test.run=TestHelperProcess"}, args...)...)
+		cmd.Env = append(os.Environ(), processHelperEnv+"=1", processHelperMode+"="+processHelperModeFail)
+		return cmd
+	}
+	server.probeWeb = func(pid int) (string, bool) { return "", false }
+	assert.NoError(t, installer.RecordInstalledPackage(installer.InstalledPackage{
+		Name:     "fake-cli",
+		Org:      "fake-org",
+		Repo:     "fake-cli",
+		Binaries: []string{os.Args[0]},
+	}))
+	seedPkgConfig(t, "fake-org", "fake-cli", "name: fake-cli\n")
+	client := httpServer.Client()
+
+	put := func(body string) *http.Response {
+		req, _ := http.NewRequest(http.MethodPut, httpServer.URL+"/api/tools/fake-cli/command",
+			strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+		return resp
+	}
+
+	// save a launch command, the leading tool name stays as typed
+	resp := put(`{"command":"fake-cli server --port 8080"}`)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	_ = resp.Body.Close()
+
+	// the tool list and the package list carry the command
+	resp, err := client.Get(httpServer.URL + "/api/tools")
+	assert.NoError(t, err)
+	tools := struct {
+		Data []toolItem `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&tools))
+	assert.Len(t, tools.Data, 1)
+	assert.Equal(t, "fake-cli server --port 8080", tools.Data[0].LaunchCommand)
+
+	resp, err = client.Get(httpServer.URL + "/api/packages")
+	assert.NoError(t, err)
+	packages := struct {
+		Data []packageItem `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&packages))
+	assert.Len(t, packages.Data, 1)
+	assert.Equal(t, "fake-cli server --port 8080", packages.Data[0].LaunchCommand)
+
+	// unbalanced quotes and a broken body are rejected
+	resp = put(`{"command":"a 'unclosed"}`)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	_ = resp.Body.Close()
+	resp = put(`not-json`)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	_ = resp.Body.Close()
+
+	// unknown tool
+	req, _ := http.NewRequest(http.MethodPut, httpServer.URL+"/api/tools/none/command",
+		strings.NewReader(`{"command":"x"}`))
+	resp, err = client.Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	_ = resp.Body.Close()
+
+	// starting the tool passes the command, the tool name prefix is dropped
+	resp, err = client.Post(httpServer.URL+"/api/tools/fake-cli/start", "application/json", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	_ = resp.Body.Close()
+	assert.Equal(t, []string{"server", "--port", "8080"}, gotArgs)
+	assert.Eventually(t, func() bool {
+		proc := server.findProc("fake-cli")
+		return proc != nil && proc.status() == procExited
+	}, 5*time.Second, 200*time.Millisecond)
+
+	// clearing the command persists too
+	resp = put(`{"command":""}`)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	_ = resp.Body.Close()
+	tool, _ := installer.FindInstalledPackage("fake-cli")
+	assert.Equal(t, "", tool.LaunchCommand)
+}
+
+// TestHelperProcess is not a real test, it is the tool process of the web
+// console tests, see TestWebProcessLifecycle
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv(processHelperEnv) != "1" {
+		return
+	}
+	switch os.Getenv(processHelperMode) {
+	case processHelperModeHang:
+		fmt.Println("fake tool is running")
+		time.Sleep(time.Minute)
+	case processHelperModeFail:
+		os.Exit(3)
+	}
+	os.Exit(0)
 }
 
 func homedirHome(t *testing.T) string {

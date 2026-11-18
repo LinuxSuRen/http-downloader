@@ -20,6 +20,9 @@ type InstalledPackage struct {
 	InstalledAt     string   `yaml:"installedAt,omitempty" json:"installedAt,omitempty"`
 	FromSource      bool     `yaml:"fromSource,omitempty" json:"fromSource,omitempty"`
 	Native          bool     `yaml:"native,omitempty" json:"native,omitempty"`
+	// LaunchCommand is the argument string passed to the binary when the
+	// tool starts from the web console, empty starts the tool plain
+	LaunchCommand string `yaml:"launchCommand,omitempty" json:"launchCommand,omitempty"`
 }
 
 // installedFile is the structure of the installed tools record file

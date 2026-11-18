@@ -4,6 +4,8 @@
 [![GitHub release](https://img.shields.io/github/release/linuxsuren/http-downloader.svg?label=release)](https://github.com/linuxsuren/github-go/releases/latest)
 ![GitHub All Releases](https://img.shields.io/github/downloads/linuxsuren/http-downloader/total)
 
+<p align="center"><img src="docs/logo.svg" width="120" alt="http-downloader logo"></p>
+
 # 入门
 
 `hd` 是一个基于 HTTP 协议的下载工具。

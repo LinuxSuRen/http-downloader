@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
 <title>hd console</title>
 <style>
   :root { --border: #ddd; --muted: #777; --accent: #2563eb; --danger: #dc2626; --ok: #16a34a; --chip: #eef2f7; }
@@ -23,8 +24,8 @@
   .toolbar input[type=text] { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
   #proxy-select, #proxy-custom { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: #fff; }
   #proxy-custom { min-width: 220px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .chip { border: 1px solid var(--border); background: var(--chip); border-radius: 14px; padding: 3px 12px; font-size: 12px; cursor: pointer; }
+  .chips { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 6px; margin-top: 10px; }
+  .chip { border: 1px solid var(--border); background: var(--chip); border-radius: 14px; padding: 3px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .list-meta { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 8px; }
   .list-meta .count { color: var(--muted); font-size: 12px; }
@@ -56,11 +57,31 @@
   .status.failed  { background: #fee2e2; color: #991b1b; }
   .empty { color: var(--muted); text-align: center; padding: 20px 0; }
   .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  header .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+  header .brand img { width: 28px; height: 28px; }
+  footer { max-width: 1080px; margin: 0 auto 24px; padding: 0 16px; text-align: center; color: var(--muted); font-size: 12px; }
+  footer a { color: var(--muted); }
+  .list-meta .meta-actions { display: flex; gap: 8px; align-items: center; }
+  .pager { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .pager .btn { min-height: 44px; min-width: 72px; }
+  .page-info { color: var(--muted); font-size: 13px; }
+  .status.stopped { background: #e5e7eb; color: #374151; }
+  .proc-meta { color: var(--muted); font-size: 12px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  dialog { border: 1px solid var(--border); border-radius: 8px; padding: 18px; width: min(460px, 92vw); }
+  dialog::backdrop { background: rgba(15, 23, 42, .35); }
+  dialog #cmd-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; margin: 10px 0 14px; }
+  dialog pre { background: #f6f7f9; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-size: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; overflow-x: auto; margin: 10px 0 14px; text-align: left; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
 <header>
-  <h1>hd console</h1>
+  <a class="brand" href="https://github.com/linuxsuren/http-downloader" target="_blank" rel="noopener noreferrer"
+     title="http-downloader on GitHub">
+    <img src="/logo.svg" alt="hd logo">
+    <h1>hd console</h1>
+  </a>
   <span style="display:flex; gap:12px; align-items:center;">
     <span class="view-toggle">
       <button class="btn view-btn" data-view="table" title="Switch to the table view">Table</button>
@@ -72,7 +93,7 @@
 <main>
   <div class="card" id="packages-card">
     <div class="toolbar">
-      <input type="text" id="search-keyword" placeholder="Search packages, e.g. jenkins" autofocus>
+      <input type="text" id="search-keyword" placeholder="Search packages as you type, e.g. jenkins" autofocus>
       <button class="btn primary" id="search-btn">Search</button>
       <button class="btn" id="fetch-btn">Refresh data</button>
       <select id="proxy-select" title="GitHub acceleration proxy used by the installs">
@@ -80,12 +101,21 @@
         <option value="__custom__">Custom…</option>
       </select>
       <input type="text" id="proxy-custom" placeholder="proxy host, e.g. gh.api.99988866.xyz" hidden>
+      <button class="btn" id="submit-btn" title="Share your own tool via the hd-home registry">Submit a tool</button>
     </div>
     <div class="chips" id="categories"></div>
     <div class="hint">Installed and not-installed tools share this list, the green badge marks the installed ones with their version. If a package is missing, it may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
     <div class="list-meta">
       <span class="count" id="pkg-count"></span>
-      <button class="btn sort-btn" id="sort-btn" title="Sort the list by the tool name">Name ↑</button>
+      <span class="meta-actions">
+        <select id="page-size" class="ver" title="Rows per page">
+          <option value="10">10 / page</option>
+          <option value="20">20 / page</option>
+          <option value="50">50 / page</option>
+          <option value="100">100 / page</option>
+        </select>
+        <button class="btn sort-btn" id="sort-btn" title="Sort the list by the tool name">Name ↑</button>
+      </span>
     </div>
     <table id="packages-table">
       <thead><tr><th>Package</th><th>Categories</th><th>Installed</th><th>Actions</th></tr></thead>
@@ -93,6 +123,23 @@
     </table>
     <div class="cards" id="packages-cards" hidden></div>
     <div class="empty" id="packages-empty" hidden>No package matches. The data may be stale, try Refresh data.</div>
+    <div class="pager" id="pkg-pager" hidden>
+      <button class="btn" id="page-prev">‹ Prev</button>
+      <span class="page-info" id="page-info"></span>
+      <button class="btn" id="page-next">Next ›</button>
+    </div>
+  </div>
+
+  <div class="card" id="processes-card">
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <strong>Running tools</strong>
+      <span class="hint" style="margin-top:0;">Tools started here run as background processes, no extra terminal opens. The web address appears once a tool serves one.</span>
+    </div>
+    <table>
+      <thead><tr><th>Tool</th><th>Status</th><th>Web UI</th><th>Actions</th></tr></thead>
+      <tbody id="processes-body"></tbody>
+    </table>
+    <div class="empty" id="processes-empty" hidden>No tool is running. Start one from the list above.</div>
   </div>
 
   <div class="card">
@@ -106,6 +153,36 @@
     <div id="logs">waiting for a job…</div>
   </div>
 </main>
+<footer>hd console · <a href="https://github.com/linuxsuren/http-downloader" target="_blank" rel="noopener noreferrer">http-downloader</a></footer>
+<dialog id="cmd-dialog">
+  <form method="dialog">
+    <strong id="cmd-dialog-title">Launch command</strong>
+    <p class="hint" style="margin:8px 0 0;">Passed to the tool binary whenever it starts from here, e.g. <code>server --port 8080</code>. A leading tool name is ignored, quoted values keep their spaces. Leave it empty to start the tool plain.</p>
+    <input type="text" id="cmd-input" placeholder="e.g. server --port 8080">
+    <div class="dialog-actions">
+      <button type="button" class="btn" id="cmd-cancel">Cancel</button>
+      <button class="btn primary" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="submit-dialog">
+  <strong>Submit your tool</strong>
+  <p class="hint" style="margin:8px 0 0;">Make your tool installable for every hd user: add a YAML config to the hd-home registry and open a pull request. The file lives at <code>config/$org/$repo.yml</code> in the hd-home repository, its contribution guide explains all fields.</p>
+  <pre id="submit-template">filename: "{{.Name}}-{{.OS}}-{{.Arch}}"
+binary: your-tool
+targetBinary: your-tool
+tar: true
+formatOverrides:
+  windows: zip
+  linux: tar.gz
+categories:
+- ci</pre>
+  <div class="dialog-actions">
+    <button type="button" class="btn" id="submit-cancel">Cancel</button>
+    <button type="button" class="btn" id="submit-copy">Copy template</button>
+    <a class="btn primary" href="https://github.com/LinuxSuRen/hd-home" target="_blank" rel="noopener noreferrer">Open hd-home</a>
+  </div>
+</dialog>
 <script>
 const texts = {
   confirmRemove: 'Remove this tool from your system?',
@@ -116,13 +193,21 @@ const texts = {
   packagesFailed: 'Could not load the tools. Try again later.',
   categoriesFailed: 'Could not load the categories. Try Refresh data.',
   proxyFailed: 'Could not load the proxy settings. The direct connection is used.',
-  openFailed: 'Could not launch the tool. It may be missing or unsupported on this system.',
+  startFailed: 'Could not start the tool. It may be missing or not runnable on this system.',
+  stopFailed: 'Could not stop the tool. Please try again.',
+  procLogsFailed: 'Could not load the tool output.',
+  commandFailed: 'Could not save the launch command. Please try again.',
   jobFailed: 'The job did not finish successfully. Check the logs above for details.',
   streamFailed: 'Lost the connection to the log stream. Reconnecting is not available, refresh the page.',
 };
 
 let activeCategory = '';
 let packageItems = [];
+// the category chips of the registry, kept once and re-ordered per view
+let allCategories = [];
+// the managed processes of the tools, refreshed by polling, it drives the
+// Start/Stop actions of the package list
+let runningProcs = {};
 
 // the view preference of the user wins over the viewport width, which is
 // only read once when the page loads
@@ -138,6 +223,33 @@ function initialSort() {
   return localStorage.getItem('hd-sort') === 'desc' ? 'desc' : 'asc';
 }
 let sortDir = initialSort();
+
+// both views share one pagination, the page size preference persists
+function initialPageSize() {
+  const size = parseInt(localStorage.getItem('hd-page-size'), 10);
+  return [10, 20, 50, 100].includes(size) ? size : 20;
+}
+let pageNo = 1;
+const pageSize = initialPageSize();
+document.getElementById('page-size').value = String(pageSize);
+
+function pageCount(total) {
+  return Math.max(1, Math.ceil(total / pageSize));
+}
+
+document.getElementById('page-prev').addEventListener('click', () => {
+  pageNo--;
+  renderPackages(packageItems);
+});
+document.getElementById('page-next').addEventListener('click', () => {
+  pageNo++;
+  renderPackages(packageItems);
+});
+document.getElementById('page-size').addEventListener('change', () => {
+  localStorage.setItem('hd-page-size', document.getElementById('page-size').value);
+  pageNo = 1;
+  renderPackages(packageItems);
+});
 
 function applyView() {
   document.querySelectorAll('.view-btn').forEach(btn =>
@@ -156,6 +268,7 @@ document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('clic
 document.getElementById('sort-btn').addEventListener('click', () => {
   sortDir = sortDir === 'asc' ? 'desc' : 'asc';
   localStorage.setItem('hd-sort', sortDir);
+  pageNo = 1;
   renderPackages(packageItems);
 });
 
@@ -245,25 +358,75 @@ async function loadCategories() {
     alert(friendly(err, texts.categoriesFailed));
     return;
   }
-  const categories = Array.isArray(data.data) ? data.data : [];
-  document.getElementById('categories').innerHTML =
-    `<button class="chip ${activeCategory === '' ? 'active' : ''}" data-cat="">All</button>` +
-    categories.map(cat =>
-      `<button class="chip ${activeCategory === cat ? 'active' : ''}" data-cat="${esc(cat)}">${esc(cat)}</button>`).join('');
+  allCategories = Array.isArray(data.data) ? data.data : [];
+  renderCategories();
 }
+
+// the chips stay in one line and never scroll: as many as fully fit are
+// shown, the rest hide whole. During a keyword search the categories of
+// the found tools come first, so the relevant ones are within the fit.
+// A signature guard skips no-op renders of the row.
+let categoriesSign = '';
+function renderCategories() {
+  const keyword = activeCategory === '' ? document.getElementById('search-keyword').value.trim() : '';
+  let categories = allCategories;
+  if (keyword && packageItems.length > 0) {
+    const found = new Set();
+    packageItems.forEach(item => (item.categories || []).forEach(cat => found.add(cat)));
+    const hit = [], rest = [];
+    categories.forEach(cat => (found.has(cat) ? hit : rest).push(cat));
+    categories = hit.concat(rest);
+  }
+  const sign = activeCategory + '|' + keyword + '|' + categories.join(',');
+  if (sign !== categoriesSign) {
+    categoriesSign = sign;
+    document.getElementById('categories').innerHTML =
+      `<button class="chip ${activeCategory === '' ? 'active' : ''}" data-cat="">All</button>` +
+      categories.map(cat =>
+        `<button class="chip ${activeCategory === cat ? 'active' : ''}" data-cat="${esc(cat)}">${esc(cat)}</button>`).join('');
+  }
+  trimChips();
+}
+
+// hides the chips beyond the width of the row, the cut lands between
+// chips so nothing is half visible, and it recomputes from scratch so a
+// wider row brings hidden chips back
+let trimTimer = null;
+function trimChips() {
+  const row = document.getElementById('categories');
+  const chips = Array.from(row.children);
+  chips.forEach(chip => { chip.style.display = ''; });
+  const limit = row.clientWidth;
+  let cut = chips.length;
+  for (let i = 0; i < chips.length; i++) {
+    if (chips[i].offsetLeft + chips[i].offsetWidth > limit) { cut = i; break; }
+  }
+  for (let i = cut; i < chips.length; i++) chips[i].style.display = 'none';
+}
+
+window.addEventListener('resize', () => {
+  clearTimeout(trimTimer);
+  trimTimer = setTimeout(trimChips, 150);
+});
 
 document.getElementById('categories').addEventListener('click', ev => {
   const chip = ev.target.closest('button[data-cat]');
   if (!chip) return;
   activeCategory = chip.dataset.cat;
+  pageNo = 1;
   if (activeCategory) {
     document.getElementById('search-keyword').value = '';
+    saveKeyword();
   }
-  loadCategories();
+  renderCategories();
   loadPackages();
 });
 
+// live search fires a query per debounce pause, stale responses are
+// dropped so only the newest keyword wins
+let packagesSeq = 0;
 async function loadPackages() {
+  const seq = ++packagesSeq;
   let url = '/api/packages';
   if (activeCategory) {
     url += '?category=' + encodeURIComponent(activeCategory);
@@ -278,9 +441,10 @@ async function loadPackages() {
   try {
     data = await api('GET', url);
   } catch (err) {
-    alert(friendly(err, texts.packagesFailed));
+    if (seq === packagesSeq) alert(friendly(err, texts.packagesFailed));
     return;
   }
+  if (seq !== packagesSeq) return;
   renderPackages(data.data || []);
 }
 
@@ -300,10 +464,23 @@ function packageActions(item) {
       <button class="btn primary" data-install="${esc(item.org)}/${esc(item.repo)}">Install</button>`;
   const upgradable = item.installed && item.org && item.repo && !item.native;
   const record = item.installed ? `
-      <button class="btn" data-action="open" data-name="${esc(recordName(item))}">Open</button>
+      ${runAction(recordName(item))}
+      <button class="btn" data-action="command" data-name="${esc(recordName(item))}" title="${esc(item.launch_command ? 'Launch command: ' + item.launch_command : 'Set the launch command of the tool')}">Cmd</button>
       <button class="btn" data-action="upgrade" data-name="${esc(recordName(item))}" ${upgradable ? '' : 'disabled'}>Upgrade</button>
       <button class="btn danger" data-action="remove" data-name="${esc(recordName(item))}">Remove</button>` : '';
   return install + record + link;
+}
+
+// the run action follows the managed process state of the tool: Start on
+// an idle tool, Stop plus the web address on a running one
+function runAction(name) {
+  const proc = runningProcs[name];
+  if (proc && proc.status === 'running') {
+    const web = proc.url
+      ? `<a class="btn" href="${esc(proc.url)}" target="_blank" rel="noopener noreferrer">Web</a>` : '';
+    return `<button class="btn danger" data-action="stop" data-name="${esc(name)}">Stop</button>${web}`;
+  }
+  return `<button class="btn" data-action="start" data-name="${esc(name)}">Start</button>`;
 }
 
 function packageCategories(item) {
@@ -327,11 +504,18 @@ function renderPackages(items) {
   const sorted = [...items].sort((a, b) =>
     direction * String(a.name || '').localeCompare(String(b.name || ''), undefined, {sensitivity: 'base'}));
 
+  // pagination slices the sorted list once, both views render the same page
+  const total = sorted.length;
+  const pages = pageCount(total);
+  pageNo = Math.min(Math.max(1, pageNo), pages);
+  const first = (pageNo - 1) * pageSize;
+  const pageItems = sorted.slice(first, first + pageSize);
+
   document.getElementById('sort-btn').textContent = sortDir === 'asc' ? 'Name ↑' : 'Name ↓';
   document.getElementById('pkg-count').textContent =
-    `${sorted.length} tools, ${sorted.filter(item => item.installed).length} installed`;
-  document.getElementById('packages-empty').hidden = sorted.length > 0;
-  document.getElementById('packages-body').innerHTML = sorted.map(item => `
+    `${total} tools, ${sorted.filter(item => item.installed).length} installed`;
+  document.getElementById('packages-empty').hidden = total > 0;
+  document.getElementById('packages-body').innerHTML = pageItems.map(item => `
     <tr>
       <td>
         <div class="pkg-name">${esc(item.name)}</div>
@@ -341,7 +525,7 @@ function renderPackages(items) {
       <td>${packageInstalled(item) || '-'}</td>
       <td class="actions">${packageActions(item)}</td>
     </tr>`).join('');
-  document.getElementById('packages-cards').innerHTML = sorted.map(item => `
+  document.getElementById('packages-cards').innerHTML = pageItems.map(item => `
     <div class="tool-card ${item.installed ? 'installed' : ''}">
       <div class="tool-card-head">
         <span class="pkg-name">${esc(item.name)}</span>
@@ -351,6 +535,14 @@ function renderPackages(items) {
       <div class="pkg-cats">${packageCategories(item)}</div>
       <div class="tool-card-actions">${packageActions(item)}</div>
     </div>`).join('');
+
+  document.getElementById('pkg-pager').hidden = pages <= 1;
+  document.getElementById('page-info').textContent = `Page ${pageNo} / ${pages}`;
+  document.getElementById('page-prev').disabled = pageNo <= 1;
+  document.getElementById('page-next').disabled = pageNo >= pages;
+  // the chips follow the results so the categories of the found tools
+  // lead during a keyword search
+  renderCategories();
 }
 
 // the release tags are fetched when the version dropdown is opened the first time
@@ -401,23 +593,99 @@ document.getElementById('packages-card').addEventListener('click', async ev => {
     } catch (err) {
       alert(friendly(err, texts.removeFailed));
     }
-  } else if (actionBtn.dataset.action === 'open') {
+  } else if (actionBtn.dataset.action === 'start') {
     try {
-      await api('POST', '/api/tools/' + encodeURIComponent(name) + '/open');
+      await api('POST', '/api/tools/' + encodeURIComponent(name) + '/start');
+      loadProcesses();
     } catch (err) {
-      alert(friendly(err, texts.openFailed));
+      alert(friendly(err, texts.startFailed));
     }
+  } else if (actionBtn.dataset.action === 'stop') {
+    try {
+      await api('POST', '/api/tools/' + encodeURIComponent(name) + '/stop');
+      loadProcesses();
+    } catch (err) {
+      alert(friendly(err, texts.stopFailed));
+    }
+  } else if (actionBtn.dataset.action === 'command') {
+    cmdToolName = name;
+    const item = packageItems.find(pkg => recordName(pkg) === name);
+    document.getElementById('cmd-dialog-title').textContent = `Launch command · ${name}`;
+    document.getElementById('cmd-input').value = item && item.launch_command ? item.launch_command : '';
+    document.getElementById('cmd-dialog').showModal();
+    document.getElementById('cmd-input').focus();
   } else {
     startJob('POST', `/api/tools/${encodeURIComponent(name)}/upgrade`, {proxy: currentProxy()}, texts.upgradeFailed);
   }
 });
 
+// the launch command editor shares one dialog across the tools
+let cmdToolName = '';
+const cmdDialog = document.getElementById('cmd-dialog');
+document.getElementById('cmd-cancel').addEventListener('click', () => cmdDialog.close('cancel'));
+cmdDialog.addEventListener('close', async () => {
+  if (cmdDialog.returnValue !== 'save') return;
+  try {
+    await api('PUT', '/api/tools/' + encodeURIComponent(cmdToolName) + '/command',
+      {command: document.getElementById('cmd-input').value.trim()});
+    loadPackages();
+  } catch (err) {
+    alert(friendly(err, texts.commandFailed));
+  }
+});
+
+// the submit entry guides developers who want to share their own tool: a
+// copyable config template plus the link to the hd-home registry
+const submitDialog = document.getElementById('submit-dialog');
+document.getElementById('submit-btn').addEventListener('click', () => submitDialog.showModal());
+document.getElementById('submit-cancel').addEventListener('click', () => submitDialog.close('cancel'));
+document.getElementById('submit-copy').addEventListener('click', async () => {
+  const btn = document.getElementById('submit-copy');
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(document.getElementById('submit-template').textContent);
+    copied = true;
+  } catch (err) {
+    copied = false;
+  }
+  btn.textContent = copied ? 'Copied' : 'Copy failed';
+  setTimeout(() => { btn.textContent = 'Copy template'; }, 1500);
+});
+
+// the keyword survives a page reload, an empty one clears the store
+function saveKeyword() {
+  const keyword = document.getElementById('search-keyword').value.trim();
+  if (keyword) {
+    localStorage.setItem('hd-search', keyword);
+  } else {
+    localStorage.removeItem('hd-search');
+  }
+}
+
+// typing searches live, a short debounce keeps the request rate sane
+let searchTimer = null;
+document.getElementById('search-keyword').addEventListener('input', () => {
+  saveKeyword();
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    if (activeCategory !== '') {
+      activeCategory = '';
+      renderCategories();
+    }
+    pageNo = 1;
+    loadPackages();
+  }, 300);
+});
+
+// Enter and the Search button skip the debounce, an empty keyword resets
+// to the full list
 function searchPackages() {
-  const input = document.getElementById('search-keyword');
-  if (!input.value.trim()) { input.focus(); return; }
+  clearTimeout(searchTimer);
   activeCategory = '';
-  loadCategories();
+  pageNo = 1;
+  renderCategories();
   loadPackages();
+  document.getElementById('search-keyword').focus();
 }
 
 document.getElementById('search-btn').addEventListener('click', searchPackages);
@@ -464,10 +732,97 @@ async function startJob(method, url, body, fallback) {
   };
 }
 
+// the running tools section polls the managed processes, the latest state
+// also drives the Start/Stop actions of the package list
+async function loadProcesses() {
+  let data;
+  try {
+    data = await api('GET', '/api/processes');
+  } catch (err) {
+    // keep the last known state, the next poll retries silently
+    return;
+  }
+  const procs = Array.isArray(data.data) ? data.data : [];
+  runningProcs = {};
+  procs.forEach(proc => { runningProcs[proc.name] = proc; });
+  renderProcesses(procs);
+  renderPackages(packageItems);
+}
+
+function procStatus(proc) {
+  if (proc.status === 'exited') {
+    const code = proc.exit_code == null ? '' : ` (${proc.exit_code})`;
+    return `<span class="status stopped">exited${esc(code)}</span>`;
+  }
+  return badge(proc.status);
+}
+
+function procWebUI(proc) {
+  if (proc.url) {
+    const short = proc.url.replace(/^https?:\/\//, '');
+    return `<a class="btn" href="${esc(proc.url)}" target="_blank" rel="noopener noreferrer">Open ${esc(short)}</a>`;
+  }
+  if (proc.status !== 'running') return '<span class="muted">—</span>';
+  return '<span class="muted">detecting…</span>';
+}
+
+function renderProcesses(procs) {
+  document.getElementById('processes-empty').hidden = procs.length > 0;
+  document.getElementById('processes-body').innerHTML = procs.map(proc => `
+    <tr>
+      <td>
+        <div class="pkg-name">${esc(proc.name)}</div>
+        <div class="proc-meta">pid ${esc(proc.pid || '—')} · since ${esc((proc.started_at || '').replace('T', ' ').slice(0, 19))}</div>
+      </td>
+      <td>${procStatus(proc)}</td>
+      <td>${procWebUI(proc)}</td>
+      <td class="actions">
+        <button class="btn" data-proc-logs="${esc(proc.name)}">Logs</button>
+        <button class="btn danger" data-proc-stop="${esc(proc.name)}" ${proc.status === 'running' ? '' : 'disabled'}>Stop</button>
+      </td>
+    </tr>`).join('');
+}
+
+// the output of a managed process shares the log panel with the job logs
+document.getElementById('processes-card').addEventListener('click', async ev => {
+  const logsBtn = ev.target.closest('button[data-proc-logs]');
+  if (logsBtn) {
+    const name = logsBtn.dataset.procLogs;
+    try {
+      const data = await api('GET', '/api/processes/' + encodeURIComponent(name) + '/logs');
+      const logs = document.getElementById('logs');
+      logs.textContent = (data.logs || []).join('\n') || 'no output yet';
+      logs.scrollTop = logs.scrollHeight;
+      document.getElementById('job-badge').innerHTML = badge(data.data && data.data.status);
+      document.getElementById('log-status').textContent = `output of ${name}`;
+    } catch (err) {
+      alert(friendly(err, texts.procLogsFailed));
+    }
+    return;
+  }
+
+  const stopBtn = ev.target.closest('button[data-proc-stop]');
+  if (stopBtn && !stopBtn.disabled) {
+    try {
+      await api('POST', '/api/tools/' + encodeURIComponent(stopBtn.dataset.procStop) + '/stop');
+      loadProcesses();
+    } catch (err) {
+      alert(friendly(err, texts.stopFailed));
+    }
+  }
+});
+
 applyView();
+// restore the keyword before the first load so the list opens filtered
+const savedKeyword = localStorage.getItem('hd-search');
+if (savedKeyword) {
+  document.getElementById('search-keyword').value = savedKeyword;
+}
 loadPackages();
 loadCategories();
 loadProxy();
+loadProcesses();
+setInterval(loadProcesses, 3000);
 </script>
 </body>
 </html>
