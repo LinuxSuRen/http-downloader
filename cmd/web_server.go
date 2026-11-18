@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -65,10 +66,19 @@ type webServer struct {
 	// only one job runs at a time: its output is captured globally
 	jobLock chan struct{}
 
+	// procMu guards procs, the map of the tool processes which were
+	// started from the web console
+	procMu sync.Mutex
+	procs  map[string]*managedProc
+	// selfPort carries the port of the console itself, the web service
+	// detection must not report it as the endpoint of a tool
+	selfPort int
+
 	// overridable behaviors, they talk to GitHub or to the desktop, which
 	// is neither available nor desired in the unit tests
 	listVersions func(org, repo string, count int) ([]versionTag, error)
-	launchTool   func(binPath string) error
+	probeWeb     func(pid int) (url string, ok bool)
+	buildCommand func(binPath string, args []string) *exec.Cmd
 }
 
 func newWebServer(ctx context.Context) *webServer {
@@ -77,15 +87,20 @@ func newWebServer(ctx context.Context) *webServer {
 		execer:  fakeruntime.NewDefaultExecer(),
 		jobs:    map[int]*webJob{},
 		jobLock: make(chan struct{}, 1),
+		procs:   map[string]*managedProc{},
 	}
 	server.listVersions = listGitHubVersions
-	server.launchTool = openInTerminal
+	server.probeWeb = server.detectWebURL
+	server.buildCommand = func(binPath string, args []string) *exec.Cmd {
+		return exec.Command(binPath, args...)
+	}
 	return server
 }
 
 func (s *webServer) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleIndex)
+	mux.HandleFunc("/logo.svg", s.handleLogo)
 	mux.HandleFunc("/api/tools", s.handleTools)
 	mux.HandleFunc("/api/tools/", s.handleTool)
 	mux.HandleFunc("/api/search", s.handleSearch)
@@ -95,6 +110,8 @@ func (s *webServer) routes() http.Handler {
 	mux.HandleFunc("/api/packages", s.handlePackages)
 	mux.HandleFunc("/api/packages/", s.handlePackageVersions)
 	mux.HandleFunc("/api/proxy", s.handleProxy)
+	mux.HandleFunc("/api/processes", s.handleProcesses)
+	mux.HandleFunc("/api/processes/", s.handleProcesses)
 	return mux
 }
 
@@ -234,6 +251,9 @@ type packageItem struct {
 	Version       string `json:"version,omitempty"`
 	InstalledAt   string `json:"installed_at,omitempty"`
 	Native        bool   `json:"native,omitempty"`
+	// LaunchCommand is the argument string the web console passes to the
+	// binary when the tool starts
+	LaunchCommand string `json:"launch_command,omitempty"`
 }
 
 // GET /api/packages lists the tools of the local hd-home cache together
@@ -295,6 +315,7 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 			item.Version = record.Version
 			item.InstalledName = record.Name
 			item.InstalledAt = record.InstalledAt
+			item.LaunchCommand = record.LaunchCommand
 		}
 		seen[orgRepo] = true
 		items = append(items, item)
@@ -319,6 +340,7 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 				InstalledName: record.Name,
 				InstalledAt:   record.InstalledAt,
 				Native:        record.Native,
+				LaunchCommand: record.LaunchCommand,
 			})
 		}
 	}
@@ -445,7 +467,9 @@ func (s *webServer) handleFetch(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /api/tools/{name} removes a tool
 // POST /api/tools/{name}/upgrade starts an upgrade job
-// POST /api/tools/{name}/open launches the tool in a new terminal window
+// POST /api/tools/{name}/start starts the tool as a managed process
+// POST /api/tools/{name}/stop stops the managed process of the tool
+// PUT /api/tools/{name}/command saves the launch command of the tool
 func (s *webServer) handleTool(w http.ResponseWriter, r *http.Request) {
 	rest := strings.TrimPrefix(r.URL.Path, "/api/tools/")
 	name, action := rest, ""
@@ -485,39 +509,15 @@ func (s *webServer) handleTool(w http.ResponseWriter, r *http.Request) {
 			return s.upgradeTool(stub, tool.Org, tool.Repo, proxy)
 		})
 		writeJSON(w, http.StatusAccepted, job)
-	case r.Method == http.MethodPost && action == "open":
-		s.openTool(w, name)
+	case r.Method == http.MethodPost && action == "start":
+		s.startTool(w, name)
+	case r.Method == http.MethodPost && action == "stop":
+		s.stopTool(w, name)
+	case r.Method == http.MethodPut && action == "command":
+		s.setLaunchCommand(w, r, name)
 	default:
 		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "unsupported action")
 	}
-}
-
-// openTool launches an installed tool in a new terminal window
-func (s *webServer) openTool(w http.ResponseWriter, name string) {
-	tool, _ := installer.FindInstalledPackage(name)
-	if tool == nil {
-		writeError(w, http.StatusNotFound, "TOOL_NOT_FOUND",
-			fmt.Sprintf("tool %s is not installed yet", name))
-		return
-	}
-
-	binPath := s.findToolBinary(tool)
-	if binPath == "" {
-		writeError(w, http.StatusNotFound, "BINARY_NOT_FOUND",
-			fmt.Sprintf("cannot find the binary of %s, please reinstall it", name))
-		return
-	}
-	if err := s.launchTool(binPath); err != nil {
-		// #nosec G706 -- the values come from the local install record, they
-		// only reach the server side log
-		log.Printf("cannot launch %s: %v", name, err)
-		writeError(w, http.StatusInternalServerError, "LAUNCH_FAILED",
-			fmt.Sprintf("failed to launch %s in a terminal window", name))
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"data": map[string]string{"name": name, "binary": binPath},
-	})
 }
 
 // findToolBinary returns an existing binary path of an installed tool
@@ -721,13 +721,14 @@ func (s *webServer) loadTools() (tools []toolItem) {
 	for i := range packages {
 		pkg := packages[i]
 		tools = append(tools, toolItem{
-			Name:        pkg.Name,
-			Version:     pkg.Version,
-			Org:         pkg.Org,
-			Repo:        pkg.Repo,
-			InstalledAt: pkg.InstalledAt,
-			Directory:   pkg.TargetDirectory,
-			Upgradable:  pkg.Org != "" && pkg.Repo != "" && !pkg.Native,
+			Name:          pkg.Name,
+			Version:       pkg.Version,
+			Org:           pkg.Org,
+			Repo:          pkg.Repo,
+			InstalledAt:   pkg.InstalledAt,
+			Directory:     pkg.TargetDirectory,
+			Upgradable:    pkg.Org != "" && pkg.Repo != "" && !pkg.Native,
+			LaunchCommand: pkg.LaunchCommand,
 		})
 	}
 	return

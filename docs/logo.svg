@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="http-downloader logo">
+  <title>http-downloader</title>
+  <!-- the blue tile matches the accent color of the web console -->
+  <rect width="96" height="96" rx="22" fill="#2563eb"/>
+  <!-- a download arrow landing on a tray: an HTTP downloader -->
+  <path d="M43 18h10v26h13L48 66 30 44h13z" fill="#fff"/>
+  <path d="M28 74h40" stroke="#fff" stroke-width="8" stroke-linecap="round" fill="none"/>
+</svg>
