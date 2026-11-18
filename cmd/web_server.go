@@ -92,6 +92,8 @@ func newWebServer(ctx context.Context) *webServer {
 	server.listVersions = listGitHubVersions
 	server.probeWeb = server.detectWebURL
 	server.buildCommand = func(binPath string, args []string) *exec.Cmd {
+		// #nosec G702 -- the path points to an existing binary of the
+		// local install record, the console binds to 127.0.0.1 only
 		return exec.Command(binPath, args...)
 	}
 	return server

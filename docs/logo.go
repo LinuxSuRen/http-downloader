@@ -3,7 +3,11 @@
 // reference them, no copy lives anywhere else.
 package docs
 
-import _ "embed"
+import (
+	// embed is required by the go:embed directive below, it pulls the
+	// logo file into the binary
+	_ "embed"
+)
 
 // LogoSVG is the project logo, the web console serves it as the favicon
 // and the header brand.
