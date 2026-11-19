@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	sysos "os"
@@ -92,6 +93,8 @@ type installOption struct {
 
 	// inner fields
 	nativePackage bool
+	repoSource    *installer.RepoSource
+	repoPkg       *installer.RepoPackage
 	tool          string
 	execer        fakeruntime.Execer
 }
@@ -128,6 +131,24 @@ func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
+	// a registered repo source wins over hd-home: debian-stable/curl
+	// addresses the package of that source
+	if sourceName, pkgName, found := strings.Cut(o.tool, "/"); found {
+		var configDir string
+		if configDir, err = (&installer.DefaultFetcher{}).GetConfigDir(); err == nil {
+			source, pkg, resolveErr := installer.FindRepoPackage(cmd.Context(), configDir, sourceName, pkgName)
+			switch {
+			case resolveErr == nil:
+				o.repoSource, o.repoPkg = source, pkg
+				return nil
+			case errors.Is(resolveErr, installer.ErrUnknownSource):
+				// not a repo source, keep resolving against hd-home
+			default:
+				return resolveErr
+			}
+		}
+	}
+
 	// try to find if it's a native package
 	o.nativePackage = os.HasPackage(o.tool)
 	if !o.nativePackage {
@@ -152,6 +173,20 @@ func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 }
 
 func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
+	if o.repoPkg != nil && o.repoSource != nil {
+		// a package of a repo source: download, verify and let the
+		// native tooling of the source install it
+		if err = installer.InstallRepoPackage(cmd.Context(), *o.repoSource, *o.repoPkg, o.execer); err != nil {
+			return
+		}
+		return installer.RecordInstalledPackage(installer.InstalledPackage{
+			Name:        o.repoPkg.Name,
+			Version:     o.repoPkg.Version,
+			Source:      o.repoSource.Name,
+			Native:      true,
+			InstalledAt: time.Now().Format(time.RFC3339),
+		})
+	}
 	if o.nativePackage {
 		// install a package
 		if should, exist := o.shouldInstall(); !should {

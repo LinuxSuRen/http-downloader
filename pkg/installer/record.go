@@ -23,6 +23,9 @@ type InstalledPackage struct {
 	// LaunchCommand is the argument string passed to the binary when the
 	// tool starts from the web console, empty starts the tool plain
 	LaunchCommand string `yaml:"launchCommand,omitempty" json:"launchCommand,omitempty"`
+	// Source names the repo source a package came from, e.g.
+	// debian-stable, empty means the hd-home registry itself
+	Source string `yaml:"source,omitempty" json:"source,omitempty"`
 }
 
 // installedFile is the structure of the installed tools record file

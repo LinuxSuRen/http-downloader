@@ -48,11 +48,12 @@ Submit the new proxy server in https://github.com/LinuxSuRen/hd-home`)
 func (s *searchOption) runE(c *cobra.Command, args []string) (err error) {
 	logger := log.GetLoggerFromContextOrDefault(c)
 
-	err = search(args[0], s.Fetch, s.fetcher, c.OutOrStdout(), logger)
+	err = search(c.Context(), args[0], s.Fetch, s.fetcher, c.OutOrStdout(), logger)
 	return
 }
 
-func search(keyword string, fetch bool, fetcher installer.Fetcher, writer io.Writer, logger *log.LevelLog) (err error) {
+func search(ctx context.Context, keyword string, fetch bool, fetcher installer.Fetcher,
+	writer io.Writer, logger *log.LevelLog) (err error) {
 	if fetch {
 		if err = fetcher.FetchLatestRepo("", "", writer); err != nil {
 			return
@@ -68,6 +69,24 @@ func search(keyword string, fetch bool, fetcher installer.Fetcher, writer io.Wri
 	result := installer.FindByKeyword(keyword, configDir)
 	for _, item := range result {
 		fmt.Fprintln(writer, item)
+	}
+
+	// the repo descriptors of hd-home extend the search to external
+	// sources, a failing source never hides the local results
+	for _, source := range installer.FindRepoSources(configDir) {
+		packages, searchErr := source.Search(ctx, configDir, keyword)
+		if searchErr != nil {
+			logger.Info("cannot search", source.Name, ":", searchErr)
+			continue
+		}
+		for i := range packages {
+			pkg := packages[i]
+			if pkg.Description == "" {
+				fmt.Fprintf(writer, "%s/%s\n", pkg.Source, pkg.Name)
+			} else {
+				fmt.Fprintf(writer, "%s/%s\t%s\n", pkg.Source, pkg.Name, pkg.Description)
+			}
+		}
 	}
 	return
 }

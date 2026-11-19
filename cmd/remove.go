@@ -49,6 +49,21 @@ func (o *removeOption) runE(cmd *cobra.Command, args []string) (err error) {
 		}
 
 		if tool.Native {
+			// a package of a repo source goes back through its channel,
+			// e.g. dpkg -r, sources without a channel stay manual
+			var configDir string
+			if dir, dirErr := (&installer.DefaultFetcher{}).GetConfigDir(); dirErr == nil {
+				configDir = dir
+			}
+			if handled, rmErr := installer.UninstallRepoPackage(configDir, o.execer, *tool); handled {
+				if rmErr != nil {
+					cmd.Printf("cannot remove %s, error: %v\n", name, rmErr)
+					err = rmErr
+				} else {
+					cmd.Printf("removed the package %s of %s\n", tool.Name, tool.Source)
+				}
+				continue
+			}
 			cmd.Printf("please remove the native package [%s] by yourself\n", name)
 			continue
 		}
