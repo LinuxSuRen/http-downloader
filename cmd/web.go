@@ -9,11 +9,24 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/linuxsuren/http-downloader/docs"
 	"github.com/spf13/cobra"
 )
 
 //go:embed web/index.html
 var webIndexHTML []byte
+
+// handleLogo serves the project logo, the single source of it lives in
+// docs/logo.svg
+func (s *webServer) handleLogo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
+		return
+	}
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Header().Set("Cache-Control", "max-age=86400")
+	_, _ = w.Write(docs.LogoSVG)
+}
 
 func newWebCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &webOption{
@@ -41,6 +54,9 @@ type webOption struct {
 func (o *webOption) runE(cmd *cobra.Command, args []string) (err error) {
 	addr := fmt.Sprintf("%s:%d", o.Listen, o.Port)
 	cmd.Printf("web server is running at http://%s\n", addr)
+	// the web service detection must not report the console itself as the
+	// endpoint of a started tool
+	o.server.selfPort = o.Port
 	// use an explicit http.Server so that timeouts are always set
 	server := &http.Server{
 		Addr:              addr,
@@ -60,6 +76,9 @@ type toolItem struct {
 	InstalledAt string `json:"installed_at,omitempty"`
 	Directory   string `json:"directory,omitempty"`
 	Upgradable  bool   `json:"upgradable"`
+	// LaunchCommand is the argument string the web console passes to the
+	// binary when the tool starts
+	LaunchCommand string `json:"launch_command,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload interface{}) {

@@ -9,6 +9,8 @@
 ![GitHub All Releases](https://img.shields.io/github/downloads/linuxsuren/http-downloader/total)
 [![LinuxSuRen/open-source-best-practice](https://img.shields.io/static/v1?label=OSBP&message=%E5%BC%80%E6%BA%90%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5&color=blue)](https://github.com/LinuxSuRen/open-source-best-practice)
 
+<p align="center"><img src="docs/logo.svg" width="120" alt="http-downloader logo"></p>
+
 # Get started
 `hd` is a HTTP download tool.
 
