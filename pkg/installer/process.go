@@ -173,8 +173,9 @@ func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 		}
 		defer func() { _ = sourceF.Close() }()
 		// O_TRUNC keeps a smaller binary from inheriting the tail of the
-		// bigger one it replaces
-		if targetF, err = os.OpenFile(staged, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755); err != nil {
+		// bigger one it replaces, 0600 is enough because Windows derives
+		// the executable state from the file extension
+		if targetF, err = os.OpenFile(staged, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600); err != nil {
 			err = fmt.Errorf("cannot create the staged file %s, error: %v", staged, err)
 			return
 		}
