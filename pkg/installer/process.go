@@ -140,18 +140,61 @@ func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 			err = o.Execer.RunCommand("mv", sourceFile, targetPath)
 		}
 	default:
-		sourceF, sourceE := os.Open(sourceFile)
-		targetF, targetE := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, 0600)
-		if sourceE != nil || targetE != nil {
-			err = fmt.Errorf("failed to open source file: %v, or target file: %v", sourceE, targetE)
+		// A running binary cannot be overwritten on Windows, but it can
+		// be renamed: move the current file aside, stage the new one and
+		// drop the old file when nothing holds it anymore. A self
+		// upgrade keeps the .old file behind until the next replace,
+		// because the old process still runs it at this point.
+		backup := targetPath + ".old"
+		if _, statErr := os.Stat(targetPath); statErr == nil {
+			// the backup of an earlier upgrade is not in use anymore
+			_ = os.Remove(backup)
+			if err = os.Rename(targetPath, backup); err != nil {
+				err = fmt.Errorf("cannot replace %s, it may be in use, error: %v", targetPath, err)
+				return
+			}
+		}
+		defer func() {
+			if err != nil {
+				// put the previous binary back when the new one did not
+				// make it into place
+				if _, statErr := os.Stat(targetPath); statErr != nil {
+					_ = os.Rename(backup, targetPath)
+				}
+			}
+		}()
+
+		staged := targetPath + ".new"
+		var sourceF *os.File
+		var targetF *os.File
+		if sourceF, err = os.Open(sourceFile); err != nil {
+			err = fmt.Errorf("cannot open the downloaded package %s, error: %v", sourceFile, err)
 			return
 		}
-
-		if _, err = io.Copy(targetF, sourceF); err != nil {
-			err = fmt.Errorf("cannot copy %s from %s to %v, error: %v", o.Name, sourceFile, targetPath, err)
-		} else {
-			_ = os.RemoveAll(sourceFile)
+		defer func() { _ = sourceF.Close() }()
+		// O_TRUNC keeps a smaller binary from inheriting the tail of the
+		// bigger one it replaces, 0600 is enough because Windows derives
+		// the executable state from the file extension
+		if targetF, err = os.OpenFile(staged, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600); err != nil {
+			err = fmt.Errorf("cannot create the staged file %s, error: %v", staged, err)
+			return
 		}
+		if _, err = io.Copy(targetF, sourceF); err != nil {
+			_ = targetF.Close()
+			err = fmt.Errorf("cannot copy %s from %s to %s, error: %v", o.Name, sourceFile, staged, err)
+			return
+		}
+		if err = targetF.Close(); err != nil {
+			return
+		}
+		if err = os.Rename(staged, targetPath); err != nil {
+			err = fmt.Errorf("cannot put %s into place, error: %v", targetPath, err)
+			return
+		}
+		_ = os.RemoveAll(sourceFile)
+		// the old binary is unlocked once no process runs it, failing to
+		// remove it right now is fine
+		_ = os.Remove(backup)
 	}
 	return
 }
