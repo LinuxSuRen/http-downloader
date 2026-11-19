@@ -36,6 +36,52 @@ func TestOverwriteBinary(t *testing.T) {
 	assert.Nil(t, installer.OverWriteBinary(sourceFile, targetFile))
 }
 
+// TestOverwriteBinaryWindows covers the replace semantics of Windows: the
+// running binary moves aside instead of being overwritten, the staged
+// file truncates, and a failed install keeps the current binary.
+func TestOverwriteBinaryWindows(t *testing.T) {
+	dir := t.TempDir()
+	sourceFile := path.Join(dir, "hd-src")
+	targetFile := path.Join(dir, "hd.exe")
+
+	installer := &Installer{
+		Name:   "hd",
+		Execer: &fakeruntime.FakeExecer{ExpectOS: fakeruntime.OSWindows},
+	}
+
+	// fresh install puts the new binary in place and drops the source
+	assert.NoError(t, os.WriteFile(sourceFile, []byte("new-binary"), 0755))
+	assert.NoError(t, installer.OverWriteBinary(sourceFile, targetFile))
+	content, err := os.ReadFile(targetFile)
+	assert.NoError(t, err)
+	assert.Equal(t, "new-binary", string(content))
+	_, err = os.Stat(sourceFile)
+	assert.True(t, os.IsNotExist(err))
+
+	// a smaller binary leaves no tail of the bigger one it replaces, the
+	// stale backup of an earlier upgrade is cleaned and nothing is left
+	// behind
+	assert.NoError(t, os.WriteFile(sourceFile, []byte("v2"), 0755))
+	assert.NoError(t, os.WriteFile(targetFile+".old", []byte("stale"), 0755))
+	assert.NoError(t, installer.OverWriteBinary(sourceFile, targetFile))
+	content, err = os.ReadFile(targetFile)
+	assert.NoError(t, err)
+	assert.Equal(t, "v2", string(content))
+	for _, leftover := range []string{targetFile + ".old", targetFile + ".new"} {
+		_, err = os.Stat(leftover)
+		assert.True(t, os.IsNotExist(err), leftover+" should be gone")
+	}
+
+	// a failed install keeps the current binary in place
+	assert.NoError(t, os.WriteFile(targetFile, []byte("current"), 0755))
+	assert.Error(t, installer.OverWriteBinary(path.Join(dir, "missing"), targetFile))
+	content, err = os.ReadFile(targetFile)
+	assert.NoError(t, err)
+	assert.Equal(t, "current", string(content))
+	_, err = os.Stat(targetFile + ".old")
+	assert.True(t, os.IsNotExist(err), "the backup goes back on failure")
+}
+
 func TestInstall(t *testing.T) {
 	tests := []struct {
 		name      string
