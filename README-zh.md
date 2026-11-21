@@ -51,6 +51,18 @@ hd get --pre ks
 * 断点续传 (TODO)
 * 对 GitHub release 文件下载（安装）友好
 
+## 搜索
+首次使用请先初始化本地缓存：`hd fetch`，然后按关键词搜索：`hd search jenkins`。
+
+关键词还会搜索当前系统的软件源（Windows 的 Chocolatey、macOS 的 Homebrew、Linux 的 Debian 仓库等），软件源在 [hd-home](https://github.com/LinuxSuRen/hd-home) 的 `repos` 目录中注册。命中结果带源前缀，安装与卸载走对应源的原生通道（`choco install`、`dpkg -i` 等）：
+
+```shell
+hd search 7zip
+chocolatey/7zip	7-Zip is a file archiver with a high compression ratio.
+
+hd install chocolatey/7zip
+```
+
 ## 管理已安装的工具
 通过 `hd install` 安装的每一个工具都会被记录到 `~/.config/hd-installed.yaml` 中，你可以用以下的命令来管理它们：
 
@@ -85,7 +97,7 @@ hd web
 打开 http://127.0.0.1:8080 即可：
 
 * 在一个列表里看到全部工具，已安装与未安装混排展示，绿色徽标区分安装状态，列表支持按名称双向排序
-* 搜索可安装的软件包，或者按分类浏览，支持表格与卡片两种展示方式
+* 搜索可安装的软件包，或者按分类浏览，支持表格与卡片两种展示方式；关键词还会搜索当前系统的软件源，例如 Windows 上的 Chocolatey
 * 安装任意发布版本，升级与降级都支持
 * 为下载选择 GitHub 加速代理，候选项来自 hd 的配置和 hd-home，也支持自定义地址
 * 在新的终端窗口中打开已安装的工具

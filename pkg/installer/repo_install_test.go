@@ -6,9 +6,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -32,7 +35,7 @@ func (r *recordExecer) LookPath(name string) (string, error) {
 
 func (r *recordExecer) RunCommand(name string, args ...string) error {
 	r.commands = append(r.commands, strings.Join(append([]string{name}, args...), " "))
-	return nil
+	return r.FakeExecer.ExpectError
 }
 
 func (r *recordExecer) RunCommandWithSudo(name string, args ...string) error {
@@ -160,6 +163,75 @@ func TestUninstallRepoPackage(t *testing.T) {
 	handled, err = UninstallRepoPackage(configDir, execer, InstalledPackage{Name: "x", Native: true})
 	assert.NoError(t, err)
 	assert.False(t, handled)
+}
+
+// writeChocoDescriptor registers a fake Chocolatey source in the config
+// cache
+func writeChocoDescriptor(t *testing.T, configDir string) {
+	t.Helper()
+	assert.NoError(t, os.MkdirAll(filepath.Join(configDir, "repos"), 0750))
+	assert.NoError(t, os.WriteFile(filepath.Join(configDir, "repos", "chocolatey.yml"),
+		[]byte("name: chocolatey\nkind: choco-api\napiURL: https://example.com/api/v2\n"), 0644))
+}
+
+// newChocoExecer knows the Chocolatey CLI and records what runs through it
+func newChocoExecer() *recordExecer {
+	return &recordExecer{
+		FakeExecer: &fakeruntime.FakeExecer{ExpectOS: "windows"},
+		lookPath:   map[string]string{"choco": `C:\ProgramData\chocolatey\bin\choco.exe`},
+	}
+}
+
+func TestInstallChocoPackage(t *testing.T) {
+	chocoSource := RepoSource{Name: "chocolatey", Kind: "choco-api", APIURL: "https://example.com/api/v2"}
+
+	// the Chocolatey CLI is a hard requirement, nothing runs without it
+	execer := &recordExecer{FakeExecer: &fakeruntime.FakeExecer{ExpectOS: "windows"}, lookPath: map[string]string{}}
+	err := InstallRepoPackage(context.Background(), chocoSource, RepoPackage{Name: "7zip"}, execer)
+	assert.EqualError(t, err, "choco is not available, please install it first")
+	assert.Empty(t, execer.commands)
+
+	// the version the search reported is pinned, so the installed record
+	// matches the package on disk
+	execer = newChocoExecer()
+	assert.NoError(t, InstallRepoPackage(context.Background(), chocoSource,
+		RepoPackage{Name: "7zip", Version: "24.8.0"}, execer))
+	assert.Equal(t, []string{"choco install 7zip --yes --version 24.8.0"}, execer.commands)
+
+	// without a version choco picks its latest one
+	assert.NoError(t, InstallRepoPackage(context.Background(), chocoSource,
+		RepoPackage{Name: "7zip"}, execer))
+	assert.Equal(t, []string{
+		"choco install 7zip --yes --version 24.8.0",
+		"choco install 7zip --yes",
+	}, execer.commands)
+
+	// a failing choco command surfaces its error
+	execer = newChocoExecer()
+	execer.FakeExecer.ExpectError = errors.New("access denied")
+	assert.Error(t, InstallRepoPackage(context.Background(), chocoSource,
+		RepoPackage{Name: "7zip"}, execer))
+}
+
+func TestUninstallRepoPackageChoco(t *testing.T) {
+	configDir := t.TempDir()
+	writeChocoDescriptor(t, configDir)
+	tool := InstalledPackage{Name: "7zip", Source: "chocolatey", Native: true}
+
+	// choco available: the source owns the channel and removes the
+	// package itself
+	execer := newChocoExecer()
+	handled, err := UninstallRepoPackage(configDir, execer, tool)
+	assert.True(t, handled)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"choco uninstall 7zip --yes"}, execer.commands)
+
+	// choco missing: the channel exists but cannot run, the guidance
+	// stays actionable
+	execer = &recordExecer{FakeExecer: &fakeruntime.FakeExecer{ExpectOS: "windows"}, lookPath: map[string]string{}}
+	handled, err = UninstallRepoPackage(configDir, execer, tool)
+	assert.True(t, handled)
+	assert.EqualError(t, err, "choco is not available, please remove 7zip manually")
 }
 
 // sha256Of returns the hex checksum of the fixture payload

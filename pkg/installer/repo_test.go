@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -147,6 +148,46 @@ func TestRepoSourceSearch(t *testing.T) {
 	_, err = source.Search(context.Background(), configDir, "curl")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, *downloads)
+}
+
+func TestRepoSourceSearchConcurrent(t *testing.T) {
+	// a slow index stretches the download window, so racing searches
+	// would overlap without the per path lock
+	gz := &bytes.Buffer{}
+	writer := gzip.NewWriter(gz)
+	_, _ = writer.Write([]byte(debianPackagesIndex))
+	_ = writer.Close()
+
+	count := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count++
+		time.Sleep(100 * time.Millisecond)
+		_, _ = w.Write(gz.Bytes())
+	}))
+	defer server.Close()
+
+	configDir := t.TempDir()
+	writeRepoDescriptor(t, configDir, server.URL)
+	source := RepoSource{Name: "debian-stable", Kind: "apt-index",
+		Mirror: server.URL, Suite: "stable", Components: []string{"main"}}
+
+	var wg sync.WaitGroup
+	errs := make([]error, 4)
+	for i := range errs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, errs[i] = source.Search(context.Background(), configDir, "curl")
+		}()
+	}
+	wg.Wait()
+
+	// every search answers from a valid gzip index and the staged file
+	// is downloaded once, not interleaved four times
+	for i := range errs {
+		assert.NoError(t, errs[i])
+	}
+	assert.Equal(t, 1, count)
 }
 
 func TestRepoSourceSearchFailures(t *testing.T) {

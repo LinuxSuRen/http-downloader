@@ -104,7 +104,7 @@
       <button class="btn" id="submit-btn" title="Share your own tool via the hd-home registry">Submit a tool</button>
     </div>
     <div class="chips" id="categories"></div>
-    <div class="hint">Installed and not-installed tools share this list, the green badge marks the installed ones with their version. If a package is missing, it may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
+    <div class="hint">Installed and not-installed tools share this list, the green badge marks the installed ones with their version. A keyword also searches the package repositories of this system, e.g. Chocolatey on Windows. If a package is missing, it may not be in hd-home yet, or the local data is stale — try Refresh data.</div>
     <div class="list-meta">
       <span class="count" id="pkg-count"></span>
       <span class="meta-actions">
@@ -454,14 +454,25 @@ function recordName(item) {
   return item.installed_name || item.name;
 }
 
+// repo source summaries can be long, the list truncates them, the full
+// text stays one hover away
+function shortDesc(text) {
+  text = text || '';
+  return text.length > 80 ? text.slice(0, 77) + '…' : text;
+}
+
 function packageActions(item) {
   const link = /^https?:\/\//i.test(item.homepage || '')
     ? `<a class="btn" href="${esc(item.homepage)}" target="_blank" rel="noopener noreferrer">Open link</a>` : '';
-  const install = item.web || !(item.org && item.repo) ? '' : `
+  // a repo source package installs through the native channel of its
+  // source and carries the version the source reports, so it has no
+  // GitHub release picker
+  const install = item.web || !(item.org && item.repo) ? '' : (item.repo_pkg ? `
+      <button class="btn primary" data-install="${esc(item.org)}/${esc(item.repo)}" title="Install through the native channel of ${esc(item.org)}">Install</button>` : `
       <select class="ver" data-org="${esc(item.org)}" data-repo="${esc(item.repo)}" title="Release version, latest by default">
         <option value="">latest</option>
       </select>
-      <button class="btn primary" data-install="${esc(item.org)}/${esc(item.repo)}">Install</button>`;
+      <button class="btn primary" data-install="${esc(item.org)}/${esc(item.repo)}">Install</button>`);
   const upgradable = item.installed && item.org && item.repo && !item.native;
   const record = item.installed ? `
       ${runAction(recordName(item))}
@@ -493,6 +504,10 @@ function packageInstalled(item) {
 }
 
 function packageSource(item) {
+  // a repo source package names its source instead of a GitHub repo
+  if (item.repo_pkg) {
+    return `<span title="${esc(item.description || item.org)}">${esc(item.org)}${item.description ? ' · ' + esc(shortDesc(item.description)) : ''}</span>`;
+  }
   return item.org && item.repo
     ? `<a class="silent" href="https://github.com/${esc(item.org)}/${esc(item.repo)}" target="_blank" rel="noopener noreferrer">${esc(item.org)}/${esc(item.repo)}</a>`
     : (item.native ? 'native' : '');

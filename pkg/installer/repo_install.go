@@ -56,9 +56,32 @@ func InstallRepoPackage(ctx context.Context, source RepoSource, pkg RepoPackage,
 	switch source.Kind {
 	case "apt-index":
 		return installAptPackage(ctx, source, pkg, execer)
+	case "choco-api":
+		return installChocoPackage(pkg, execer)
 	default:
 		return fmt.Errorf("installing from a %s source is not supported yet", source.Kind)
 	}
+}
+
+// chocoTool is the command line of Chocolatey, the native channel of the
+// choco-api sources
+const chocoTool = "choco"
+
+// installChocoPackage hands the package to the Chocolatey CLI which owns
+// the dependency handling, the same way the apt channel relies on dpkg.
+// The CLI asks for its own elevation when it needs one
+func installChocoPackage(pkg RepoPackage, execer fakeruntime.Execer) (err error) {
+	if _, err = execer.LookPath(chocoTool); err != nil {
+		return fmt.Errorf("choco is not available, please install it first")
+	}
+
+	args := []string{"install", pkg.Name, "--yes"}
+	if pkg.Version != "" {
+		// pin the version the search reported, so the installed record
+		// matches the package on disk
+		args = append(args, "--version", pkg.Version)
+	}
+	return execer.RunCommand(chocoTool, args...)
 }
 
 // installAptPackage downloads the package file of the apt index, checks
@@ -138,6 +161,11 @@ func UninstallRepoPackage(configDir string, execer fakeruntime.Execer, tool Inst
 				return true, fmt.Errorf("dpkg is not available, please remove %s manually", tool.Name)
 			}
 			return true, runWithRoot(execer, "dpkg", "-r", tool.Name)
+		case "choco-api":
+			if _, lookErr := execer.LookPath(chocoTool); lookErr != nil {
+				return true, fmt.Errorf("choco is not available, please remove %s manually", tool.Name)
+			}
+			return true, execer.RunCommand(chocoTool, "uninstall", tool.Name, "--yes")
 		default:
 			return false, nil
 		}

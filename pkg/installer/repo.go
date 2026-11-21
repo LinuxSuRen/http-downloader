@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -317,6 +318,18 @@ func (s RepoSource) searchChocoAPI(ctx context.Context, configDir, keyword strin
 	return rankPackages(hits, keyword), nil
 }
 
+// indexDownloads serializes the work on one index cache path. Two
+// searches racing on the same staged .part file would interleave their
+// writes and corrupt the cache, the web console fires a search per
+// keystroke pause which makes the race likely
+var indexDownloads sync.Map // cache path -> *sync.Mutex
+
+// lockIndexDownload returns the mutex of an index cache path
+func lockIndexDownload(cachePath string) *sync.Mutex {
+	lock, _ := indexDownloads.LoadOrStore(cachePath, &sync.Mutex{})
+	return lock.(*sync.Mutex)
+}
+
 // cachePathOf returns the local cache file of an index URL
 func cachePathOf(configDir, source, indexURL string) string {
 	safe := strings.NewReplacer(":", "", "/", "-", ".", "_").Replace(indexURL)
@@ -328,6 +341,10 @@ func cachePathOf(configDir, source, indexURL string) string {
 // the cached copy with If-Modified-Since
 func (s RepoSource) cachedIndex(ctx context.Context, configDir, indexURL string) (data io.ReadCloser, err error) {
 	cachePath := cachePathOf(configDir, s.Name, indexURL)
+
+	lock := lockIndexDownload(cachePath)
+	lock.Lock()
+	defer lock.Unlock()
 
 	var modTime time.Time
 	if stat, statErr := os.Stat(cachePath); statErr == nil {
