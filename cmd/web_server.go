@@ -74,11 +74,13 @@ type webServer struct {
 	// detection must not report it as the endpoint of a tool
 	selfPort int
 
-	// overridable behaviors, they talk to GitHub or to the desktop, which
-	// is neither available nor desired in the unit tests
+	// overridable behaviors, they talk to GitHub, to the public package
+	// APIs or to the desktop, which is neither available nor desired in
+	// the unit tests
 	listVersions func(org, repo string, count int) ([]versionTag, error)
 	probeWeb     func(pid int) (url string, ok bool)
 	buildCommand func(binPath string, args []string) *exec.Cmd
+	searchRepos  func(ctx context.Context, configDir, keyword string) []installer.RepoPackage
 }
 
 func newWebServer(ctx context.Context) *webServer {
@@ -91,6 +93,7 @@ func newWebServer(ctx context.Context) *webServer {
 	}
 	server.listVersions = listGitHubVersions
 	server.probeWeb = server.detectWebURL
+	server.searchRepos = searchRepoPackages
 	server.buildCommand = func(binPath string, args []string) *exec.Cmd {
 		// #nosec G702 -- the path points to an existing binary of the
 		// local install record, the console binds to 127.0.0.1 only
@@ -185,7 +188,8 @@ func (s *webServer) handleProxy(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GET /api/search?q=keyword searches the installable packages from hd-home
+// GET /api/search?q=keyword searches the installable packages from
+// hd-home and the repo sources serving the running platform
 func (s *webServer) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
@@ -205,7 +209,31 @@ func (s *webServer) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := installer.FindByKeyword(keyword, configDir)
+	// the hits of the repo sources address the same way as on the
+	// command line: source/name
+	for _, pkg := range s.searchRepos(r.Context(), configDir, keyword) {
+		result = append(result, pkg.Source+"/"+pkg.Name)
+	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"data": result})
+}
+
+// searchRepoPackages queries the repo sources serving the running
+// platform with the keyword, a slow or failing source is logged and
+// skipped, it never hides the hd-home results
+func searchRepoPackages(ctx context.Context, configDir, keyword string) (packages []installer.RepoPackage) {
+	for _, source := range installer.FindRepoSources(configDir) {
+		// the first download of a source index may take a while, a bound
+		// keeps one slow source from holding the whole search answer
+		searchCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		hits, searchErr := source.Search(searchCtx, configDir, keyword)
+		cancel()
+		if searchErr != nil {
+			log.Printf("cannot search %s: %v", source.Name, searchErr)
+			continue
+		}
+		packages = append(packages, hits...)
+	}
+	return
 }
 
 // ensureConfigCache returns the local hd-home config directory, it fetches
@@ -253,6 +281,12 @@ type packageItem struct {
 	Version       string `json:"version,omitempty"`
 	InstalledAt   string `json:"installed_at,omitempty"`
 	Native        bool   `json:"native,omitempty"`
+	// Description is the summary of a repo source package
+	Description string `json:"description,omitempty"`
+	// RepoPkg marks a package of an external repo source: org carries
+	// the source name, repo the package name, an install addresses it
+	// as source/name and the native channel of the source installs it
+	RepoPkg bool `json:"repo_pkg,omitempty"`
 	// LaunchCommand is the argument string the web console passes to the
 	// binary when the tool starts
 	LaunchCommand string `json:"launch_command,omitempty"`
@@ -321,6 +355,32 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 		}
 		seen[orgRepo] = true
 		items = append(items, item)
+	}
+
+	// a keyword also reaches the repo sources of the running platform,
+	// e.g. Chocolatey on Windows, their hits carry the version the
+	// source reports and install through the native channel
+	if keyword != "" {
+		repoIndex := installedRepoIndex(records)
+		for _, pkg := range s.searchRepos(r.Context(), configDir, keyword) {
+			item := packageItem{
+				Org:         pkg.Source,
+				Repo:        pkg.Name,
+				Name:        pkg.Name,
+				Version:     pkg.Version,
+				Description: pkg.Description,
+				RepoPkg:     true,
+			}
+			if record := repoIndex[pkg.Source+"/"+pkg.Name]; record != nil {
+				item.Installed = true
+				item.Version = record.Version
+				item.InstalledName = record.Name
+				item.InstalledAt = record.InstalledAt
+				item.Native = true
+			}
+			seen[item.Org+"/"+item.Repo] = true
+			items = append(items, item)
+		}
 	}
 
 	// the unfiltered view also carries the installed tools which are not
@@ -433,6 +493,18 @@ func installedIndex(records []installer.InstalledPackage) (index map[string]*ins
 	for i := range records {
 		if records[i].Org != "" && records[i].Repo != "" {
 			index[records[i].Org+"/"+records[i].Repo] = &records[i]
+		}
+	}
+	return
+}
+
+// installedRepoIndex indexes the installed packages of repo sources by
+// their source/name address
+func installedRepoIndex(records []installer.InstalledPackage) (index map[string]*installer.InstalledPackage) {
+	index = make(map[string]*installer.InstalledPackage, len(records))
+	for i := range records {
+		if records[i].Source != "" && records[i].Name != "" {
+			index[records[i].Source+"/"+records[i].Name] = &records[i]
 		}
 	}
 	return
@@ -658,6 +730,9 @@ func (s *webServer) startJob(action, name string, fn func(stub *cobra.Command) e
 		if err != nil {
 			job.Status = jobFailed
 			job.Message = fmt.Sprintf("failed to %s %s", action, name)
+			// the cause belongs into the log panel, the job message
+			// stays generic, the lock is held so the append is inline
+			job.logs = append(job.logs, fmt.Sprintf("error: %v", err))
 			log.Printf("job %d failed: %v", job.ID, err)
 		} else {
 			job.Status = jobSuccess

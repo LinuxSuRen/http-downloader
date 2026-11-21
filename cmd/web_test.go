@@ -143,7 +143,7 @@ func TestWebAPI(t *testing.T) {
 }
 
 func TestWebSearch(t *testing.T) {
-	httpServer, _ := setupWebServer(t)
+	httpServer, server := setupWebServer(t)
 	client := httpServer.Client()
 
 	// missing keyword
@@ -157,6 +157,12 @@ func TestWebSearch(t *testing.T) {
 	assert.NoError(t, os.WriteFile(filepath.Join(cacheDir, "fake-cli.yml"),
 		[]byte("name: fake-cli\n"), 0644))
 
+	// the repo sources of the platform join the answer, their hits
+	// address as source/name like on the command line
+	server.searchRepos = func(ctx context.Context, configDir, keyword string) []installer.RepoPackage {
+		return []installer.RepoPackage{{Source: "chocolatey", Name: "fake-cli", Version: "1.0.0"}}
+	}
+
 	resp, err = client.Get(httpServer.URL + "/api/search?q=fake-cli")
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -165,6 +171,7 @@ func TestWebSearch(t *testing.T) {
 	}{}
 	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&searchResult))
 	assert.Contains(t, searchResult.Data, "fake-org/fake-cli")
+	assert.Contains(t, searchResult.Data, "chocolatey/fake-cli")
 }
 
 func TestWebJobLogsSSE(t *testing.T) {
@@ -314,6 +321,79 @@ categories:
 	assert.Len(t, packages.Data, 2)
 	assert.Equal(t, "fake-cli", packages.Data[0].Repo)
 	assert.Equal(t, "fake-web", packages.Data[1].Repo)
+}
+
+func TestWebPackagesRepoSources(t *testing.T) {
+	httpServer, server := setupWebServer(t)
+	client := httpServer.Client()
+
+	searched := ""
+	server.searchRepos = func(ctx context.Context, configDir, keyword string) []installer.RepoPackage {
+		searched = keyword
+		return []installer.RepoPackage{
+			{Source: "chocolatey", Name: "7zip", Version: "24.8.0", Description: "file archiver"},
+			{Source: "chocolatey", Name: "curl", Version: "8.23.0", Description: "transfer data"},
+		}
+	}
+
+	// the local hd-home cache exists, so the handler never reaches the
+	// network for the registry part
+	assert.NoError(t, os.MkdirAll(
+		filepath.Join(homedirHome(t), ".config", "hd-home", "config"), 0750))
+
+	// an installed repo source package is matched by its source/name
+	// record and reports the installed version
+	assert.NoError(t, installer.RecordInstalledPackage(installer.InstalledPackage{
+		Name:        "curl",
+		Version:     "8.9.0",
+		Source:      "chocolatey",
+		Native:      true,
+		InstalledAt: "2026-02-01T00:00:00Z",
+	}))
+
+	resp, err := client.Get(httpServer.URL + "/api/packages?q=7zip")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	packages := struct {
+		Data []packageItem `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&packages))
+	assert.Equal(t, "7zip", searched)
+	assert.Len(t, packages.Data, 2)
+
+	sevenZip := packages.Data[0] // chocolatey/7zip sorts before chocolatey/curl
+	assert.True(t, sevenZip.RepoPkg)
+	assert.Equal(t, "chocolatey", sevenZip.Org)
+	assert.Equal(t, "7zip", sevenZip.Repo)
+	assert.Equal(t, "7zip", sevenZip.Name)
+	assert.Equal(t, "24.8.0", sevenZip.Version)
+	assert.Equal(t, "file archiver", sevenZip.Description)
+	assert.False(t, sevenZip.Installed)
+
+	curl := packages.Data[1]
+	assert.True(t, curl.RepoPkg)
+	assert.True(t, curl.Installed)
+	assert.Equal(t, "8.9.0", curl.Version)
+	assert.Equal(t, "curl", curl.InstalledName)
+	assert.Equal(t, "2026-02-01T00:00:00Z", curl.InstalledAt)
+	assert.True(t, curl.Native)
+
+	// without a keyword the registry list stays to itself, the repo
+	// sources only answer keyword searches
+	server.searchRepos = func(ctx context.Context, configDir, keyword string) []installer.RepoPackage {
+		t.Error("repo sources must stay out of the unfiltered list")
+		return nil
+	}
+	resp, err = client.Get(httpServer.URL + "/api/packages")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	packages = struct {
+		Data []packageItem `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&packages))
+	for i := range packages.Data {
+		assert.False(t, packages.Data[i].RepoPkg)
+	}
 }
 
 func TestWebPackageVersions(t *testing.T) {

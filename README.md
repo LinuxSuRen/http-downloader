@@ -74,6 +74,19 @@ When you first run it, please init via: `hd fetch`
 
 then you can search it by a keyword: `hd search jenkins`
 
+The keyword also reaches the package repositories of your system, e.g. Chocolatey on Windows, Homebrew on macOS and the Debian archive on Linux. The sources register in the `repos` directory of [hd-home](https://github.com/LinuxSuRen/hd-home), their hits carry the source as a prefix:
+
+```shell
+$ hd search 7zip
+chocolatey/7zip	7-Zip is a file archiver with a high compression ratio.
+```
+
+Install such a package with the same address, `hd` hands it to the native channel of the source (`choco install`, `dpkg -i`, ...) and `hd remove` uninstalls it the same way:
+
+```shell
+hd install chocolatey/7zip
+```
+
 ## Manage the installed tools
 Every tool installed via `hd install` is recorded into `~/.config/hd-installed.yaml`. You can manage them with the following commands:
 
@@ -108,7 +121,7 @@ hd web
 Then open http://127.0.0.1:8080, you can:
 
 * see all the tools in one list, installed and not-installed ones together, the green badge tells them apart and the list sorts by name in both directions
-* search the packages or browse them by category, shown as a table or as cards
+* search the packages or browse them by category, shown as a table or as cards; a keyword also covers the package repositories of your system, e.g. Chocolatey on Windows
 * install a package with any release version, which also covers upgrades and downgrades
 * pick a GitHub acceleration proxy for the downloads, the candidates come from your hd config and from hd-home, a custom address also works
 * open an installed tool in a new terminal window
