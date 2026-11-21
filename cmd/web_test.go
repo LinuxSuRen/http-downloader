@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -693,6 +694,40 @@ func TestWebLaunchCommand(t *testing.T) {
 	_ = resp.Body.Close()
 	tool, _ := installer.FindInstalledPackage("fake-cli")
 	assert.Equal(t, "", tool.LaunchCommand)
+}
+
+func TestFindToolBinary(t *testing.T) {
+	server := newWebServer(context.Background())
+
+	// the recorded binary path wins
+	bin := filepath.Join(t.TempDir(), "fake-cli")
+	assert.NoError(t, os.WriteFile(bin, []byte("bin"), 0750))
+	found := server.findToolBinary(&installer.InstalledPackage{Name: "fake-cli", Binaries: []string{bin}})
+	assert.Equal(t, bin, found)
+
+	// nothing matches an empty record
+	assert.Equal(t, "", server.findToolBinary(&installer.InstalledPackage{Name: "hd-no-such-tool"}))
+
+	// a fallback install lands in the working directory, the console
+	// finds it there no matter which platform runs
+	workDir := t.TempDir()
+	t.Chdir(workDir)
+	name := "cwd-tool"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	assert.NoError(t, os.WriteFile(filepath.Join(workDir, name), []byte("bin"), 0750))
+	found = server.findToolBinary(&installer.InstalledPackage{Name: "cwd-tool"})
+	assert.Equal(t, name, filepath.Base(found))
+
+	// older records carry no Windows executable suffix, the lookup
+	// still finds the file next to the recorded directory
+	if runtime.GOOS == "windows" {
+		dir := t.TempDir()
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, "legacy.exe"), []byte("bin"), 0750))
+		found = server.findToolBinary(&installer.InstalledPackage{Name: "legacy", TargetDirectory: dir})
+		assert.Equal(t, filepath.Join(dir, "legacy.exe"), found)
+	}
 }
 
 // TestHelperProcess is not a real test, it is the tool process of the web

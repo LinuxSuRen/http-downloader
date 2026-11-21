@@ -235,13 +235,7 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 	if o.Package == nil {
 		o.Package = &installer.HDConfig{}
 	}
-	if o.target != "" && o.Package.TargetDirectory == "" {
-		o.Package.TargetDirectory = o.target
-	}
-	if o.Package.TargetDirectory == "" {
-		o.Package.TargetDirectory = "/usr/local/bin"
-	}
-	if err = sysos.MkdirAll(o.Package.TargetDirectory, 0750); err != nil {
+	if err = sysos.MkdirAll(o.resolveTargetDir(cmd), 0750); err != nil {
 		return
 	}
 
@@ -276,15 +270,47 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 	return
 }
 
+// resolveTargetDir decides the install directory and stores it into the
+// package config: the target directory of the package config wins, then
+// the --target flag, the platform default follows. A default directory
+// which needs privileges this Windows process lacks falls back to the
+// working directory instead of failing the install, an explicit
+// --target never falls back
+func (o *installOption) resolveTargetDir(cmd *cobra.Command) (dir string) {
+	dir = o.Package.TargetDirectory
+	if dir == "" {
+		dir = o.target
+	}
+	explicit := cmd != nil && cmd.Flags().Lookup("target") != nil && cmd.Flags().Changed("target")
+	if dir == "" {
+		dir = o.getDefaultInstallDir()
+	}
+	if dir == "" {
+		dir = "/usr/local/bin"
+	}
+	if o.execer.OS() == "windows" && !explicit && common.IsDirWriteable(dir) != nil {
+		// a fallback into the working directory keeps the install
+		// working without an elevated process
+		if abs, absErr := filepath.Abs("."); absErr == nil {
+			log.Printf("cannot write into %s, install into %s instead", dir, abs)
+			dir = abs
+		}
+	}
+	o.Package.TargetDirectory = dir
+	return dir
+}
+
 // recordInstall saves the installed tool into the record file
 func (o *installOption) recordInstall(native bool) (err error) {
-	targetDir := o.target
+	// the package config carries the resolved directory of the install,
+	// it wins over the raw flag value: the Windows fallback rewrites it
+	targetDir := o.Package.TargetDirectory
+	if targetDir == "" {
+		targetDir = o.target
+	}
 	pkg := o.Package
 	if pkg == nil {
 		pkg = &installer.HDConfig{}
-	}
-	if targetDir == "" {
-		targetDir = pkg.TargetDirectory
 	}
 	if targetDir == "" {
 		targetDir = "/usr/local/bin"
@@ -294,10 +320,15 @@ func (o *installOption) recordInstall(native bool) (err error) {
 	if pkg.TargetBinary != "" {
 		targetBinary = pkg.TargetBinary
 	}
+	if o.execer.OS() == "windows" && !strings.HasSuffix(targetBinary, ".exe") {
+		// the record must carry the real file name, otherwise the
+		// lookup of the tool misses it on Windows
+		targetBinary += ".exe"
+	}
 
-	binaries := []string{path.Join(targetDir, targetBinary)}
+	binaries := []string{filepath.Join(targetDir, targetBinary)}
 	for _, addition := range pkg.AdditionBinaries {
-		binaries = append(binaries, path.Join(targetDir, filepath.Base(addition)))
+		binaries = append(binaries, filepath.Join(targetDir, filepath.Base(addition)))
 	}
 
 	installedVersion := pkg.LatestVersion

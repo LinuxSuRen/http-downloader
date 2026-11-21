@@ -117,6 +117,18 @@ func (o *Installer) Install() (err error) {
 
 // OverWriteBinary install a binary file
 func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
+	// a fallback install into the working directory can make the source
+	// and the target the same file, copying it onto itself would
+	// truncate it to nothing
+	if sourceFile != "" && targetPath != "" {
+		if sourceAbs, srcErr := filepath.Abs(sourceFile); srcErr == nil {
+			if targetAbs, tgtErr := filepath.Abs(targetPath); tgtErr == nil && strings.EqualFold(sourceAbs, targetAbs) {
+				fmt.Println("source and target are the same file, keep it in place")
+				return nil
+			}
+		}
+	}
+
 	fmt.Println("install", sourceFile, "to", targetPath)
 	switch o.Execer.OS() {
 	case fakeruntime.OSLinux, fakeruntime.OSDarwin:

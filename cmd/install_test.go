@@ -3,12 +3,15 @@ package cmd
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
 	cotesting "github.com/linuxsuren/cobra-extension/pkg/testing"
 	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
@@ -226,5 +229,95 @@ func TestGetDefaultInstallDir(t *testing.T) {
 			result := opt.getDefaultInstallDir()
 			assert.Equal(t, tt.expect, result)
 		})
+	}
+}
+
+func TestResolveTargetDir(t *testing.T) {
+	windows := &fakeruntime.FakeExecer{ExpectOS: "windows"}
+	linux := &fakeruntime.FakeExecer{ExpectOS: "linux"}
+	newCmd := func(explicit bool) (cmd *cobra.Command) {
+		cmd = &cobra.Command{}
+		var target string
+		cmd.Flags().StringVar(&target, "target", "", "")
+		if explicit {
+			// an explicit --target never falls back
+			assert.NoError(t, cmd.Flags().Set("target", `Z:\nowhere`))
+		}
+		return
+	}
+
+	// the package config wins
+	opt := &installOption{execer: linux, target: "/opt/x",
+		downloadOption: &downloadOption{Package: &installer.HDConfig{TargetDirectory: "/opt/pkg"}}}
+	assert.Equal(t, "/opt/pkg", opt.resolveTargetDir(newCmd(false)))
+
+	// the plain --target follows
+	opt = &installOption{execer: linux, target: "/opt/x",
+		downloadOption: &downloadOption{Package: &installer.HDConfig{}}}
+	assert.Equal(t, "/opt/x", opt.resolveTargetDir(newCmd(false)))
+
+	// an explicit --target stays even when it is not writable
+	opt = &installOption{execer: windows, target: `Z:\nowhere`,
+		downloadOption: &downloadOption{Package: &installer.HDConfig{}}}
+	assert.Equal(t, `Z:\nowhere`, opt.resolveTargetDir(newCmd(true)))
+
+	// a missing default of linux keeps the sudo based flow
+	opt = &installOption{execer: linux,
+		downloadOption: &downloadOption{Package: &installer.HDConfig{}}}
+	assert.Equal(t, "/usr/local/bin", opt.resolveTargetDir(newCmd(false)))
+
+	workDir := t.TempDir()
+	t.Chdir(workDir)
+
+	// a writable windows default stays
+	writable := filepath.Join(workDir, "writable")
+	assert.NoError(t, os.MkdirAll(writable, 0750))
+	opt = &installOption{execer: windows, target: writable,
+		downloadOption: &downloadOption{Package: &installer.HDConfig{}}}
+	assert.Equal(t, writable, opt.resolveTargetDir(newCmd(false)))
+
+	// an unwritable default on windows falls back to the working
+	// directory, the web console path has no target at all
+	abs, err := filepath.Abs(".")
+	assert.NoError(t, err)
+	opt = &installOption{execer: windows,
+		downloadOption: &downloadOption{Package: &installer.HDConfig{}}}
+	assert.Equal(t, abs, opt.resolveTargetDir(newCmd(false)))
+	assert.Equal(t, abs, opt.Package.TargetDirectory)
+
+	// the same default flag value falls back too, only an explicit
+	// --target is pinned
+	opt = &installOption{execer: windows, target: filepath.Join(workDir, "missing"),
+		downloadOption: &downloadOption{Package: &installer.HDConfig{}}}
+	assert.Equal(t, abs, opt.resolveTargetDir(newCmd(false)))
+}
+
+func TestRecordInstallWindowsSuffix(t *testing.T) {
+	tmpHome := t.TempDir()
+	oldCache := homedir.DisableCache
+	homedir.DisableCache = true
+	t.Setenv("HOME", tmpHome)
+	t.Cleanup(func() { homedir.DisableCache = oldCache })
+
+	opt := &installOption{
+		execer: &fakeruntime.FakeExecer{ExpectOS: "windows"},
+		downloadOption: &downloadOption{Package: &installer.HDConfig{
+			// the resolver stored the effective directory here, it wins
+			// over the raw flag value so a Windows fallback records
+			// where the binary really went
+			TargetDirectory: tmpHome,
+		}},
+	}
+	opt.tool = "open-pdf"
+	opt.target = `C:\somewhere else`
+	assert.NoError(t, opt.recordInstall(false))
+
+	tools, err := installer.LoadInstalledPackages()
+	assert.NoError(t, err)
+	if assert.Len(t, tools, 1) {
+		// the record carries the real file name, otherwise the lookup
+		// of the tool misses it on Windows
+		assert.Equal(t, []string{filepath.Join(tmpHome, "open-pdf.exe")}, tools[0].Binaries)
+		assert.Equal(t, tmpHome, tools[0].TargetDirectory)
 	}
 }

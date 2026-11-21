@@ -594,24 +594,55 @@ func (s *webServer) handleTool(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// findToolBinary returns an existing binary path of an installed tool
+// findToolBinary returns an existing binary path of an installed tool:
+// the recorded paths come first, then the recorded directory, then the
+// PATH. The working directory and the platform default directory
+// follow, so a fallback install and older records without the Windows
+// executable suffix still start
 func (s *webServer) findToolBinary(tool *installer.InstalledPackage) (binPath string) {
-	for _, binary := range tool.Binaries {
-		if binary == "" {
-			continue
+	suffix := ""
+	if s.execer.OS() == "windows" {
+		suffix = ".exe"
+	}
+	try := func(candidate string) string {
+		if candidate == "" {
+			return ""
 		}
-		if exists, _ := common.PathExists(binary); exists {
-			return binary
+		if exists, _ := common.PathExists(candidate); exists {
+			return candidate
+		}
+		// older records carry no Windows executable suffix
+		if suffix == "" || strings.HasSuffix(candidate, suffix) {
+			return ""
+		}
+		if exists, _ := common.PathExists(candidate + suffix); exists {
+			return candidate + suffix
+		}
+		return ""
+	}
+
+	for _, binary := range tool.Binaries {
+		if found := try(binary); found != "" {
+			return found
 		}
 	}
 	if tool.TargetDirectory != "" {
-		candidate := filepath.Join(tool.TargetDirectory, tool.Name)
-		if exists, _ := common.PathExists(candidate); exists {
-			return candidate
+		if found := try(filepath.Join(tool.TargetDirectory, tool.Name)); found != "" {
+			return found
 		}
 	}
 	if found, err := s.execer.LookPath(tool.Name); err == nil && found != "" {
 		return found
+	}
+	// a fallback install lands in the working directory, the default
+	// directory covers records which never noted where they went, both
+	// probes need an absolute path so the launcher does not mistake the
+	// result for a PATH lookup
+	workDir, _ := filepath.Abs(".")
+	for _, dir := range []string{workDir, (&installOption{execer: s.execer}).getDefaultInstallDir()} {
+		if found := try(filepath.Join(dir, tool.Name)); found != "" {
+			return found
+		}
 	}
 	return
 }
@@ -820,6 +851,10 @@ func (s *webServer) newInstallOption() *installOption {
 	}
 	opt.OS = runtime.GOOS
 	opt.Arch = runtime.GOARCH
+	// the platform default directory, the same one the install command
+	// starts from; the resolver falls back to the working directory
+	// when it needs privileges this process lacks
+	opt.target = opt.getDefaultInstallDir()
 	opt.Timeout = 15 * time.Minute
 	opt.MaxAttempts = 10
 	opt.ShowProgress = false
