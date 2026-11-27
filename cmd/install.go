@@ -3,10 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	sysos "os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -15,6 +17,9 @@ import (
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/os"
+	npminstaller "github.com/linuxsuren/http-downloader/pkg/os/npm"
+	"github.com/linuxsuren/http-downloader/pkg/remote"
+	"github.com/linuxsuren/http-downloader/pkg/source"
 	"github.com/linuxsuren/http-downloader/pkg/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -25,14 +30,17 @@ func newInstallCmd(ctx context.Context) (cmd *cobra.Command) {
 	opt := &installOption{
 		downloadOption: newDownloadOption(ctx),
 		execer:         fakeruntime.NewDefaultExecer(),
+		sourceName:     source.HDHome,
+		targetConfig:   loadRemoteConfig(),
 	}
 	cmd = &cobra.Command{
 		Use:     "install",
 		Aliases: []string{"i", "add"},
-		Short:   "Install a package from https://github.com/LinuxSuRen/hd-home",
-		Long: `Install a package from https://github.com/LinuxSuRen/hd-home
+		Short:   "Install a package from hd-home, npm or a native package manager",
+		Long: `Install a package from hd-home, npm or a native package manager.
+Use --mode ssh to install to a remote server, and --source npm to install an npm package.
 Cannot find your desired package? Please run command: hd fetch --reset, then try it again`,
-		Example: "hd install goget",
+		Example: "hd install goget\nhd install --source npm typescript\nhd install --mode ssh --ssh-host 10.0.0.1 jcli",
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
 		GroupID: coreGroup.ID,
@@ -52,7 +60,11 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 		"Indicate if install it via go install github.com/xxx/xxx")
 	flags.StringVarP(&opt.fromBranch, "from-branch", "", "master",
 		"Only works if the flag --from-source is true")
-	flags.StringVarP(&opt.target, "target", "", opt.getDefaultInstallDir(), "The target installation directory")
+	target := configuredInstallDir()
+	if target == "" {
+		target = opt.getDefaultInstallDir()
+	}
+	flags.StringVarP(&opt.target, "target", "", target, "The target installation directory")
 	flags.BoolVarP(&opt.goget, "goget", "", viper.GetBool("fetch"),
 		"Use command goget to download the binary, only works if the flag --from-source is true")
 
@@ -64,20 +76,52 @@ Cannot find your desired package? Please run command: hd fetch --reset, then try
 		"Clean the package if the installation is success")
 	flags.BoolVarP(&opt.KeepPart, "keep-part", "", false,
 		"If you want to keep the part files instead of deleting them")
+
+	flags.StringVar(&opt.sourceName, "source", source.HDHome,
+		"The package source: hd-home, npm, native or all")
+	flags.StringVar(&opt.targetConfig.Mode, "mode", opt.targetConfig.Mode,
+		"The install mode: local or ssh")
+	flags.StringVar(&opt.targetConfig.Host, "ssh-host", opt.targetConfig.Host,
+		"The host of the target server, only works with --mode ssh")
+	flags.IntVar(&opt.targetConfig.Port, "ssh-port", opt.targetConfig.Port,
+		"The SSH port of the target server")
+	flags.StringVar(&opt.targetConfig.User, "ssh-user", opt.targetConfig.User,
+		"The SSH user of the target server")
+	flags.StringVar(&opt.targetConfig.Password, "ssh-password", opt.targetConfig.Password,
+		"The SSH password, a private key is recommended instead")
+	flags.StringVar(&opt.targetConfig.KeyFile, "ssh-key", opt.targetConfig.KeyFile,
+		"The SSH private key file")
+	flags.BoolVar(&opt.targetConfig.Insecure, "ssh-insecure", opt.targetConfig.Insecure,
+		"Skip the SSH host key verification")
+	flags.StringVar(&opt.targetConfig.OS, "ssh-os", opt.targetConfig.OS,
+		"The OS of the SSH target, it selects the release asset")
+	flags.StringVar(&opt.targetConfig.Arch, "ssh-arch", opt.targetConfig.Arch,
+		"The architecture of the SSH target, it selects the release asset")
 	return
 }
 
 func (o *installOption) getDefaultInstallDir() string {
-	switch o.execer.OS() {
-	case "linux", "darwin":
-		return "/usr/local/bin"
-	case "windows":
-		if o.execer.Getenv("SHELL") == "/usr/bin/bash" {
-			return "/usr/bin"
-		}
-		return `C:\Program Files (x86)\Common Files`
+	return platformInstallDir(o.execer.OS(), o.execer.Getenv("SHELL"))
+}
+
+func (o *installOption) targetOS() string {
+	if o.targetConfig.Mode == remote.ModeSSH {
+		return o.targetConfig.Normalize().OS
 	}
-	return ""
+	if o.execer != nil {
+		return o.execer.OS()
+	}
+	return runtime.GOOS
+}
+
+// resolveTargetDir keeps the CLI flag, the package config and the configured
+// default in sync without ever falling back to a Unix path on Windows
+func (o *installOption) resolveTargetDir() string {
+	pkgDir := ""
+	if o.Package != nil {
+		pkgDir = o.Package.TargetDirectory
+	}
+	return installer.ResolveInstallDir(o.target, pkgDir, o.targetOS())
 }
 
 type installOption struct {
@@ -90,10 +134,16 @@ type installOption struct {
 	goget        bool
 	force        bool
 
+	sourceName   string
+	targetConfig remote.Config
+	npmPackage   string
+	npmVersion   string
+
 	// inner fields
 	nativePackage bool
 	tool          string
 	execer        fakeruntime.Execer
+	remoteExec    remote.Executor
 }
 
 func (o *installOption) shouldInstall() (should, exist bool) {
@@ -128,8 +178,46 @@ func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	// try to find if it's a native package
-	o.nativePackage = os.HasPackage(o.tool)
+	o.targetConfig = o.targetConfig.Normalize()
+	if o.targetConfig.Mode != remote.ModeLocal && o.targetConfig.Mode != remote.ModeSSH {
+		err = fmt.Errorf("invalid install mode: %s, expected local or ssh", o.targetConfig.Mode)
+		return
+	}
+	if o.targetConfig.Mode == remote.ModeSSH {
+		if err = o.targetConfig.Validate(); err != nil {
+			return
+		}
+		// the flag default follows the local platform, a remote target uses
+		// its own platform unless --target was given explicitly
+		if cmd == nil || cmd.Flags() == nil || !cmd.Flags().Changed("target") {
+			o.target = configuredInstallDir()
+		}
+		if cmd == nil || cmd.Flags() == nil || !cmd.Flags().Changed("os") {
+			o.OS = o.targetConfig.OS
+		}
+		if cmd == nil || cmd.Flags() == nil || !cmd.Flags().Changed("arch") {
+			o.Arch = o.targetConfig.Arch
+		}
+	}
+
+	switch o.sourceName {
+	case "":
+		o.sourceName = source.HDHome
+	case source.NPM:
+		o.npmPackage, o.npmVersion = splitPackageVersion(o.tool)
+		o.tool = o.npmPackage
+		return
+	case source.HDHome, source.Native, source.All:
+	default:
+		err = fmt.Errorf("unknown package source: %s", o.sourceName)
+		return
+	}
+
+	// native packages are only detected on the local machine, a remote
+	// target gets the same binary installation flow as a local one. An
+	// explicit --source native does not need a config cache lookup.
+	o.nativePackage = o.targetConfig.Mode == remote.ModeLocal &&
+		(o.sourceName == source.Native || os.HasPackage(o.tool))
 	if !o.nativePackage {
 		if o.Category == "" {
 			err = o.downloadOption.preRunE(cmd, args)
@@ -151,7 +239,34 @@ func (o *installOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 	return
 }
 
+// splitPackageVersion supports both plain and scoped npm package names
+func splitPackageVersion(name string) (pkg, version string) {
+	if index := strings.LastIndex(name, "@"); index > 0 {
+		return name[:index], name[index+1:]
+	}
+	return name, ""
+}
+
 func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
+	if o.sourceName == source.NPM {
+		if err = o.installNPM(); err != nil {
+			return
+		}
+		return o.recordNPMInstall()
+	}
+
+	if o.targetConfig.Mode == remote.ModeSSH {
+		if err = o.installRemote(cmd, args); err != nil {
+			return
+		}
+		return o.recordInstall(false)
+	}
+
+	if o.Package == nil {
+		o.Package = &installer.HDConfig{}
+	}
+	o.Package.TargetDirectory = o.resolveTargetDir()
+
 	if o.nativePackage {
 		// install a package
 		if should, exist := o.shouldInstall(); !should {
@@ -176,6 +291,9 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 
 	// aka go get github.com/xxx/xxx
 	if o.fromSource {
+		if err = sysos.MkdirAll(o.Package.TargetDirectory, 0750); err != nil {
+			return
+		}
 		if err = o.installFromSource(); err == nil {
 			err = o.recordInstall(false)
 		}
@@ -197,15 +315,6 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
-	if o.Package == nil {
-		o.Package = &installer.HDConfig{}
-	}
-	if o.target != "" && o.Package.TargetDirectory == "" {
-		o.Package.TargetDirectory = o.target
-	}
-	if o.Package.TargetDirectory == "" {
-		o.Package.TargetDirectory = "/usr/local/bin"
-	}
 	if err = sysos.MkdirAll(o.Package.TargetDirectory, 0750); err != nil {
 		return
 	}
@@ -241,18 +350,187 @@ func (o *installOption) install(cmd *cobra.Command, args []string) (err error) {
 	return
 }
 
+// installNPM uses the npm installer either locally or on the SSH target
+func (o *installOption) installNPM() (err error) {
+	name := o.npmPackage
+	if o.npmVersion != "" {
+		name = fmt.Sprintf("%s@%s", name, o.npmVersion)
+	}
+	if o.targetConfig.Mode == remote.ModeSSH {
+		var exec remote.Executor
+		if exec, err = o.getRemoteExecutor(); err != nil {
+			return
+		}
+		log.Println("install npm package on", o.targetConfig.Host, name)
+		err = exec.Run("npm install -g "+remote.Quote(name), nil, sysos.Stdout, sysos.Stderr)
+		return
+	}
+	installer := &npminstaller.CommonInstaller{Name: name, Execer: o.execer}
+	err = installer.Install()
+	return
+}
+
+// installRemote downloads and extracts the package locally, then uploads
+// only the resulting binaries to the target server over SSH
+func (o *installOption) installRemote(cmd *cobra.Command, args []string) (err error) {
+	exec, err := o.getRemoteExecutor()
+	if err != nil {
+		return
+	}
+
+	targetDir := installer.ResolveInstallDir(o.target, "", o.targetConfig.Normalize().OS)
+	if err = exec.Run("mkdir -p "+remote.Quote(targetDir), nil, sysos.Stdout, sysos.Stderr); err != nil {
+		return
+	}
+
+	if o.Download {
+		log.Println("check if it should be installed on", o.targetConfig.Host)
+		if should, exist := o.shouldInstallRemote(exec, targetDir); !should {
+			if exist {
+				cmd.Printf("%s already exists on %s, please use --force to install it again\n", o.tool, o.targetConfig.Host)
+			}
+			return
+		}
+		if err = o.downloadOption.runE(cmd, args); err != nil {
+			return
+		}
+	}
+
+	if o.Package == nil {
+		o.Package = &installer.HDConfig{}
+	}
+	targetBinary := o.name
+	if o.Package.TargetBinary != "" {
+		targetBinary = o.Package.TargetBinary
+	}
+
+	stageDir, err := sysos.MkdirTemp("", "hd-remote-")
+	if err != nil {
+		return
+	}
+	defer func() { _ = sysos.RemoveAll(stageDir) }()
+
+	var binaries []string
+	if o.Tar {
+		binaries, err = installer.StagePackage(o.Output, stageDir, targetBinary, o.Package.AdditionBinaries)
+	} else {
+		var data []byte
+		if data, err = sysos.ReadFile(o.downloadOption.Output); err == nil {
+			staged := filepath.Join(stageDir, targetBinary)
+			if err = sysos.WriteFile(staged, data, 0750); err == nil {
+				binaries = append(binaries, staged)
+			}
+		}
+	}
+	if err != nil {
+		return
+	}
+
+	for _, binary := range binaries {
+		remotePath := path.Join(targetDir, filepath.Base(binary))
+		if err = o.uploadBinary(exec, binary, remotePath); err != nil {
+			return
+		}
+	}
+
+	if err = o.runRemoteHooks(exec); err != nil {
+		return
+	}
+	o.Package.TargetDirectory = targetDir
+	return
+}
+
+func (o *installOption) getRemoteExecutor() (remote.Executor, error) {
+	if o.remoteExec != nil {
+		return o.remoteExec, nil
+	}
+	o.targetConfig = o.targetConfig.Normalize()
+	if err := o.targetConfig.Validate(); err != nil {
+		return nil, err
+	}
+	exec, err := remote.NewSSHExecutor(context.Background(), o.targetConfig)
+	if err != nil {
+		return nil, err
+	}
+	o.remoteExec = exec
+	return exec, nil
+}
+
+func (o *installOption) shouldInstallRemote(exec remote.Executor, targetDir string) (should, exist bool) {
+	binary := o.tool
+	if o.Package != nil && o.Package.TargetBinary != "" {
+		binary = o.Package.TargetBinary
+	}
+	if err := exec.Run("test -x "+remote.Quote(path.Join(targetDir, binary)), nil, io.Discard, io.Discard); err == nil {
+		exist = true
+	}
+	should = o.force || !exist
+	return
+}
+
+func (o *installOption) uploadBinary(exec remote.Executor, localPath, remotePath string) (err error) {
+	fmt.Println("install", localPath, "to", o.targetConfig.Host+":"+remotePath)
+	if err = exec.Run("mkdir -p "+remote.Quote(path.Dir(remotePath)), nil, sysos.Stdout, sysos.Stderr); err != nil {
+		return
+	}
+	if err = exec.Run("rm -f "+remote.Quote(remotePath), nil, sysos.Stdout, sysos.Stderr); err != nil {
+		return
+	}
+	if err = exec.Copy(localPath, remotePath); err != nil {
+		return
+	}
+	err = exec.Run("chmod u+x "+remote.Quote(remotePath), nil, sysos.Stdout, sysos.Stderr)
+	return
+}
+
+// remoteCmd joins a configured command with shell quoted arguments
+func remoteCmd(cmd installer.CmdWithArgs) string {
+	parts := []string{remote.Quote(cmd.Cmd)}
+	for _, arg := range cmd.Args {
+		parts = append(parts, remote.Quote(arg))
+	}
+	return strings.Join(parts, " ")
+}
+
+func (o *installOption) runRemoteHooks(exec remote.Executor) (err error) {
+	cfg := o.Package
+	if cfg == nil {
+		return
+	}
+	for _, cmds := range [][]installer.CmdWithArgs{cfg.PreInstalls, cfg.PostInstalls, cfg.TestInstalls} {
+		for i := range cmds {
+			if cmds[i].Cmd == "" {
+				continue
+			}
+			if err = exec.Run(remoteCmd(cmds[i]), nil, sysos.Stdout, sysos.Stderr); err != nil {
+				return
+			}
+		}
+	}
+	if cfg.Installation != nil && cfg.Installation.Cmd != "" {
+		if err = exec.Run(remoteCmd(*cfg.Installation), nil, sysos.Stdout, sysos.Stderr); err != nil {
+			return
+		}
+	}
+	for _, file := range cfg.DefaultConfigFile {
+		if file.OS != "" && file.OS != o.targetOS() {
+			continue
+		}
+		parent := path.Dir(file.Path)
+		if err = exec.Run("mkdir -p "+remote.Quote(parent)+" && cat > "+remote.Quote(file.Path),
+			strings.NewReader(file.Content), sysos.Stdout, sysos.Stderr); err != nil {
+			return
+		}
+	}
+	return
+}
+
 // recordInstall saves the installed tool into the record file
 func (o *installOption) recordInstall(native bool) (err error) {
-	targetDir := o.target
+	targetDir := o.resolveTargetDir()
 	pkg := o.Package
 	if pkg == nil {
 		pkg = &installer.HDConfig{}
-	}
-	if targetDir == "" {
-		targetDir = pkg.TargetDirectory
-	}
-	if targetDir == "" {
-		targetDir = "/usr/local/bin"
 	}
 
 	targetBinary := o.tool
@@ -270,7 +548,11 @@ func (o *installOption) recordInstall(native bool) (err error) {
 		installedVersion = pkg.Version
 	}
 
-	return installer.RecordInstalledPackage(installer.InstalledPackage{
+	sourceName := o.sourceName
+	if sourceName == source.All {
+		sourceName = source.HDHome
+	}
+	record := installer.InstalledPackage{
 		Name:            o.tool,
 		Org:             o.org,
 		Repo:            o.repo,
@@ -280,7 +562,27 @@ func (o *installOption) recordInstall(native bool) (err error) {
 		InstalledAt:     time.Now().Format(time.RFC3339),
 		FromSource:      o.fromSource,
 		Native:          native,
-	})
+		Source:          installer.SourceOfInstalled(sourceName),
+	}
+	if o.targetConfig.Mode == remote.ModeSSH {
+		record.Mode = remote.ModeSSH
+		record.Host = o.targetConfig.Host
+	}
+	return installer.RecordInstalledPackage(record)
+}
+
+func (o *installOption) recordNPMInstall() (err error) {
+	record := installer.InstalledPackage{
+		Name:        o.npmPackage,
+		Version:     o.npmVersion,
+		Source:      source.NPM,
+		InstalledAt: time.Now().Format(time.RFC3339),
+	}
+	if o.targetConfig.Mode == remote.ModeSSH {
+		record.Mode = remote.ModeSSH
+		record.Host = o.targetConfig.Host
+	}
+	return installer.RecordInstalledPackage(record)
 }
 
 func (o *installOption) runE(cmd *cobra.Command, args []string) (err error) {

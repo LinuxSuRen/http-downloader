@@ -10,6 +10,7 @@ import (
 
 	"github.com/linuxsuren/http-downloader/pkg/installer"
 	"github.com/linuxsuren/http-downloader/pkg/log"
+	"github.com/linuxsuren/http-downloader/pkg/source"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -46,6 +47,27 @@ func Test_search(t *testing.T) {
 
 	err = search("repo", true, &installer.FakeFetcher{ConfigDir: tempDir}, buf, logger)
 	assert.Nil(t, err)
+}
+
+func TestSearchFromLabelsHDHome(t *testing.T) {
+	tempDir := t.TempDir()
+	orgDir := path.Join(tempDir, "config", "fake-org")
+	assert.NoError(t, os.MkdirAll(orgDir, 0750))
+	assert.NoError(t, os.WriteFile(path.Join(orgDir, "fake-cli.yml"),
+		[]byte("name: fake-cli\n"), 0644))
+
+	buf := &bytes.Buffer{}
+	err := searchFrom(context.Background(), "fake-cli", false, source.HDHome,
+		&installer.FakeFetcher{ConfigDir: tempDir}, buf, log.GetLogger())
+	assert.NoError(t, err)
+	assert.Equal(t, "hd-home | fake-org/fake-cli\n", buf.String())
+}
+
+func TestSearchFromRejectsUnknownSource(t *testing.T) {
+	cmd := newSearchCmd(context.Background())
+	opt := &searchOption{Source: "unknown", fetcher: &installer.FakeFetcher{}}
+	err := opt.runE(cmd, []string{"fake"})
+	assert.ErrorContains(t, err, "unknown package source")
 }
 
 func Test_newSearchCmd(t *testing.T) {

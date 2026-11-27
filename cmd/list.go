@@ -50,7 +50,10 @@ func (o *listOption) runE(cmd *cobra.Command, args []string) (err error) {
 		_, _ = fmt.Fprintln(writer, "NAME\tVERSION\tSOURCE\tINSTALLED AT\tDIRECTORY")
 		for i := range tools {
 			tool := tools[i]
-			source := tool.Org + "/" + tool.Repo
+			source := installer.SourceOfInstalled(tool.Source)
+			if tool.Org != "" && tool.Repo != "" {
+				source = tool.Org + "/" + tool.Repo
+			}
 			if tool.Native {
 				source = "native"
 			} else if tool.FromSource {

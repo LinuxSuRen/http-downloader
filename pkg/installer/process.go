@@ -156,6 +156,44 @@ func (o *Installer) OverWriteBinary(sourceFile, targetPath string) (err error) {
 	return
 }
 
+// StagePackage extracts the wanted binaries into a local temporary
+// directory. Remote installs use it to prepare the files before uploading
+// them, without running any package hooks on the machine running hd.
+func StagePackage(archive, stageDir, binaryName string, additions []string) (binaries []string, err error) {
+	if err = os.MkdirAll(stageDir, 0750); err != nil {
+		return
+	}
+
+	stagedArchive := filepath.Join(stageDir, filepath.Base(archive))
+	var data []byte
+	if data, err = os.ReadFile(archive); err != nil {
+		return
+	}
+	if err = os.WriteFile(stagedArchive, data, 0600); err != nil {
+		return
+	}
+
+	compressor := compress.GetCompressor(path.Ext(stagedArchive), additions)
+	if compressor == nil {
+		err = fmt.Errorf("no compressor support for %s", stagedArchive)
+		return
+	}
+	if err = compressor.ExtractFiles(stagedArchive, binaryName); err != nil {
+		return
+	}
+
+	for _, name := range append([]string{binaryName}, additions...) {
+		candidate := filepath.Join(stageDir, filepath.Base(name))
+		if exists, _ := common.PathExists(candidate); exists {
+			binaries = append(binaries, candidate)
+		}
+	}
+	if len(binaries) == 0 {
+		err = fmt.Errorf("cannot find the binary %s in %s", binaryName, archive)
+	}
+	return
+}
+
 func (o *Installer) extractFiles(tarFile, targetName string) (err error) {
 	compressor := compress.GetCompressor(path.Ext(tarFile), o.AdditionBinaries)
 	if compressor == nil {

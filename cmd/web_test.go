@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,7 +18,11 @@ import (
 	"time"
 
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/linuxsuren/http-downloader/pkg/npmregistry"
+	"github.com/linuxsuren/http-downloader/pkg/remote"
+	"github.com/linuxsuren/http-downloader/pkg/source"
 	"github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,6 +46,11 @@ func setupWebServer(t *testing.T) (*httptest.Server, *webServer) {
 	assert.NoError(t, os.WriteFile(filepath.Join(tmpHome, "bin", "fake-cli"), []byte("bin"), 0750))
 
 	server := newWebServer(context.Background())
+	// the npm registry is an external service, keep the tests offline by
+	// default and let specific tests override this stub
+	server.searchNPM = func(context.Context, string, int) ([]npmregistry.Package, error) {
+		return nil, nil
+	}
 	httpServer := httptest.NewServer(server.routes())
 	t.Cleanup(httpServer.Close)
 	return httpServer, server
@@ -161,10 +172,15 @@ func TestWebSearch(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	searchResult := struct {
-		Data []string `json:"data"`
+		Data []source.Result `json:"data"`
 	}{}
 	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&searchResult))
-	assert.Contains(t, searchResult.Data, "fake-org/fake-cli")
+	assert.Contains(t, searchResult.Data, source.Result{
+		Source: source.HDHome,
+		Org:    "fake-org",
+		Repo:   "fake-cli",
+		Name:   "fake-cli",
+	})
 }
 
 func TestWebJobLogsSSE(t *testing.T) {
@@ -635,4 +651,351 @@ func homedirHome(t *testing.T) string {
 	home, err := homedir.Dir()
 	assert.NoError(t, err)
 	return home
+}
+
+func TestWebSettings(t *testing.T) {
+	resetViper(t)
+	httpServer, _ := setupWebServer(t)
+	client := httpServer.Client()
+
+	// the defaults are platform aware and always include the install mode
+	resp, err := client.Get(httpServer.URL + "/api/settings")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	settings := struct {
+		Data settingsInfo `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&settings))
+	assert.Empty(t, settings.Data.InstallDir)
+	assert.Equal(t, remote.ModeLocal, settings.Data.Mode)
+	assert.Equal(t, 22, settings.Data.SSHPort)
+
+	// update the shared config through the web console
+	body := `{"install_dir":"D:\\hd\\bin","mode":"ssh","ssh_host":"example.com",` +
+		`"ssh_port":2222,"ssh_user":"hd","ssh_password":"secret",` +
+		`"ssh_os":"linux","ssh_arch":"arm64"}`
+	req, err := http.NewRequest(http.MethodPut, httpServer.URL+"/api/settings", strings.NewReader(body))
+	assert.NoError(t, err)
+	resp, err = client.Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	resp, err = client.Get(httpServer.URL + "/api/settings")
+	assert.NoError(t, err)
+	settings = struct {
+		Data settingsInfo `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&settings))
+	assert.Equal(t, `D:\hd\bin`, settings.Data.InstallDir)
+	assert.Equal(t, remote.ModeSSH, settings.Data.Mode)
+	assert.Equal(t, "example.com", settings.Data.SSHHost)
+	assert.Equal(t, 2222, settings.Data.SSHPort)
+	assert.True(t, settings.Data.HasPassword)
+	// passwords are never returned by the API
+	data, err := os.ReadFile(filepath.Join(homedirHome(t), ".config", "hd.yaml"))
+	assert.NoError(t, err)
+	assert.Contains(t, string(data), "install-dir")
+}
+
+func TestWebSettingsRejectsInvalidMode(t *testing.T) {
+	resetViper(t)
+	httpServer, _ := setupWebServer(t)
+	client := httpServer.Client()
+
+	req, _ := http.NewRequest(http.MethodPut, httpServer.URL+"/api/settings",
+		strings.NewReader(`{"mode":"telnet"}`))
+	resp, err := client.Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestWebSearchSourceLabels(t *testing.T) {
+	httpServer, server := setupWebServer(t)
+	server.searchNPM = func(_ context.Context, keyword string, size int) ([]npmregistry.Package, error) {
+		assert.Equal(t, "fake", keyword)
+		return []npmregistry.Package{{
+			Name:        "fake-npm-pkg",
+			Version:     "1.2.3",
+			Description: "fake npm package",
+		}}, nil
+	}
+	client := httpServer.Client()
+
+	// all sources mixes hd-home configs with npm packages
+	cacheDir := filepath.Join(homedirHome(t), ".config", "hd-home", "config", "fake-org")
+	assert.NoError(t, os.MkdirAll(cacheDir, 0750))
+	assert.NoError(t, os.WriteFile(filepath.Join(cacheDir, "fake-cli.yml"),
+		[]byte("name: fake-cli\n"), 0644))
+
+	resp, err := client.Get(httpServer.URL + "/api/search?q=fake")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	result := struct {
+		Data []source.Result `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
+	assert.Contains(t, result.Data, source.Result{
+		Source: source.HDHome, Org: "fake-org", Repo: "fake-cli", Name: "fake-cli",
+	})
+	assert.Contains(t, result.Data, source.Result{
+		Source: source.NPM, Name: "fake-npm-pkg", Version: "1.2.3", Description: "fake npm package",
+	})
+
+	// the source filter is honoured
+	resp, err = client.Get(httpServer.URL + "/api/search?q=fake&source=npm")
+	assert.NoError(t, err)
+	result = struct {
+		Data []source.Result `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
+	assert.Len(t, result.Data, 1)
+	assert.Equal(t, source.NPM, result.Data[0].Source)
+
+	resp, err = client.Get(httpServer.URL + "/api/search?q=fake&source=unknown")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestWebPackagesSourceFilter(t *testing.T) {
+	httpServer, server := setupWebServer(t)
+	server.searchNPM = func(context.Context, string, int) ([]npmregistry.Package, error) {
+		return []npmregistry.Package{{Name: "fake-npm-pkg", Version: "1.0.0"}}, nil
+	}
+	client := httpServer.Client()
+
+	resp, err := client.Get(httpServer.URL + "/api/packages?source=npm&q=fake")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	packages := struct {
+		Data []packageItem `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&packages))
+	assert.Len(t, packages.Data, 1)
+	assert.Equal(t, source.NPM, packages.Data[0].Source)
+	assert.Equal(t, "fake-npm-pkg", packages.Data[0].Name)
+}
+
+func TestWebToolsInstallSource(t *testing.T) {
+	resetViper(t)
+	httpServer, server := setupWebServer(t)
+	client := httpServer.Client()
+
+	// an invalid source is rejected before a job is started
+	resp, err := client.Post(httpServer.URL+"/api/tools", "application/json",
+		strings.NewReader(`{"name":"fake","source":"unknown"}`))
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	// npm packages are accepted and labelled in the job, stub the executor
+	// so no real npm command runs
+	server.runJob = func(action, name string, _ func(*cobra.Command) error) *webJob {
+		return &webJob{ID: 1, Action: action, Tool: name, Status: jobSuccess}
+	}
+	resp, err = client.Post(httpServer.URL+"/api/tools", "application/json",
+		strings.NewReader(`{"name":"chalk","source":"npm"}`))
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusAccepted, resp.StatusCode)
+	job := webJob{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&job))
+	assert.Equal(t, "install", job.Action)
+	assert.Equal(t, "chalk", job.Tool)
+}
+
+// occupyPort binds a real port. The resulting errors come from the same
+// network stack as in production, which matters on Windows where the
+// Winsock error differs from syscall.EADDRINUSE.
+func occupyPort(t *testing.T) (int, string) {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	return listener.Addr().(*net.TCPAddr).Port, listener.Addr().String()
+}
+
+func TestListenWithDrift(t *testing.T) {
+	_, busyAddr := occupyPort(t)
+	free, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	t.Cleanup(func() { _ = free.Close() })
+
+	var requested []string
+	opt := &webOption{
+		Listen:            "127.0.0.1",
+		Port:              39000,
+		PortDrift:         true,
+		PortDriftAttempts: 4,
+		listen: func(network, address string) (net.Listener, error) {
+			assert.Equal(t, "tcp", network)
+			requested = append(requested, address)
+			if len(requested) < 3 {
+				return net.Listen(network, busyAddr)
+			}
+			return free, nil
+		},
+	}
+	listener, port, err := opt.listenWithDrift()
+	assert.NoError(t, err)
+	assert.Equal(t, 39002, port)
+	assert.Equal(t, free, listener)
+	assert.Equal(t, []string{
+		"127.0.0.1:39000", "127.0.0.1:39001", "127.0.0.1:39002",
+	}, requested)
+}
+
+func TestListenWithDriftDisabled(t *testing.T) {
+	_, busyAddr := occupyPort(t)
+	calls := 0
+	opt := &webOption{
+		Listen: "127.0.0.1",
+		Port:   39000,
+		listen: func(network, _ string) (net.Listener, error) {
+			calls++
+			return net.Listen(network, busyAddr)
+		},
+	}
+	_, _, err := opt.listenWithDrift()
+	assert.Error(t, err)
+	assert.True(t, isAddrInUse(err), "the real bind error must be recognized as an occupied port")
+	assert.Equal(t, 1, calls, "a disabled drift must not try other ports")
+}
+
+func TestListenWithDriftErrors(t *testing.T) {
+	t.Run("unrelated errors are not retried", func(t *testing.T) {
+		boom := errors.New("boom")
+		calls := 0
+		opt := &webOption{
+			Listen:    "127.0.0.1",
+			Port:      39000,
+			PortDrift: true,
+			listen: func(string, string) (net.Listener, error) {
+				calls++
+				return nil, boom
+			},
+		}
+		_, _, err := opt.listenWithDrift()
+		assert.ErrorIs(t, err, boom)
+		assert.Equal(t, 1, calls)
+	})
+
+	t.Run("all ports busy", func(t *testing.T) {
+		_, busyAddr := occupyPort(t)
+		opt := &webOption{
+			Listen:            "127.0.0.1",
+			Port:              39000,
+			PortDrift:         true,
+			PortDriftAttempts: 2,
+			listen: func(network, _ string) (net.Listener, error) {
+				return net.Listen(network, busyAddr)
+			},
+		}
+		_, _, err := opt.listenWithDrift()
+		assert.ErrorContains(t, err, "no available port in range 39000-39001")
+	})
+
+	t.Run("invalid port", func(t *testing.T) {
+		opt := &webOption{Listen: "127.0.0.1", Port: 0}
+		_, _, err := opt.listenWithDrift()
+		assert.ErrorContains(t, err, "invalid port")
+	})
+
+	t.Run("invalid attempt count falls back to a single try", func(t *testing.T) {
+		_, busyAddr := occupyPort(t)
+		calls := 0
+		opt := &webOption{
+			Listen:            "127.0.0.1",
+			Port:              39000,
+			PortDrift:         true,
+			PortDriftAttempts: -1,
+			listen: func(network, _ string) (net.Listener, error) {
+				calls++
+				return net.Listen(network, busyAddr)
+			},
+		}
+		_, _, err := opt.listenWithDrift()
+		assert.Error(t, err)
+		assert.Equal(t, 1, calls)
+	})
+}
+
+func TestWebCmdPortDrift(t *testing.T) {
+	_, busyAddr := occupyPort(t)
+	free, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	t.Cleanup(func() { _ = free.Close() })
+
+	server := newWebServer(context.Background())
+	var served *http.Server
+	opt := &webOption{
+		Listen:            "127.0.0.1",
+		Port:              39000,
+		PortDrift:         true,
+		PortDriftAttempts: 2,
+		server:            server,
+		listen: func(network, address string) (net.Listener, error) {
+			if address == "127.0.0.1:39000" {
+				return net.Listen(network, busyAddr)
+			}
+			return free, nil
+		},
+		serve: func(s *http.Server, _ net.Listener) error {
+			served = s
+			return nil
+		},
+	}
+	cmd := &cobra.Command{}
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	assert.NoError(t, opt.runE(cmd, nil))
+	assert.Equal(t, 39001, server.selfPort, "the console must not detect itself as a tool")
+	assert.Contains(t, buf.String(), "port 39000 is in use, drifting to 39001")
+	assert.Contains(t, buf.String(), "web server is running at http://")
+	assert.NotNil(t, served)
+	assert.NotZero(t, served.ReadHeaderTimeout)
+}
+
+func TestWebCmdPortDriftWithRealSockets(t *testing.T) {
+	busyPort, _ := occupyPort(t)
+	if busyPort > maxTCPPort-10 {
+		t.Skip("not enough ports left above the occupied one")
+	}
+
+	server := newWebServer(context.Background())
+	served := false
+	opt := &webOption{
+		Listen:            "127.0.0.1",
+		Port:              busyPort,
+		PortDrift:         true,
+		PortDriftAttempts: 10,
+		server:            server,
+		serve: func(*http.Server, net.Listener) error {
+			served = true
+			return nil
+		},
+	}
+	cmd := &cobra.Command{}
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	assert.NoError(t, opt.runE(cmd, nil))
+	assert.Greater(t, server.selfPort, busyPort)
+	assert.LessOrEqual(t, server.selfPort, busyPort+9)
+	assert.Contains(t, buf.String(),
+		fmt.Sprintf("port %d is in use, drifting to %d", busyPort, server.selfPort))
+	assert.True(t, served)
+}
+
+func TestNewWebCmdPortDriftFlags(t *testing.T) {
+	cmd := newWebCmd(context.Background())
+	for _, name := range []string{"port-drift", "port-drift-attempts"} {
+		assert.NotNil(t, cmd.Flags().Lookup(name), name)
+	}
+	assert.Equal(t, "true", cmd.Flags().Lookup("port-drift").DefValue)
+	assert.Equal(t, "100", cmd.Flags().Lookup("port-drift-attempts").DefValue)
+}
+
+func TestWebDefaultViewIsCards(t *testing.T) {
+	html := string(webIndexHTML)
+	assert.Contains(t, html, "return 'cards';")
+	assert.NotContains(t, html, "window.innerWidth < 1024 ? 'cards' : 'table'")
 }

@@ -8,6 +8,7 @@ import (
 
 	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/linuxsuren/http-downloader/pkg/source"
 	"github.com/spf13/cobra"
 )
 
@@ -45,6 +46,18 @@ func (o *removeOption) runE(cmd *cobra.Command, args []string) (err error) {
 
 		if o.keepRecord {
 			cmd.Printf("removed record of %s\n", name)
+			continue
+		}
+
+		if tool.Source == source.NPM {
+			if npmErr := uninstallNPMPackage(tool, o.execer); npmErr != nil {
+				cmd.Printf("cannot uninstall the npm package %s, error: %v\n", name, npmErr)
+				if err == nil {
+					err = npmErr
+				}
+			} else {
+				cmd.Printf("uninstalled npm package %s\n", name)
+			}
 			continue
 		}
 

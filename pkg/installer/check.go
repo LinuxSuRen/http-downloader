@@ -45,7 +45,7 @@ func (o *Installer) CheckDepAndInstall(tools map[string]string) (err error) {
 		o.Arch = o.Execer.Arch()
 	}
 	if o.TargetDirectory == "" {
-		o.TargetDirectory = "/usr/local/bin"
+		o.TargetDirectory = ResolveInstallDir("", "", o.OS)
 	}
 
 	for tool, formula := range tools {

@@ -6,7 +6,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/linuxsuren/http-downloader/docs"
@@ -42,28 +44,84 @@ func newWebCmd(ctx context.Context) (cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.StringVarP(&opt.Listen, "listen", "", "127.0.0.1", "The address to listen on")
 	flags.IntVarP(&opt.Port, "port", "p", 8080, "The port to listen on")
+	flags.BoolVar(&opt.PortDrift, "port-drift", true, "Try the next ports when the requested port is already in use")
+	flags.IntVar(&opt.PortDriftAttempts, "port-drift-attempts", 100, "How many consecutive ports to try when port drift is enabled")
 	return
 }
 
+const maxTCPPort = 65535
+
 type webOption struct {
-	Listen string
-	Port   int
-	server *webServer
+	Listen            string
+	Port              int
+	PortDrift         bool
+	PortDriftAttempts int
+	server            *webServer
+
+	// listen and serve are replaceable so the port selection can be
+	// tested without occupying real ports or starting the console
+	listen func(network, address string) (net.Listener, error)
+	serve  func(*http.Server, net.Listener) error
+}
+
+// listenWithDrift binds the requested port, moving on to the following
+// ports when one is already occupied. Binding directly (instead of
+// checking and then listening) avoids a race with other processes.
+func (o *webOption) listenWithDrift() (listener net.Listener, actualPort int, err error) {
+	if o.Port < 1 || o.Port > maxTCPPort {
+		return nil, 0, fmt.Errorf("invalid port: %d", o.Port)
+	}
+
+	attempts := o.PortDriftAttempts
+	if attempts < 1 {
+		attempts = 1
+	}
+	if o.Port+attempts-1 > maxTCPPort {
+		attempts = maxTCPPort - o.Port + 1
+	}
+
+	listen := o.listen
+	if listen == nil {
+		listen = net.Listen
+	}
+
+	lastPort := o.Port
+	for i := 0; i < attempts; i++ {
+		lastPort = o.Port + i
+		listener, err = listen("tcp", net.JoinHostPort(o.Listen, strconv.Itoa(lastPort)))
+		if err == nil {
+			return listener, lastPort, nil
+		}
+		if !o.PortDrift || !isAddrInUse(err) {
+			return nil, 0, err
+		}
+	}
+
+	return nil, 0, fmt.Errorf("no available port in range %d-%d: %w", o.Port, lastPort, err)
 }
 
 func (o *webOption) runE(cmd *cobra.Command, args []string) (err error) {
-	addr := fmt.Sprintf("%s:%d", o.Listen, o.Port)
-	cmd.Printf("web server is running at http://%s\n", addr)
+	listener, actualPort, err := o.listenWithDrift()
+	if err != nil {
+		return err
+	}
+	if actualPort != o.Port {
+		cmd.Printf("port %d is in use, drifting to %d\n", o.Port, actualPort)
+	}
+	cmd.Printf("web server is running at http://%s\n", listener.Addr().String())
 	// the web service detection must not report the console itself as the
-	// endpoint of a started tool
-	o.server.selfPort = o.Port
+	// endpoint of a started tool; it must use the port we ended up with
+	o.server.selfPort = actualPort
 	// use an explicit http.Server so that timeouts are always set
 	server := &http.Server{
-		Addr:              addr,
 		Handler:           o.server.routes(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	err = server.ListenAndServe()
+	serve := o.serve
+	if serve == nil {
+		serve = (*http.Server).Serve
+	}
+	err = serve(server, listener)
 	return
 }
 
@@ -73,6 +131,9 @@ type toolItem struct {
 	Version     string `json:"version"`
 	Org         string `json:"org,omitempty"`
 	Repo        string `json:"repo,omitempty"`
+	Source      string `json:"source,omitempty"`
+	Mode        string `json:"mode,omitempty"`
+	Host        string `json:"host,omitempty"`
 	InstalledAt string `json:"installed_at,omitempty"`
 	Directory   string `json:"directory,omitempty"`
 	Upgradable  bool   `json:"upgradable"`

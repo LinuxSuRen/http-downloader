@@ -3,12 +3,16 @@ package cmd
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"sync"
 	"testing"
 
 	cotesting "github.com/linuxsuren/cobra-extension/pkg/testing"
 	fakeruntime "github.com/linuxsuren/go-fake-runtime"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/linuxsuren/http-downloader/pkg/remote"
+	"github.com/linuxsuren/http-downloader/pkg/source"
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
@@ -227,4 +231,169 @@ func TestGetDefaultInstallDir(t *testing.T) {
 			assert.Equal(t, tt.expect, result)
 		})
 	}
+}
+
+func TestGetDefaultInstallDirWithBash(t *testing.T) {
+	opt := &installOption{execer: &fakeruntime.FakeExecer{
+		ExpectOS: "windows",
+		Env:      map[string]string{"SHELL": "/usr/bin/bash"},
+	}}
+	assert.Equal(t, "/usr/bin", opt.getDefaultInstallDir())
+}
+
+func TestResolveTargetDir(t *testing.T) {
+	t.Run("local uses the machine platform", func(t *testing.T) {
+		opt := &installOption{
+			downloadOption: &downloadOption{},
+			execer:         &fakeruntime.FakeExecer{ExpectOS: "windows"},
+			target:         "",
+		}
+		assert.Equal(t, installer.WindowsBinDir, opt.resolveTargetDir())
+	})
+
+	t.Run("remote uses the target platform", func(t *testing.T) {
+		opt := &installOption{
+			downloadOption: &downloadOption{},
+			execer:         &fakeruntime.FakeExecer{ExpectOS: "windows"},
+			targetConfig:   remote.Config{Mode: remote.ModeSSH, OS: "linux"},
+			target:         "",
+		}
+		assert.Equal(t, installer.UnixBinDir, opt.resolveTargetDir())
+	})
+
+	t.Run("flag wins", func(t *testing.T) {
+		opt := &installOption{
+			downloadOption: &downloadOption{},
+			execer:         &fakeruntime.FakeExecer{ExpectOS: "windows"},
+			target:         "D:\\tools",
+		}
+		assert.Equal(t, "D:\\tools", opt.resolveTargetDir())
+	})
+
+	t.Run("package config wins over platform but not the flag", func(t *testing.T) {
+		opt := &installOption{
+			execer: &fakeruntime.FakeExecer{ExpectOS: "windows"},
+			target: "",
+			downloadOption: &downloadOption{
+				Package: &installer.HDConfig{TargetDirectory: "/opt/tools"},
+			},
+		}
+		assert.Equal(t, "/opt/tools", opt.resolveTargetDir())
+	})
+}
+
+func TestSplitPackageVersion(t *testing.T) {
+	pkg, ver := splitPackageVersion("typescript")
+	assert.Equal(t, "typescript", pkg)
+	assert.Empty(t, ver)
+
+	pkg, ver = splitPackageVersion("typescript@5.3.0")
+	assert.Equal(t, "typescript", pkg)
+	assert.Equal(t, "5.3.0", ver)
+
+	// scoped packages keep their scope
+	pkg, ver = splitPackageVersion("@types/node@18.0.0")
+	assert.Equal(t, "@types/node", pkg)
+	assert.Equal(t, "18.0.0", ver)
+}
+
+func TestInstallNPM(t *testing.T) {
+	home := t.TempDir()
+	oldCache := homedir.DisableCache
+	homedir.DisableCache = true
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Cleanup(func() { homedir.DisableCache = oldCache })
+
+	opt := &installOption{
+		downloadOption: &downloadOption{},
+		execer:         &fakeruntime.FakeExecer{},
+		npmPackage:     "chalk",
+		npmVersion:     "5.3.0",
+		sourceName:     source.NPM,
+	}
+	assert.NoError(t, opt.install(&cobra.Command{}, []string{"chalk"}))
+
+	tool, _ := installer.FindInstalledPackage("chalk")
+	assert.NotNil(t, tool)
+	assert.Equal(t, source.NPM, tool.Source)
+	assert.Equal(t, "5.3.0", tool.Version)
+}
+
+func TestInstallPreRunESources(t *testing.T) {
+	t.Run("unknown source", func(t *testing.T) {
+		opt := &installOption{
+			downloadOption: &downloadOption{},
+			sourceName:     "unknown",
+		}
+		err := opt.preRunE(&cobra.Command{}, []string{"fake"})
+		assert.ErrorContains(t, err, "unknown package source")
+	})
+
+	t.Run("npm does not need a config cache", func(t *testing.T) {
+		opt := &installOption{
+			downloadOption: &downloadOption{},
+			sourceName:     source.NPM,
+		}
+		err := opt.preRunE(&cobra.Command{}, []string{"chalk@5.3.0"})
+		assert.NoError(t, err)
+		assert.Equal(t, "chalk", opt.npmPackage)
+		assert.Equal(t, "5.3.0", opt.npmVersion)
+	})
+
+	t.Run("ssh requires a host", func(t *testing.T) {
+		opt := &installOption{
+			downloadOption: &downloadOption{},
+			sourceName:     source.HDHome,
+			targetConfig:   remote.Config{Mode: remote.ModeSSH},
+		}
+		err := opt.preRunE(&cobra.Command{}, []string{"fake"})
+		assert.ErrorContains(t, err, "host is required")
+	})
+
+	t.Run("ssh selects the target platform", func(t *testing.T) {
+		opt := &installOption{
+			downloadOption: &downloadOption{},
+			sourceName:     source.NPM,
+			execer:         &fakeruntime.FakeExecer{ExpectOS: "windows"},
+			targetConfig: remote.Config{
+				Mode:     remote.ModeSSH,
+				Host:     "example.com",
+				Password: "secret",
+				OS:       "linux",
+				Arch:     "arm64",
+			},
+		}
+		assert.NoError(t, opt.preRunE(&cobra.Command{}, []string{"chalk"}))
+		assert.Equal(t, "linux", opt.OS)
+		assert.Equal(t, "arm64", opt.Arch)
+	})
+}
+
+func TestRecordInstallRemote(t *testing.T) {
+	home := t.TempDir()
+	oldCache := homedir.DisableCache
+	homedir.DisableCache = true
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Cleanup(func() { homedir.DisableCache = oldCache })
+
+	target := filepath.Join(home, "bin")
+	opt := &installOption{
+		downloadOption: &downloadOption{},
+		tool:           "fake-cli",
+		target:         target,
+		sourceName:     source.HDHome,
+		targetConfig: remote.Config{
+			Mode: remote.ModeSSH,
+			Host: "example.com",
+		},
+	}
+	assert.NoError(t, opt.recordInstall(false))
+
+	tool, _ := installer.FindInstalledPackage("fake-cli")
+	assert.NotNil(t, tool)
+	assert.Equal(t, remote.ModeSSH, tool.Mode)
+	assert.Equal(t, "example.com", tool.Host)
+	assert.Equal(t, source.HDHome, tool.Source)
 }

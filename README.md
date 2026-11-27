@@ -66,6 +66,29 @@ or install by a category name:
 hd install --category security
 ```
 
+The default install directory follows the target platform (`/usr/local/bin` on Linux/macOS, a user writable directory on Windows). You can change it once, for both the CLI and the web console, with:
+
+```shell
+hd setup --install-dir /opt/hd/bin
+```
+
+Use `--target` to override the directory for a single install.
+
+Packages can come from different registries. npm packages are installed globally with `npm`:
+
+```shell
+hd install --source npm chalk
+hd install --source native git
+```
+
+By default the tool is installed on the local machine. Use `--mode ssh` to install the binaries on a remote Linux server over SSH (password, private key or `SSH_AUTH_SOCK` are supported):
+
+```shell
+hd install --mode ssh --ssh-host 10.0.0.1 --ssh-user root --ssh-key ~/.ssh/id_rsa jcli
+```
+
+These settings can also be persisted in `~/.config/hd.yaml` with `hd setup --mode ssh --ssh-host ...` or from the web console.
+
 ## Search
 hd can download or install via the format of `$org/$repo`. If you find that it's not working. It might because of there's 
 no record in [hd-home](https://github.com/LinuxSuRen/hd-home). You're welcome to help us to maintain it.
@@ -73,6 +96,14 @@ no record in [hd-home](https://github.com/LinuxSuRen/hd-home). You're welcome to
 When you first run it, please init via: `hd fetch`
 
 then you can search it by a keyword: `hd search jenkins`
+
+Search covers hd-home, npm and the native package managers. Results are labelled with their source and can be filtered:
+
+```shell
+hd search --source npm chalk
+hd search --source hd-home jcli
+hd search --source all fake
+```
 
 ## Manage the installed tools
 Every tool installed via `hd install` is recorded into `~/.config/hd-installed.yaml`. You can manage them with the following commands:
@@ -105,12 +136,15 @@ Use the browser as the central entry of your tools:
 hd web
 ```
 
+If the port is already in use, `hd web` automatically drifts to the next free port (up to 100 consecutive ports) and prints the actual address. Pass `--port-drift=false` to fail instead, or `--port-drift-attempts N` to change the number of ports tried.
+
 Then open http://127.0.0.1:8080, you can:
 
 * see all the tools in one list, installed and not-installed ones together, the green badge tells them apart and the list sorts by name in both directions
-* search the packages or browse them by category, shown as a table or as cards
+* search the packages or browse them by category, shown as cards by default (table view is one click away), with a source selector for hd-home, npm and native packages
 * install a package with any release version, which also covers upgrades and downgrades
 * pick a GitHub acceleration proxy for the downloads, the candidates come from your hd config and from hd-home, a custom address also works
+* change the default install directory and switch between local and SSH installs in Settings; the settings are shared with the CLI through `~/.config/hd.yaml`
 * open an installed tool in a new terminal window
 * open the link of a web tool directly, packages can declare their entry link with the `homepage` field in [hd-home](https://github.com/LinuxSuRen/hd-home)
 
