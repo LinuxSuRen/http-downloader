@@ -16,7 +16,11 @@ import (
 	"time"
 
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/linuxsuren/http-downloader/pkg/npmregistry"
+	"github.com/linuxsuren/http-downloader/pkg/remote"
+	"github.com/linuxsuren/http-downloader/pkg/source"
 	"github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,6 +44,11 @@ func setupWebServer(t *testing.T) (*httptest.Server, *webServer) {
 	assert.NoError(t, os.WriteFile(filepath.Join(tmpHome, "bin", "fake-cli"), []byte("bin"), 0750))
 
 	server := newWebServer(context.Background())
+	// the npm registry is an external service, keep the tests offline by
+	// default and let specific tests override this stub
+	server.searchNPM = func(context.Context, string, int) ([]npmregistry.Package, error) {
+		return nil, nil
+	}
 	httpServer := httptest.NewServer(server.routes())
 	t.Cleanup(httpServer.Close)
 	return httpServer, server
@@ -161,10 +170,15 @@ func TestWebSearch(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	searchResult := struct {
-		Data []string `json:"data"`
+		Data []source.Result `json:"data"`
 	}{}
 	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&searchResult))
-	assert.Contains(t, searchResult.Data, "fake-org/fake-cli")
+	assert.Contains(t, searchResult.Data, source.Result{
+		Source: source.HDHome,
+		Org:    "fake-org",
+		Repo:   "fake-cli",
+		Name:   "fake-cli",
+	})
 }
 
 func TestWebJobLogsSSE(t *testing.T) {
@@ -635,4 +649,152 @@ func homedirHome(t *testing.T) string {
 	home, err := homedir.Dir()
 	assert.NoError(t, err)
 	return home
+}
+
+func TestWebSettings(t *testing.T) {
+	resetViper(t)
+	httpServer, _ := setupWebServer(t)
+	client := httpServer.Client()
+
+	// the defaults are platform aware and always include the install mode
+	resp, err := client.Get(httpServer.URL + "/api/settings")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	settings := struct {
+		Data settingsInfo `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&settings))
+	assert.Empty(t, settings.Data.InstallDir)
+	assert.Equal(t, remote.ModeLocal, settings.Data.Mode)
+	assert.Equal(t, 22, settings.Data.SSHPort)
+
+	// update the shared config through the web console
+	body := `{"install_dir":"D:\\hd\\bin","mode":"ssh","ssh_host":"example.com",` +
+		`"ssh_port":2222,"ssh_user":"hd","ssh_password":"secret",` +
+		`"ssh_os":"linux","ssh_arch":"arm64"}`
+	req, err := http.NewRequest(http.MethodPut, httpServer.URL+"/api/settings", strings.NewReader(body))
+	assert.NoError(t, err)
+	resp, err = client.Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	resp, err = client.Get(httpServer.URL + "/api/settings")
+	assert.NoError(t, err)
+	settings = struct {
+		Data settingsInfo `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&settings))
+	assert.Equal(t, `D:\hd\bin`, settings.Data.InstallDir)
+	assert.Equal(t, remote.ModeSSH, settings.Data.Mode)
+	assert.Equal(t, "example.com", settings.Data.SSHHost)
+	assert.Equal(t, 2222, settings.Data.SSHPort)
+	assert.True(t, settings.Data.HasPassword)
+	// passwords are never returned by the API
+	data, err := os.ReadFile(filepath.Join(homedirHome(t), ".config", "hd.yaml"))
+	assert.NoError(t, err)
+	assert.Contains(t, string(data), "install-dir")
+}
+
+func TestWebSettingsRejectsInvalidMode(t *testing.T) {
+	resetViper(t)
+	httpServer, _ := setupWebServer(t)
+	client := httpServer.Client()
+
+	req, _ := http.NewRequest(http.MethodPut, httpServer.URL+"/api/settings",
+		strings.NewReader(`{"mode":"telnet"}`))
+	resp, err := client.Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestWebSearchSourceLabels(t *testing.T) {
+	httpServer, server := setupWebServer(t)
+	server.searchNPM = func(_ context.Context, keyword string, size int) ([]npmregistry.Package, error) {
+		assert.Equal(t, "fake", keyword)
+		return []npmregistry.Package{{
+			Name:        "fake-npm-pkg",
+			Version:     "1.2.3",
+			Description: "fake npm package",
+		}}, nil
+	}
+	client := httpServer.Client()
+
+	// all sources mixes hd-home configs with npm packages
+	cacheDir := filepath.Join(homedirHome(t), ".config", "hd-home", "config", "fake-org")
+	assert.NoError(t, os.MkdirAll(cacheDir, 0750))
+	assert.NoError(t, os.WriteFile(filepath.Join(cacheDir, "fake-cli.yml"),
+		[]byte("name: fake-cli\n"), 0644))
+
+	resp, err := client.Get(httpServer.URL + "/api/search?q=fake")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	result := struct {
+		Data []source.Result `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
+	assert.Contains(t, result.Data, source.Result{
+		Source: source.HDHome, Org: "fake-org", Repo: "fake-cli", Name: "fake-cli",
+	})
+	assert.Contains(t, result.Data, source.Result{
+		Source: source.NPM, Name: "fake-npm-pkg", Version: "1.2.3", Description: "fake npm package",
+	})
+
+	// the source filter is honoured
+	resp, err = client.Get(httpServer.URL + "/api/search?q=fake&source=npm")
+	assert.NoError(t, err)
+	result = struct {
+		Data []source.Result `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
+	assert.Len(t, result.Data, 1)
+	assert.Equal(t, source.NPM, result.Data[0].Source)
+
+	resp, err = client.Get(httpServer.URL + "/api/search?q=fake&source=unknown")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestWebPackagesSourceFilter(t *testing.T) {
+	httpServer, server := setupWebServer(t)
+	server.searchNPM = func(context.Context, string, int) ([]npmregistry.Package, error) {
+		return []npmregistry.Package{{Name: "fake-npm-pkg", Version: "1.0.0"}}, nil
+	}
+	client := httpServer.Client()
+
+	resp, err := client.Get(httpServer.URL + "/api/packages?source=npm&q=fake")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	packages := struct {
+		Data []packageItem `json:"data"`
+	}{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&packages))
+	assert.Len(t, packages.Data, 1)
+	assert.Equal(t, source.NPM, packages.Data[0].Source)
+	assert.Equal(t, "fake-npm-pkg", packages.Data[0].Name)
+}
+
+func TestWebToolsInstallSource(t *testing.T) {
+	resetViper(t)
+	httpServer, server := setupWebServer(t)
+	client := httpServer.Client()
+
+	// an invalid source is rejected before a job is started
+	resp, err := client.Post(httpServer.URL+"/api/tools", "application/json",
+		strings.NewReader(`{"name":"fake","source":"unknown"}`))
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	// npm packages are accepted and labelled in the job, stub the executor
+	// so no real npm command runs
+	server.runJob = func(action, name string, _ func(*cobra.Command) error) *webJob {
+		return &webJob{ID: 1, Action: action, Tool: name, Status: jobSuccess}
+	}
+	resp, err = client.Post(httpServer.URL+"/api/tools", "application/json",
+		strings.NewReader(`{"name":"chalk","source":"npm"}`))
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusAccepted, resp.StatusCode)
+	job := webJob{}
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&job))
+	assert.Equal(t, "install", job.Action)
+	assert.Equal(t, "chalk", job.Tool)
 }

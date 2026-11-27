@@ -21,6 +21,9 @@ import (
 	hdpkg "github.com/linuxsuren/http-downloader/pkg"
 	"github.com/linuxsuren/http-downloader/pkg/common"
 	"github.com/linuxsuren/http-downloader/pkg/installer"
+	"github.com/linuxsuren/http-downloader/pkg/npmregistry"
+	"github.com/linuxsuren/http-downloader/pkg/remote"
+	"github.com/linuxsuren/http-downloader/pkg/source"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -79,6 +82,11 @@ type webServer struct {
 	listVersions func(org, repo string, count int) ([]versionTag, error)
 	probeWeb     func(pid int) (url string, ok bool)
 	buildCommand func(binPath string, args []string) *exec.Cmd
+	// searchNPM is replaceable so the web tests do not need network access
+	searchNPM func(ctx context.Context, keyword string, size int) ([]npmregistry.Package, error)
+	// runJob is replaceable so the install API can be tested without
+	// performing a real download or npm install
+	runJob func(action, name string, fn func(stub *cobra.Command) error) *webJob
 }
 
 func newWebServer(ctx context.Context) *webServer {
@@ -91,6 +99,9 @@ func newWebServer(ctx context.Context) *webServer {
 	}
 	server.listVersions = listGitHubVersions
 	server.probeWeb = server.detectWebURL
+	server.searchNPM = func(ctx context.Context, keyword string, size int) ([]npmregistry.Package, error) {
+		return npmregistry.Search(ctx, keyword, size, nil, npmregistry.DefaultBaseURL)
+	}
 	server.buildCommand = func(binPath string, args []string) *exec.Cmd {
 		// #nosec G702 -- the path points to an existing binary of the
 		// local install record, the console binds to 127.0.0.1 only
@@ -112,6 +123,7 @@ func (s *webServer) routes() http.Handler {
 	mux.HandleFunc("/api/packages", s.handlePackages)
 	mux.HandleFunc("/api/packages/", s.handlePackageVersions)
 	mux.HandleFunc("/api/proxy", s.handleProxy)
+	mux.HandleFunc("/api/settings", s.handleSettings)
 	mux.HandleFunc("/api/processes", s.handleProcesses)
 	mux.HandleFunc("/api/processes/", s.handleProcesses)
 	return mux
@@ -128,33 +140,44 @@ func (s *webServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/tools returns the installed tools
-// POST /api/tools {"name":"jcli","version":"v1.2.3","proxy":"gh.api...","force":true}
+// POST /api/tools {"name":"jcli","version":"v1.2.3","proxy":"gh.api...","force":true,"source":"hd-home"}
 // starts an install job, the optional version pins the release tag, so it
 // also covers upgrades and downgrades, the optional proxy downloads the
-// release through a GitHub acceleration proxy
+// release through a GitHub acceleration proxy. source selects hd-home, npm
+// or a native package, ssh_password can be supplied for a one-off SSH target.
 func (s *webServer) handleTools(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]interface{}{"data": s.loadTools()})
 	case http.MethodPost:
 		var req struct {
-			Name    string `json:"name"`
-			Version string `json:"version"`
-			Proxy   string `json:"proxy"`
-			Force   bool   `json:"force"`
+			Name        string `json:"name"`
+			Version     string `json:"version"`
+			Proxy       string `json:"proxy"`
+			Force       bool   `json:"force"`
+			Source      string `json:"source"`
+			SSHPassword string `json:"ssh_password"`
 		}
 		if err := decodeJSON(r, &req); err != nil || strings.TrimSpace(req.Name) == "" {
 			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "please provide the tool name")
 			return
 		}
+		sourceName := strings.TrimSpace(req.Source)
+		if sourceName == "" {
+			sourceName = source.HDHome
+		}
+		if !source.Known(sourceName) || sourceName == source.All {
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid package source")
+			return
+		}
 		version := strings.TrimSpace(req.Version)
 		proxy := strings.TrimSpace(req.Proxy)
 		target := strings.TrimSpace(req.Name)
-		if version != "" && !strings.Contains(target, "@") {
+		if version != "" && sourceName == source.HDHome && !strings.Contains(target, "@") {
 			target = fmt.Sprintf("%s@%s", target, version)
 		}
 		job := s.startJob("install", req.Name, func(stub *cobra.Command) error {
-			return s.installTool(stub, target, version, proxy, req.Force)
+			return s.installTool(stub, target, version, proxy, req.Force, sourceName, req.SSHPassword)
 		})
 		writeJSON(w, http.StatusAccepted, job)
 	default:
@@ -185,7 +208,111 @@ func (s *webServer) handleProxy(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GET /api/search?q=keyword searches the installable packages from hd-home
+// settingsInfo is the API view of the default install settings. The SSH
+// password is never returned, only a flag telling whether one is configured.
+type settingsInfo struct {
+	InstallDir  string `json:"install_dir"`
+	Mode        string `json:"mode"`
+	SSHHost     string `json:"ssh_host"`
+	SSHPort     int    `json:"ssh_port"`
+	SSHUser     string `json:"ssh_user"`
+	SSHKey      string `json:"ssh_key"`
+	SSHOS       string `json:"ssh_os"`
+	SSHArch     string `json:"ssh_arch"`
+	HasPassword bool   `json:"has_password"`
+}
+
+func currentSettings() settingsInfo {
+	cfg := loadRemoteConfig()
+	return settingsInfo{
+		InstallDir:  configuredInstallDir(),
+		Mode:        cfg.Mode,
+		SSHHost:     cfg.Host,
+		SSHPort:     cfg.Port,
+		SSHUser:     cfg.User,
+		SSHKey:      cfg.KeyFile,
+		SSHOS:       cfg.OS,
+		SSHArch:     cfg.Arch,
+		HasPassword: cfg.Password != "",
+	}
+}
+
+// GET /api/settings returns the install defaults, PUT updates hd.yaml
+func (s *webServer) handleSettings(w http.ResponseWriter, r *http.Request) {
+	v := viper.GetViper()
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]interface{}{"data": currentSettings()})
+	case http.MethodPut:
+		var req struct {
+			InstallDir  *string `json:"install_dir"`
+			Mode        *string `json:"mode"`
+			SSHHost     *string `json:"ssh_host"`
+			SSHPort     *int    `json:"ssh_port"`
+			SSHUser     *string `json:"ssh_user"`
+			SSHPassword *string `json:"ssh_password"`
+			SSHKey      *string `json:"ssh_key"`
+			SSHOS       *string `json:"ssh_os"`
+			SSHArch     *string `json:"ssh_arch"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "cannot parse the settings")
+			return
+		}
+		if req.InstallDir != nil {
+			v.Set(keyInstallDir, strings.TrimSpace(*req.InstallDir))
+		}
+		cfg := loadRemoteConfig()
+		if req.Mode != nil {
+			cfg.Mode = strings.TrimSpace(*req.Mode)
+		}
+		if req.SSHHost != nil {
+			cfg.Host = strings.TrimSpace(*req.SSHHost)
+		}
+		if req.SSHPort != nil {
+			cfg.Port = *req.SSHPort
+		}
+		if req.SSHUser != nil {
+			cfg.User = strings.TrimSpace(*req.SSHUser)
+		}
+		if req.SSHPassword != nil {
+			cfg.Password = *req.SSHPassword
+		}
+		if req.SSHKey != nil {
+			cfg.KeyFile = strings.TrimSpace(*req.SSHKey)
+		}
+		if req.SSHOS != nil {
+			cfg.OS = strings.TrimSpace(*req.SSHOS)
+		}
+		if req.SSHArch != nil {
+			cfg.Arch = strings.TrimSpace(*req.SSHArch)
+		}
+		cfg = cfg.Normalize()
+		if cfg.Mode != remote.ModeLocal && cfg.Mode != remote.ModeSSH {
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid install mode")
+			return
+		}
+		if cfg.Mode == remote.ModeSSH {
+			if err := cfg.Validate(); err != nil {
+				writeError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+				return
+			}
+		}
+		saveRemoteConfig(cfg)
+		path, err := writeHDConfig(v)
+		if err != nil {
+			log.Printf("cannot save the settings: %v", err)
+			writeError(w, http.StatusInternalServerError, "SETTINGS_FAILED", "failed to save the settings")
+			return
+		}
+		log.Println("settings saved into", path)
+		writeJSON(w, http.StatusOK, map[string]interface{}{"data": currentSettings()})
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET and PUT are supported")
+	}
+}
+
+// GET /api/search?q=keyword&source=hd-home searches the installable packages
 func (s *webServer) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only GET is supported")
@@ -196,16 +323,47 @@ func (s *webServer) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "please provide the search keyword")
 		return
 	}
-
-	configDir, ok := s.ensureConfigCache()
-	if !ok {
-		writeError(w, http.StatusInternalServerError, "SEARCH_FAILED",
-			"failed to load the package index, please try again later")
+	sourceName := strings.TrimSpace(r.URL.Query().Get("source"))
+	if sourceName == "" {
+		sourceName = source.All
+	}
+	if !source.Known(sourceName) {
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid package source")
 		return
 	}
 
-	result := installer.FindByKeyword(keyword, configDir)
+	configDir := ""
+	if sourceName == source.All || sourceName == source.HDHome {
+		var ok bool
+		if configDir, ok = s.ensureConfigCache(); !ok {
+			writeError(w, http.StatusInternalServerError, "SEARCH_FAILED",
+				"failed to load the package index, please try again later")
+			return
+		}
+	}
+
+	result := installer.SearchSources(keyword, configDir, sourceName)
+	if sourceName == source.All || sourceName == source.NPM {
+		packages, err := s.searchNPM(r.Context(), keyword, 20)
+		if err != nil {
+			log.Printf("cannot search npm: %v", err)
+		}
+		result = append(result, npmResults(packages)...)
+	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"data": result})
+}
+
+func npmResults(packages []npmregistry.Package) (result []source.Result) {
+	for i := range packages {
+		result = append(result, source.Result{
+			Source:      source.NPM,
+			Name:        packages[i].Name,
+			Version:     packages[i].Version,
+			Description: packages[i].Description,
+			Homepage:    packages[i].Homepage,
+		})
+	}
+	return
 }
 
 // ensureConfigCache returns the local hd-home config directory, it fetches
@@ -236,11 +394,12 @@ func (s *webServer) handleCategories(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"data": installer.FindCategories()})
 }
 
-// packageItem is the API view of an installable package from hd-home
+// packageItem is the API view of an installable package
 type packageItem struct {
 	Org        string   `json:"org"`
 	Repo       string   `json:"repo"`
 	Name       string   `json:"name"`
+	Source     string   `json:"source"`
 	Categories []string `json:"categories,omitempty"`
 	Homepage   string   `json:"homepage,omitempty"`
 	// Web marks a package which has nothing to install, the UI opens its
@@ -270,12 +429,24 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 	}
 	category := strings.TrimSpace(r.URL.Query().Get("category"))
 	keyword := strings.TrimSpace(r.URL.Query().Get("q"))
-
-	configDir, ok := s.ensureConfigCache()
-	if !ok {
-		writeError(w, http.StatusInternalServerError, "PACKAGES_FAILED",
-			"failed to load the package index, please try again later")
+	sourceName := strings.TrimSpace(r.URL.Query().Get("source"))
+	if sourceName == "" {
+		sourceName = source.All
+	}
+	if !source.Known(sourceName) {
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid package source")
 		return
+	}
+
+	includeHDHome := sourceName == source.All || sourceName == source.HDHome
+	configDir := ""
+	if includeHDHome {
+		var ok bool
+		if configDir, ok = s.ensureConfigCache(); !ok {
+			writeError(w, http.StatusInternalServerError, "PACKAGES_FAILED",
+				"failed to load the package index, please try again later")
+			return
+		}
 	}
 
 	var orgRepos []string
@@ -286,14 +457,21 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 		for i := range packages {
 			orgRepos = append(orgRepos, packages[i].Org+"/"+packages[i].Repo)
 		}
-	case keyword != "":
+	case keyword != "" && includeHDHome:
 		orgRepos = installer.FindByKeyword(keyword, configDir)
-	default:
+	case keyword == "" && includeHDHome:
 		orgRepos = installer.FindAllPackages(configDir)
 	}
 
 	records := loadInstalledRecords()
 	installed := installedIndex(records)
+	installedByName := make(map[string]*installer.InstalledPackage, len(records))
+	for i := range records {
+		if records[i].Source == source.NPM || records[i].Source == source.Native {
+			installedByName[records[i].Name] = &records[i]
+		}
+	}
+
 	seen := make(map[string]bool, len(orgRepos))
 	items := make([]packageItem, 0, len(orgRepos)+len(records))
 	for _, orgRepo := range orgRepos {
@@ -302,7 +480,7 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		item := packageItem{Org: org, Repo: repo, Name: repo}
+		item := packageItem{Org: org, Repo: repo, Name: repo, Source: source.HDHome}
 		if config := installer.LoadPackageConfig(org, repo); config != nil {
 			if config.Name != "" {
 				item.Name = config.Name
@@ -313,11 +491,7 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 				config.Binary == "" && config.TargetBinary == "" && !config.FromSource
 		}
 		if record := installed[orgRepo]; record != nil {
-			item.Installed = true
-			item.Version = record.Version
-			item.InstalledName = record.Name
-			item.InstalledAt = record.InstalledAt
-			item.LaunchCommand = record.LaunchCommand
+			applyRecord(&item, record)
 		}
 		seen[orgRepo] = true
 		items = append(items, item)
@@ -326,7 +500,7 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 	// the unfiltered view also carries the installed tools which are not
 	// part of the hd-home cache, so nothing installed is lost from the
 	// merged list
-	if category == "" && keyword == "" {
+	if category == "" && keyword == "" && sourceName == source.All {
 		for i := range records {
 			record := records[i]
 			if record.Org != "" && record.Repo != "" && seen[record.Org+"/"+record.Repo] {
@@ -337,6 +511,7 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 				Org:           record.Org,
 				Repo:          record.Repo,
 				Name:          record.Name,
+				Source:        installer.SourceOfInstalled(record.Source),
 				Installed:     true,
 				Version:       record.Version,
 				InstalledName: record.Name,
@@ -346,10 +521,58 @@ func (s *webServer) handlePackages(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
+
+	// npm has a huge catalog, only query it when there is a keyword to
+	// search for
+	if keyword != "" && (sourceName == source.NPM || sourceName == source.All) {
+		packages, err := s.searchNPM(r.Context(), keyword, 20)
+		if err != nil {
+			log.Printf("cannot search npm: %v", err)
+		}
+		for _, result := range npmResults(packages) {
+			item := packageItem{
+				Name:    result.Name,
+				Source:  source.NPM,
+				Version: result.Version,
+			}
+			if result.Homepage != "" {
+				item.Homepage = result.Homepage
+			} else {
+				item.Homepage = "https://www.npmjs.com/package/" + result.Name
+			}
+			if record := installedByName[result.Name]; record != nil {
+				applyRecord(&item, record)
+			}
+			items = append(items, item)
+		}
+	}
+
+	if sourceName == source.Native || (sourceName == source.All && keyword != "") {
+		for _, result := range installer.SearchSources(keyword, configDir, source.Native) {
+			item := packageItem{Name: result.Name, Source: source.Native, Native: true}
+			if record := installedByName[result.Name]; record != nil {
+				applyRecord(&item, record)
+			}
+			items = append(items, item)
+		}
+	}
+
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].Org+"/"+items[i].Repo < items[j].Org+"/"+items[j].Repo
+		if items[i].Source != items[j].Source {
+			return items[i].Source < items[j].Source
+		}
+		return items[i].Org+"/"+items[i].Repo+items[i].Name <
+			items[j].Org+"/"+items[j].Repo+items[j].Name
 	})
 	writeJSON(w, http.StatusOK, map[string]interface{}{"data": items})
+}
+
+func applyRecord(item *packageItem, record *installer.InstalledPackage) {
+	item.Installed = true
+	item.Version = record.Version
+	item.InstalledName = record.Name
+	item.InstalledAt = record.InstalledAt
+	item.LaunchCommand = record.LaunchCommand
 }
 
 // versionTag is the API view of a release tag
@@ -508,6 +731,9 @@ func (s *webServer) handleTool(w http.ResponseWriter, r *http.Request) {
 		}
 		proxy := strings.TrimSpace(req.Proxy)
 		job := s.startJob("upgrade", name, func(stub *cobra.Command) error {
+			if tool.Source == source.NPM {
+				return s.installTool(stub, tool.Name, "", proxy, true, source.NPM, "")
+			}
 			return s.upgradeTool(stub, tool.Org, tool.Repo, proxy)
 		})
 		writeJSON(w, http.StatusAccepted, job)
@@ -634,6 +860,9 @@ func (s *webServer) streamJobLogs(w http.ResponseWriter, r *http.Request, job *w
 // startJob runs fn in the background with the process output captured into
 // the job logs. Only one job runs at a time.
 func (s *webServer) startJob(action, name string, fn func(stub *cobra.Command) error) *webJob {
+	if s.runJob != nil {
+		return s.runJob(action, name, fn)
+	}
 	s.mu.Lock()
 	s.nextID++
 	job := &webJob{ID: s.nextID, Action: action, Tool: name, Status: jobRunning}
@@ -727,9 +956,12 @@ func (s *webServer) loadTools() (tools []toolItem) {
 			Version:       pkg.Version,
 			Org:           pkg.Org,
 			Repo:          pkg.Repo,
+			Source:        installer.SourceOfInstalled(pkg.Source),
+			Mode:          pkg.Mode,
+			Host:          pkg.Host,
 			InstalledAt:   pkg.InstalledAt,
 			Directory:     pkg.TargetDirectory,
-			Upgradable:    pkg.Org != "" && pkg.Repo != "" && !pkg.Native,
+			Upgradable:    (pkg.Org != "" && pkg.Repo != "" || pkg.Source == source.NPM) && !pkg.Native,
 			LaunchCommand: pkg.LaunchCommand,
 		})
 	}
@@ -750,6 +982,9 @@ func (s *webServer) newInstallOption() *installOption {
 	opt.ShowProgress = false
 	opt.Download = true
 	opt.CleanPackage = true
+	opt.sourceName = source.HDHome
+	opt.target = configuredInstallDir()
+	opt.targetConfig = loadRemoteConfig()
 	// -1 means keeping the system default file permission, zero would
 	// make the downloaded package unreadable
 	opt.Mod = -1
@@ -759,18 +994,24 @@ func (s *webServer) newInstallOption() *installOption {
 // installTool installs a tool by its name, the same way as hd install.
 // The version is optional, when set it pins the release tag which covers
 // upgrades and downgrades. The proxy is optional, when set the release is
-// downloaded through the GitHub acceleration proxy.
-func (s *webServer) installTool(stub *cobra.Command, name, version, proxy string, force bool) (err error) {
+// downloaded through the GitHub acceleration proxy. source selects the
+// package registry and ssh_password is only used for a one-off SSH target.
+func (s *webServer) installTool(stub *cobra.Command, name, version, proxy string, force bool,
+	sourceName, sshPassword string) (err error) {
 	opt := s.newInstallOption()
 	opt.force = force
 	opt.ProxyGitHub = proxy
+	opt.sourceName = sourceName
+	if sshPassword != "" && opt.targetConfig.Mode == remote.ModeSSH {
+		opt.targetConfig.Password = sshPassword
+	}
 	if err = opt.preRunE(stub, []string{name}); err != nil {
 		return
 	}
 	if err = opt.install(stub, []string{name}); err != nil {
 		return
 	}
-	if version != "" {
+	if version != "" && sourceName == source.HDHome {
 		// the config cache may carry a different latest version than the
 		// pinned one, keep the installed record in sync with the request
 		if tool, _ := installer.FindInstalledPackage(opt.tool); tool != nil {
@@ -793,9 +1034,19 @@ func (s *webServer) upgradeTool(stub *cobra.Command, org, repo, proxy string) er
 
 // removeTool removes a tool the same way as hd remove
 func (s *webServer) removeTool(name string) (err error) {
+	tool, _ := installer.FindInstalledPackage(name)
+	if tool != nil && tool.Source == source.NPM {
+		if err = s.uninstallNPM(tool); err != nil {
+			return
+		}
+	}
 	opt := &removeOption{execer: s.execer}
 	stub := &cobra.Command{Use: "hd"}
 	stub.SetOut(io.Discard)
 	stub.SetErr(io.Discard)
 	return opt.runE(stub, []string{name})
+}
+
+func (s *webServer) uninstallNPM(tool *installer.InstalledPackage) error {
+	return uninstallNPMPackage(tool, s.execer)
 }

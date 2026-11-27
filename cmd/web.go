@@ -73,6 +73,9 @@ type toolItem struct {
 	Version     string `json:"version"`
 	Org         string `json:"org,omitempty"`
 	Repo        string `json:"repo,omitempty"`
+	Source      string `json:"source,omitempty"`
+	Mode        string `json:"mode,omitempty"`
+	Host        string `json:"host,omitempty"`
 	InstalledAt string `json:"installed_at,omitempty"`
 	Directory   string `json:"directory,omitempty"`
 	Upgradable  bool   `json:"upgradable"`

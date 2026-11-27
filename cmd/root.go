@@ -8,6 +8,8 @@ import (
 	"runtime"
 
 	"github.com/linuxsuren/http-downloader/pkg/log"
+	"github.com/linuxsuren/http-downloader/pkg/remote"
+	"github.com/linuxsuren/http-downloader/pkg/source"
 	"github.com/mitchellh/go-homedir"
 
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -54,6 +56,8 @@ func NewRoot(cxt context.Context) (cmd *cobra.Command) {
 		registerFlagCompletionFunc(c, "os", ArrayCompletion("window", "linux", "darwin"))
 		registerFlagCompletionFunc(c, "arch", ArrayCompletion("amd64", "arm64"))
 		registerFlagCompletionFunc(c, "format", ArrayCompletion("tar.gz", "zip", "msi"))
+		registerFlagCompletionFunc(c, "source", ArrayCompletion(source.All, source.HDHome, source.NPM, source.Native))
+		registerFlagCompletionFunc(c, "mode", ArrayCompletion(remote.ModeLocal, remote.ModeSSH))
 	}
 	return
 }
@@ -88,6 +92,12 @@ func loadConfig(v *viper.Viper) (err error) {
 	v.SetDefault("fetch", false)
 	v.SetDefault("goget", false)
 	v.SetDefault("no-proxy", false)
+	v.SetDefault(keyInstallDir, "")
+	v.SetDefault(keyInstallMode, remote.ModeLocal)
+	v.SetDefault(keySSHPort, 22)
+	v.SetDefault(keySSHUser, "root")
+	v.SetDefault(keySSHOS, "linux")
+	v.SetDefault(keySSHArch, "amd64")
 
 	thread := runtime.NumCPU()
 	if thread > 4 {

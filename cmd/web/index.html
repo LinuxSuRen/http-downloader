@@ -73,6 +73,10 @@
   dialog #cmd-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; margin: 10px 0 14px; }
   dialog pre { background: #f6f7f9; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-size: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; overflow-x: auto; margin: 10px 0 14px; text-align: left; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  dialog .field { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+  dialog .field label { font-size: 12px; color: var(--muted); }
+  dialog input[type=text], dialog input[type=password], dialog select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  .badge.source { background: #e0e7ff; color: #3730a3; }
 </style>
 </head>
 <body>
@@ -101,6 +105,13 @@
         <option value="__custom__">Custom…</option>
       </select>
       <input type="text" id="proxy-custom" placeholder="proxy host, e.g. gh.api.99988866.xyz" hidden>
+      <select id="source-select" title="Package source">
+        <option value="all">All sources</option>
+        <option value="hd-home">hd-home</option>
+        <option value="npm">npm</option>
+        <option value="native">native</option>
+      </select>
+      <button class="btn" id="settings-btn" title="Default install directory and install mode">Settings</button>
       <button class="btn" id="submit-btn" title="Share your own tool via the hd-home registry">Submit a tool</button>
     </div>
     <div class="chips" id="categories"></div>
@@ -165,6 +176,27 @@
     </div>
   </form>
 </dialog>
+<dialog id="settings-dialog">
+  <strong>Install settings</strong>
+  <p class="hint" style="margin:8px 0 0;">These defaults are shared with the <code>hd</code> CLI and saved in <code>~/.config/hd.yaml</code>.</p>
+  <div class="field"><label for="settings-install-dir">Default install directory</label><input type="text" id="settings-install-dir" placeholder="Leave empty for the platform default"></div>
+  <div class="field"><label for="settings-mode">Install mode</label>
+    <select id="settings-mode"><option value="local">Local machine</option><option value="ssh">SSH server (Linux)</option></select>
+  </div>
+  <div id="settings-ssh" hidden>
+    <div class="field"><label for="settings-ssh-host">SSH host</label><input type="text" id="settings-ssh-host" placeholder="10.0.0.1"></div>
+    <div class="field"><label for="settings-ssh-port">SSH port</label><input type="text" id="settings-ssh-port" placeholder="22"></div>
+    <div class="field"><label for="settings-ssh-user">SSH user</label><input type="text" id="settings-ssh-user" placeholder="root"></div>
+    <div class="field"><label for="settings-ssh-key">Private key file</label><input type="text" id="settings-ssh-key" placeholder="~/.ssh/id_rsa"></div>
+    <div class="field"><label for="settings-ssh-password">Password (optional, leave empty to keep the current one)</label><input type="password" id="settings-ssh-password"></div>
+    <div class="field"><label for="settings-ssh-os">Target OS</label><input type="text" id="settings-ssh-os" placeholder="linux"></div>
+    <div class="field"><label for="settings-ssh-arch">Target architecture</label><input type="text" id="settings-ssh-arch" placeholder="amd64"></div>
+  </div>
+  <div class="dialog-actions">
+    <button type="button" class="btn" id="settings-cancel">Cancel</button>
+    <button type="button" class="btn primary" id="settings-save">Save</button>
+  </div>
+</dialog>
 <dialog id="submit-dialog">
   <strong>Submit your tool</strong>
   <p class="hint" style="margin:8px 0 0;">Make your tool installable for every hd user: add a YAML config to the hd-home registry and open a pull request. The file lives at <code>config/$org/$repo.yml</code> in the hd-home repository, its contribution guide explains all fields.</p>
@@ -197,11 +229,15 @@ const texts = {
   stopFailed: 'Could not stop the tool. Please try again.',
   procLogsFailed: 'Could not load the tool output.',
   commandFailed: 'Could not save the launch command. Please try again.',
+  settingsFailed: 'Could not load the install settings.',
+  settingsSaved: 'Install settings saved.',
   jobFailed: 'The job did not finish successfully. Check the logs above for details.',
   streamFailed: 'Lost the connection to the log stream. Reconnecting is not available, refresh the page.',
 };
 
 let activeCategory = '';
+// hd-home, npm, native or all: kept in sync with the source selector
+let activeSource = 'all';
 let packageItems = [];
 // the category chips of the registry, kept once and re-ordered per view
 let allCategories = [];
@@ -350,6 +386,64 @@ document.getElementById('proxy-custom').addEventListener('change', () => {
   localStorage.setItem('hd-proxy-custom', document.getElementById('proxy-custom').value.trim());
 });
 
+document.getElementById('source-select').addEventListener('change', () => {
+  activeSource = document.getElementById('source-select').value;
+  pageNo = 1;
+  loadPackages();
+});
+
+// the install defaults are shared with the CLI through hd.yaml
+const settingsDialog = document.getElementById('settings-dialog');
+function showSSHSettings() {
+  document.getElementById('settings-ssh').hidden =
+    document.getElementById('settings-mode').value !== 'ssh';
+}
+document.getElementById('settings-btn').addEventListener('click', async () => {
+  let data;
+  try {
+    data = await api('GET', '/api/settings');
+  } catch (err) {
+    alert(friendly(err, texts.settingsFailed));
+    return;
+  }
+  const info = data.data || {};
+  document.getElementById('settings-install-dir').value = info.install_dir || '';
+  document.getElementById('settings-mode').value = info.mode || 'local';
+  document.getElementById('settings-ssh-host').value = info.ssh_host || '';
+  document.getElementById('settings-ssh-port').value = info.ssh_port || 22;
+  document.getElementById('settings-ssh-user').value = info.ssh_user || '';
+  document.getElementById('settings-ssh-key').value = info.ssh_key || '';
+  document.getElementById('settings-ssh-password').value = '';
+  document.getElementById('settings-ssh-os').value = info.ssh_os || 'linux';
+  document.getElementById('settings-ssh-arch').value = info.ssh_arch || 'amd64';
+  showSSHSettings();
+  settingsDialog.showModal();
+});
+document.getElementById('settings-mode').addEventListener('change', showSSHSettings);
+document.getElementById('settings-cancel').addEventListener('click', () => settingsDialog.close('cancel'));
+document.getElementById('settings-save').addEventListener('click', async () => {
+  const port = parseInt(document.getElementById('settings-ssh-port').value, 10);
+  const body = {
+    install_dir: document.getElementById('settings-install-dir').value.trim(),
+    mode: document.getElementById('settings-mode').value,
+    ssh_host: document.getElementById('settings-ssh-host').value.trim(),
+    ssh_port: Number.isNaN(port) ? 22 : port,
+    ssh_user: document.getElementById('settings-ssh-user').value.trim(),
+    ssh_key: document.getElementById('settings-ssh-key').value.trim(),
+    ssh_os: document.getElementById('settings-ssh-os').value.trim(),
+    ssh_arch: document.getElementById('settings-ssh-arch').value.trim(),
+  };
+  const password = document.getElementById('settings-ssh-password').value;
+  if (password) body.ssh_password = password;
+  try {
+    await api('PUT', '/api/settings', body);
+    settingsDialog.close('save');
+    alert(texts.settingsSaved);
+  } catch (err) {
+    alert(friendly(err, texts.settingsFailed));
+  }
+});
+
 async function loadCategories() {
   let data;
   try {
@@ -430,11 +524,13 @@ async function loadPackages() {
   let url = '/api/packages';
   if (activeCategory) {
     url += '?category=' + encodeURIComponent(activeCategory);
+    if (activeSource !== 'all') url += '&source=' + encodeURIComponent(activeSource);
   } else {
     const keyword = document.getElementById('search-keyword').value.trim();
-    if (keyword) {
-      url += '?q=' + encodeURIComponent(keyword);
-    }
+    const params = [];
+    if (keyword) params.push('q=' + encodeURIComponent(keyword));
+    if (activeSource !== 'all') params.push('source=' + encodeURIComponent(activeSource));
+    if (params.length > 0) url += '?' + params.join('&');
   }
 
   let data;
@@ -455,14 +551,22 @@ function recordName(item) {
 }
 
 function packageActions(item) {
+  const fromHDHome = (item.source || 'hd-home') === 'hd-home';
+  const fromNPM = item.source === 'npm';
   const link = /^https?:\/\//i.test(item.homepage || '')
     ? `<a class="btn" href="${esc(item.homepage)}" target="_blank" rel="noopener noreferrer">Open link</a>` : '';
-  const install = item.web || !(item.org && item.repo) ? '' : `
+  let install = '';
+  if (!item.web && fromHDHome && item.org && item.repo) {
+    install = `
       <select class="ver" data-org="${esc(item.org)}" data-repo="${esc(item.repo)}" title="Release version, latest by default">
         <option value="">latest</option>
       </select>
-      <button class="btn primary" data-install="${esc(item.org)}/${esc(item.repo)}">Install</button>`;
-  const upgradable = item.installed && item.org && item.repo && !item.native;
+      <button class="btn primary" data-install="${esc(item.org)}/${esc(item.repo)}" data-source="hd-home">Install</button>`;
+  } else if (fromNPM && item.name) {
+    install = `<button class="btn primary" data-install="${esc(item.name)}" data-source="npm">Install</button>`;
+  }
+  const upgradable = item.installed && !item.native &&
+    ((fromHDHome && item.org && item.repo) || fromNPM);
   const record = item.installed ? `
       ${runAction(recordName(item))}
       <button class="btn" data-action="command" data-name="${esc(recordName(item))}" title="${esc(item.launch_command ? 'Launch command: ' + item.launch_command : 'Set the launch command of the tool')}">Cmd</button>
@@ -493,9 +597,14 @@ function packageInstalled(item) {
 }
 
 function packageSource(item) {
-  return item.org && item.repo
-    ? `<a class="silent" href="https://github.com/${esc(item.org)}/${esc(item.repo)}" target="_blank" rel="noopener noreferrer">${esc(item.org)}/${esc(item.repo)}</a>`
-    : (item.native ? 'native' : '');
+  const badge = `<span class="badge source">${esc(item.source || 'hd-home')}</span>`;
+  if (item.org && item.repo) {
+    return badge + ` <a class="silent" href="https://github.com/${esc(item.org)}/${esc(item.repo)}" target="_blank" rel="noopener noreferrer">${esc(item.org)}/${esc(item.repo)}</a>`;
+  }
+  if (item.homepage) {
+    return badge + ` <a class="silent" href="${esc(item.homepage)}" target="_blank" rel="noopener noreferrer">${esc(item.name)}</a>`;
+  }
+  return badge + ` ${esc(item.name || '')}`;
 }
 
 function renderPackages(items) {
@@ -578,7 +687,8 @@ document.getElementById('packages-card').addEventListener('click', async ev => {
     const version = selectEl ? selectEl.value : '';
     const force = document.getElementById('force-install').checked;
     startJob('POST', '/api/tools',
-      {name: installBtn.dataset.install, version, proxy: currentProxy(), force}, texts.installFailed);
+      {name: installBtn.dataset.install, version, proxy: currentProxy(), force,
+        source: installBtn.dataset.source || 'hd-home'}, texts.installFailed);
     return;
   }
 

@@ -20,6 +20,11 @@ type InstalledPackage struct {
 	InstalledAt     string   `yaml:"installedAt,omitempty" json:"installedAt,omitempty"`
 	FromSource      bool     `yaml:"fromSource,omitempty" json:"fromSource,omitempty"`
 	Native          bool     `yaml:"native,omitempty" json:"native,omitempty"`
+	// Source is the registry the package came from: hd-home, npm or native
+	Source string `yaml:"source,omitempty" json:"source,omitempty"`
+	// Mode is local by default, ssh records point at a remote target
+	Mode string `yaml:"mode,omitempty" json:"mode,omitempty"`
+	Host string `yaml:"host,omitempty" json:"host,omitempty"`
 	// LaunchCommand is the argument string passed to the binary when the
 	// tool starts from the web console, empty starts the tool plain
 	LaunchCommand string `yaml:"launchCommand,omitempty" json:"launchCommand,omitempty"`
