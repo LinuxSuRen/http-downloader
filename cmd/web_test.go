@@ -1,17 +1,20 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -797,4 +800,152 @@ func TestWebToolsInstallSource(t *testing.T) {
 	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&job))
 	assert.Equal(t, "install", job.Action)
 	assert.Equal(t, "chalk", job.Tool)
+}
+
+func busyPortError() error {
+	return &net.OpError{Op: "listen", Net: "tcp", Err: syscall.EADDRINUSE}
+}
+
+func TestListenWithDrift(t *testing.T) {
+	free, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	t.Cleanup(func() { _ = free.Close() })
+
+	var requested []string
+	opt := &webOption{
+		Listen:            "127.0.0.1",
+		Port:              39000,
+		PortDrift:         true,
+		PortDriftAttempts: 4,
+		listen: func(network, address string) (net.Listener, error) {
+			assert.Equal(t, "tcp", network)
+			requested = append(requested, address)
+			if len(requested) < 3 {
+				return nil, busyPortError()
+			}
+			return free, nil
+		},
+	}
+	listener, port, err := opt.listenWithDrift()
+	assert.NoError(t, err)
+	assert.Equal(t, 39002, port)
+	assert.Equal(t, free, listener)
+	assert.Equal(t, []string{
+		"127.0.0.1:39000", "127.0.0.1:39001", "127.0.0.1:39002",
+	}, requested)
+}
+
+func TestListenWithDriftDisabled(t *testing.T) {
+	calls := 0
+	opt := &webOption{
+		Listen: "127.0.0.1",
+		Port:   39000,
+		listen: func(string, string) (net.Listener, error) {
+			calls++
+			return nil, busyPortError()
+		},
+	}
+	_, _, err := opt.listenWithDrift()
+	assert.ErrorIs(t, err, syscall.EADDRINUSE)
+	assert.Equal(t, 1, calls, "a disabled drift must not try other ports")
+}
+
+func TestListenWithDriftErrors(t *testing.T) {
+	t.Run("unrelated errors are not retried", func(t *testing.T) {
+		boom := errors.New("boom")
+		calls := 0
+		opt := &webOption{
+			Listen:    "127.0.0.1",
+			Port:      39000,
+			PortDrift: true,
+			listen: func(string, string) (net.Listener, error) {
+				calls++
+				return nil, boom
+			},
+		}
+		_, _, err := opt.listenWithDrift()
+		assert.ErrorIs(t, err, boom)
+		assert.Equal(t, 1, calls)
+	})
+
+	t.Run("all ports busy", func(t *testing.T) {
+		opt := &webOption{
+			Listen:            "127.0.0.1",
+			Port:              39000,
+			PortDrift:         true,
+			PortDriftAttempts: 2,
+			listen: func(string, string) (net.Listener, error) {
+				return nil, busyPortError()
+			},
+		}
+		_, _, err := opt.listenWithDrift()
+		assert.ErrorContains(t, err, "no available port in range 39000-39001")
+	})
+
+	t.Run("invalid port", func(t *testing.T) {
+		opt := &webOption{Listen: "127.0.0.1", Port: 0}
+		_, _, err := opt.listenWithDrift()
+		assert.ErrorContains(t, err, "invalid port")
+	})
+
+	t.Run("invalid attempt count falls back to a single try", func(t *testing.T) {
+		calls := 0
+		opt := &webOption{
+			Listen:            "127.0.0.1",
+			Port:              39000,
+			PortDrift:         true,
+			PortDriftAttempts: -1,
+			listen: func(string, string) (net.Listener, error) {
+				calls++
+				return nil, busyPortError()
+			},
+		}
+		_, _, err := opt.listenWithDrift()
+		assert.Error(t, err)
+		assert.Equal(t, 1, calls)
+	})
+}
+
+func TestWebCmdPortDrift(t *testing.T) {
+	free, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	t.Cleanup(func() { _ = free.Close() })
+
+	server := newWebServer(context.Background())
+	var served *http.Server
+	opt := &webOption{
+		Listen:            "127.0.0.1",
+		Port:              39000,
+		PortDrift:         true,
+		PortDriftAttempts: 2,
+		server:            server,
+		listen: func(_, address string) (net.Listener, error) {
+			if address == "127.0.0.1:39000" {
+				return nil, busyPortError()
+			}
+			return free, nil
+		},
+		serve: func(s *http.Server, _ net.Listener) error {
+			served = s
+			return nil
+		},
+	}
+	cmd := &cobra.Command{}
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	assert.NoError(t, opt.runE(cmd, nil))
+	assert.Equal(t, 39001, server.selfPort, "the console must not detect itself as a tool")
+	assert.Contains(t, buf.String(), "port 39000 is in use, drifting to 39001")
+	assert.Contains(t, buf.String(), "web server is running at http://")
+	assert.NotNil(t, served)
+	assert.NotZero(t, served.ReadHeaderTimeout)
+}
+
+func TestNewWebCmdPortDriftFlags(t *testing.T) {
+	cmd := newWebCmd(context.Background())
+	for _, name := range []string{"port-drift", "port-drift-attempts"} {
+		assert.NotNil(t, cmd.Flags().Lookup(name), name)
+	}
+	assert.Equal(t, "true", cmd.Flags().Lookup("port-drift").DefValue)
+	assert.Equal(t, "100", cmd.Flags().Lookup("port-drift-attempts").DefValue)
 }

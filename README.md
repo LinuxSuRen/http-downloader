@@ -136,6 +136,8 @@ Use the browser as the central entry of your tools:
 hd web
 ```
 
+If the port is already in use, `hd web` automatically drifts to the next free port (up to 100 consecutive ports) and prints the actual address. Pass `--port-drift=false` to fail instead, or `--port-drift-attempts N` to change the number of ports tried.
+
 Then open http://127.0.0.1:8080, you can:
 
 * see all the tools in one list, installed and not-installed ones together, the green badge tells them apart and the list sorts by name in both directions
