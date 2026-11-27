@@ -14,7 +14,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -802,11 +801,21 @@ func TestWebToolsInstallSource(t *testing.T) {
 	assert.Equal(t, "chalk", job.Tool)
 }
 
-func busyPortError() error {
-	return &net.OpError{Op: "listen", Net: "tcp", Err: syscall.EADDRINUSE}
+// occupyPort binds a real port. The resulting errors come from the same
+// network stack as in production, which matters on Windows where the
+// Winsock error differs from syscall.EADDRINUSE.
+func occupyPort(t *testing.T) (int, string) {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	return listener.Addr().(*net.TCPAddr).Port, listener.Addr().String()
 }
 
 func TestListenWithDrift(t *testing.T) {
+	_, busyAddr := occupyPort(t)
 	free, err := net.Listen("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)
 	t.Cleanup(func() { _ = free.Close() })
@@ -821,7 +830,7 @@ func TestListenWithDrift(t *testing.T) {
 			assert.Equal(t, "tcp", network)
 			requested = append(requested, address)
 			if len(requested) < 3 {
-				return nil, busyPortError()
+				return net.Listen(network, busyAddr)
 			}
 			return free, nil
 		},
@@ -836,17 +845,19 @@ func TestListenWithDrift(t *testing.T) {
 }
 
 func TestListenWithDriftDisabled(t *testing.T) {
+	_, busyAddr := occupyPort(t)
 	calls := 0
 	opt := &webOption{
 		Listen: "127.0.0.1",
 		Port:   39000,
-		listen: func(string, string) (net.Listener, error) {
+		listen: func(network, _ string) (net.Listener, error) {
 			calls++
-			return nil, busyPortError()
+			return net.Listen(network, busyAddr)
 		},
 	}
 	_, _, err := opt.listenWithDrift()
-	assert.ErrorIs(t, err, syscall.EADDRINUSE)
+	assert.Error(t, err)
+	assert.True(t, isAddrInUse(err), "the real bind error must be recognized as an occupied port")
 	assert.Equal(t, 1, calls, "a disabled drift must not try other ports")
 }
 
@@ -869,13 +880,14 @@ func TestListenWithDriftErrors(t *testing.T) {
 	})
 
 	t.Run("all ports busy", func(t *testing.T) {
+		_, busyAddr := occupyPort(t)
 		opt := &webOption{
 			Listen:            "127.0.0.1",
 			Port:              39000,
 			PortDrift:         true,
 			PortDriftAttempts: 2,
-			listen: func(string, string) (net.Listener, error) {
-				return nil, busyPortError()
+			listen: func(network, _ string) (net.Listener, error) {
+				return net.Listen(network, busyAddr)
 			},
 		}
 		_, _, err := opt.listenWithDrift()
@@ -889,15 +901,16 @@ func TestListenWithDriftErrors(t *testing.T) {
 	})
 
 	t.Run("invalid attempt count falls back to a single try", func(t *testing.T) {
+		_, busyAddr := occupyPort(t)
 		calls := 0
 		opt := &webOption{
 			Listen:            "127.0.0.1",
 			Port:              39000,
 			PortDrift:         true,
 			PortDriftAttempts: -1,
-			listen: func(string, string) (net.Listener, error) {
+			listen: func(network, _ string) (net.Listener, error) {
 				calls++
-				return nil, busyPortError()
+				return net.Listen(network, busyAddr)
 			},
 		}
 		_, _, err := opt.listenWithDrift()
@@ -907,6 +920,7 @@ func TestListenWithDriftErrors(t *testing.T) {
 }
 
 func TestWebCmdPortDrift(t *testing.T) {
+	_, busyAddr := occupyPort(t)
 	free, err := net.Listen("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)
 	t.Cleanup(func() { _ = free.Close() })
@@ -919,9 +933,9 @@ func TestWebCmdPortDrift(t *testing.T) {
 		PortDrift:         true,
 		PortDriftAttempts: 2,
 		server:            server,
-		listen: func(_, address string) (net.Listener, error) {
+		listen: func(network, address string) (net.Listener, error) {
 			if address == "127.0.0.1:39000" {
-				return nil, busyPortError()
+				return net.Listen(network, busyAddr)
 			}
 			return free, nil
 		},
@@ -939,6 +953,36 @@ func TestWebCmdPortDrift(t *testing.T) {
 	assert.Contains(t, buf.String(), "web server is running at http://")
 	assert.NotNil(t, served)
 	assert.NotZero(t, served.ReadHeaderTimeout)
+}
+
+func TestWebCmdPortDriftWithRealSockets(t *testing.T) {
+	busyPort, _ := occupyPort(t)
+	if busyPort > maxTCPPort-10 {
+		t.Skip("not enough ports left above the occupied one")
+	}
+
+	server := newWebServer(context.Background())
+	served := false
+	opt := &webOption{
+		Listen:            "127.0.0.1",
+		Port:              busyPort,
+		PortDrift:         true,
+		PortDriftAttempts: 10,
+		server:            server,
+		serve: func(*http.Server, net.Listener) error {
+			served = true
+			return nil
+		},
+	}
+	cmd := &cobra.Command{}
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	assert.NoError(t, opt.runE(cmd, nil))
+	assert.Greater(t, server.selfPort, busyPort)
+	assert.LessOrEqual(t, server.selfPort, busyPort+9)
+	assert.Contains(t, buf.String(),
+		fmt.Sprintf("port %d is in use, drifting to %d", busyPort, server.selfPort))
+	assert.True(t, served)
 }
 
 func TestNewWebCmdPortDriftFlags(t *testing.T) {

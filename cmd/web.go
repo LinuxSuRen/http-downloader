@@ -5,12 +5,10 @@ import (
 	// _ "embed" is required by the go:embed directive below to serve the web console
 	_ "embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/linuxsuren/http-downloader/docs"
@@ -94,7 +92,7 @@ func (o *webOption) listenWithDrift() (listener net.Listener, actualPort int, er
 		if err == nil {
 			return listener, lastPort, nil
 		}
-		if !o.PortDrift || !errors.Is(err, syscall.EADDRINUSE) {
+		if !o.PortDrift || !isAddrInUse(err) {
 			return nil, 0, err
 		}
 	}
