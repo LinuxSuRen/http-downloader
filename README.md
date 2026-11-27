@@ -141,7 +141,7 @@ If the port is already in use, `hd web` automatically drifts to the next free po
 Then open http://127.0.0.1:8080, you can:
 
 * see all the tools in one list, installed and not-installed ones together, the green badge tells them apart and the list sorts by name in both directions
-* search the packages or browse them by category, shown as a table or as cards, with a source selector for hd-home, npm and native packages
+* search the packages or browse them by category, shown as cards by default (table view is one click away), with a source selector for hd-home, npm and native packages
 * install a package with any release version, which also covers upgrades and downgrades
 * pick a GitHub acceleration proxy for the downloads, the candidates come from your hd config and from hd-home, a custom address also works
 * change the default install directory and switch between local and SSH installs in Settings; the settings are shared with the CLI through `~/.config/hd.yaml`

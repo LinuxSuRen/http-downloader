@@ -993,3 +993,9 @@ func TestNewWebCmdPortDriftFlags(t *testing.T) {
 	assert.Equal(t, "true", cmd.Flags().Lookup("port-drift").DefValue)
 	assert.Equal(t, "100", cmd.Flags().Lookup("port-drift-attempts").DefValue)
 }
+
+func TestWebDefaultViewIsCards(t *testing.T) {
+	html := string(webIndexHTML)
+	assert.Contains(t, html, "return 'cards';")
+	assert.NotContains(t, html, "window.innerWidth < 1024 ? 'cards' : 'table'")
+}

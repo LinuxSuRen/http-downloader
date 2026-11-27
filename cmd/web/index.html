@@ -245,12 +245,11 @@ let allCategories = [];
 // Start/Stop actions of the package list
 let runningProcs = {};
 
-// the view preference of the user wins over the viewport width, which is
-// only read once when the page loads
+// the view preference of the user wins over the default, which is cards
 function initialView() {
   const saved = localStorage.getItem('hd-view');
   if (saved === 'table' || saved === 'cards') return saved;
-  return window.innerWidth < 1024 ? 'cards' : 'table';
+  return 'cards';
 }
 let viewMode = initialView();
 
