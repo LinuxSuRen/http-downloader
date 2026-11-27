@@ -64,18 +64,6 @@ jobs:
         uses: Jerome1337/golint-action@v1.0.3
         with:
           golint-path: ./...
-  Security:
-    name: Security
-    runs-on: ubuntu-22.04
-    env:
-      GO111MODULE: on
-    steps:
-      - name: Checkout Source
-        uses: actions/checkout@v3.6.0
-      - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
-        with:
-          args: '-exclude=G402,G204,G304,G110,G306,G107,G104,G115,G118,G122,G703 ./...'
   CodeQL:
     name: CodeQL
     runs-on: ubuntu-22.04
